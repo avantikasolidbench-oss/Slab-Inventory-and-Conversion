@@ -838,6 +838,11 @@ async function doLogin(){
   }
   document.querySelector('.role-grid').style.outline='';
   if(!pin){document.getElementById('lg-err').textContent='Please enter your PIN';return;}
+  if(!CFG.url){
+    document.getElementById('lg-err').textContent='API URL not set — tap ⚙ Settings';
+    showCfg();
+    return;
+  }
   try{
     const r=await apiGet({action:'verifyPIN',pin});
     if(r.success) enterApp(r.role||selRole);
@@ -884,7 +889,7 @@ function goTo(s){
 
 // ── API ──────────────────────────────────────────────────
 async function apiGet(p){
-  if(!CFG.url){showCfg();throw new Error('No URL');}
+  if(!CFG.url) throw new Error('No URL configured');
   const qs=Object.entries(p).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
   const r=await fetch(CFG.url+'?'+qs);
   return r.json();
@@ -1390,7 +1395,6 @@ async function loadBatTable(){
       const rem=parseFloat(b.remainingCBM);
       const woodVal=parseFloat(b.woodValue||b.taxableValue||0);
       const isCN=!!b.isCreditNote;
-      const rem=parseFloat(b.remainingCBM);
       const st=isCN
         ? '<span class="badge br">⊖ Credit Note</span>'
         : rem<0?'<span class="badge br">Over-issued</span>'
