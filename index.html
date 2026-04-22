@@ -324,13 +324,17 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
               </div>
             </div>
 
-            <!-- Mass-assign batch bar -->            <div id="mass-assign-bar" style="background:var(--paper);border:1px solid var(--rule);border-radius:3px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-              <span style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;white-space:nowrap">Assign Batch to All Rows:</span>
-              <select id="mass-batch-sel" style="flex:1;min-width:280px;background:white;border:1.5px solid var(--rule);color:var(--ink);padding:7px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;cursor:pointer">
-                <option value="">— Select batch to apply to all rows —</option>
+            <!-- Mass-assign bar -->
+            <div id="mass-assign-bar" style="background:var(--paper);border:1px solid var(--rule);border-radius:3px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;white-space:nowrap">Assign to All:</span>
+              <select id="mass-batch-sel" style="flex:1;min-width:220px;background:white;border:1.5px solid var(--rule);color:var(--ink);padding:7px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;cursor:pointer">
+                <option value="">— Batch —</option>
               </select>
-              <button class="btn btn-s btn-sm" onclick="massAssignBatch()">Apply to All</button>
-              <span style="font-size:11px;color:var(--ink3)">or set per row individually below</span>
+              <select id="mass-cat-sel" style="flex:0 0 180px;background:white;border:1.5px solid var(--rule);color:var(--ink);padding:7px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;cursor:pointer">
+                <option value="">— Category —</option>
+              </select>
+              <button class="btn btn-s btn-sm" onclick="massAssignAll()">Apply to All</button>
+              <span style="font-size:11px;color:var(--ink3)">or set per row below</span>
             </div>
 
             <!-- Table -->
@@ -345,7 +349,8 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
                   <th style="width:90px">Cost ₹</th>
                   <th style="width:100px">Species</th>
                   <th style="width:130px">Client</th>
-                  <th style="width:200px">Batch / Invoice</th>
+                  <th style="width:160px">Category</th>
+                  <th style="width:190px">Batch / Invoice</th>
                   <th style="width:36px"></th>
                 </tr></thead>
                 <tbody id="slab-tbody"></tbody>
@@ -389,29 +394,47 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
             <div class="card" id="form-pur" style="display:none;margin:0">
               <div class="ch"><span class="ct">Review &amp; Confirm</span></div>
               <div class="cb">
+                <!-- Credit note banner -->
+                <div id="cn-banner" class="alert a-warn" style="display:none;margin-bottom:12px">
+                  <span style="font-size:18px">⚠️</span>
+                  <div><strong>Credit Note</strong> — CBM &amp; value will be subtracted from the linked batch.<br><span style="font-size:11px">Verify the linked invoice number below.</span></div>
+                </div>
                 <div class="g2 mb12">
                   <div class="field"><label>Vendor Name</label><input type="text" id="p-vendor"></div>
                   <div class="field"><label>Invoice No.</label><input type="text" id="p-invno"></div>
                 </div>
                 <div class="g2 mb12">
                   <div class="field"><label>Invoice Date</label><input type="date" id="p-date"></div>
-                  <div class="field"><label>Species</label>
-                    <select id="p-species"><option>White Oak</option><option>White Ash</option><option>Teak</option><option>Sheesham</option><option>Walnut</option><option>Mixed</option></select>
+                  <div id="p-linked-row" style="display:none">
+                    <div class="field"><label>Linked Original Invoice No.</label><input type="text" id="p-linked" placeholder="e.g. DL/PTIPL-21" style="background:#fef8e8;border:1.5px solid var(--amber)"></div>
                   </div>
                 </div>
-                <div class="g3 mb12">
-                  <div class="field"><label>Total CBM</label><input type="number" id="p-cbm" step="0.0001" oninput="calcRate()"></div>
-                  <div class="field"><label>No. of Slabs</label><input type="number" id="p-pcs"></div>
-                  <div class="field"><label>Thickness mm</label><input type="number" id="p-thick"></div>
+
+                <!-- Species line items table -->
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--ink3);font-weight:600;margin-bottom:8px">
+                  Wood Species &amp; Quantities
+                  <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;color:var(--ink3)"> — one row per species. Each saves as a separate batch.</span>
                 </div>
-                <div class="g2 mb12">
-                  <div class="field"><label>Taxable Value ₹ (excl GST)</label><input type="number" id="p-tax" oninput="calcRate()"></div>
-                  <div class="field"><label>Rate / CBM ₹ (auto)</label><input type="number" id="p-rate" style="background:#fdf5ec;font-weight:600"></div>
-                </div>
-                <div class="field mb16"><label>Quality Notes</label><textarea id="p-notes" placeholder="Any issues with this batch?"></textarea></div>
+                <table style="width:100%;border-collapse:collapse;margin-bottom:8px" id="pur-species-tbl">
+                  <thead>
+                    <tr style="background:var(--paper)">
+                      <th style="text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:2px solid var(--rule)">Species</th>
+                      <th style="text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:2px solid var(--rule)">CBM</th>
+                      <th style="text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:2px solid var(--rule)">Slabs</th>
+                      <th style="text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:2px solid var(--rule)">Thick mm</th>
+                      <th style="text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:2px solid var(--rule)">Taxable ₹</th>
+                      <th style="text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:2px solid var(--rule)">Rate/CBM ₹</th>
+                      <th style="width:30px;border-bottom:2px solid var(--rule)"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="pur-species-tbody"></tbody>
+                </table>
+                <button class="btn btn-g btn-sm" onclick="addPurSpeciesRow()" style="margin-bottom:16px">+ Add Species</button>
+
+                <div class="field mb16"><label>Quality Notes (applies to all)</label><textarea id="p-notes" placeholder="Any quality issues with this batch?"></textarea></div>
                 <div style="display:flex;gap:8px;justify-content:flex-end">
                   <button class="btn btn-s" onclick="resetPur()">Clear</button>
-                  <button class="btn btn-p" onclick="saveBatch()">💾 Save Batch</button>
+                  <button class="btn btn-p" onclick="saveBatch()">💾 Save All Batches</button>
                 </div>
               </div>
             </div>
@@ -511,6 +534,7 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
             <div style="display:flex;gap:0;border-bottom:none">
               <button class="tab active" id="dtab-client" onclick="switchDashTab('client')" style="padding:14px 20px;margin-bottom:0">By Client</button>
               <button class="tab" id="dtab-species" onclick="switchDashTab('species')" style="padding:14px 20px;margin-bottom:0">By Species</button>
+              <button class="tab" id="dtab-category" onclick="switchDashTab('category')" style="padding:14px 20px;margin-bottom:0">By Category</button>
             </div>
           </div>
           <!-- By client -->
@@ -520,6 +544,10 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
           <!-- By species -->
           <div id="dpanel-species" style="display:none" class="cb">
             <div id="species-conv-list" style="min-height:80px"><div style="text-align:center;padding:24px;color:var(--ink3)">Loading…</div></div>
+          </div>
+          <!-- By category -->
+          <div id="dpanel-category" style="display:none" class="cb">
+            <div id="category-conv-list" style="min-height:80px"><div style="text-align:center;padding:24px;color:var(--ink3)">Loading…</div></div>
           </div>
         </div>
 
@@ -686,7 +714,7 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
               <thead><tr>
                 <th style="width:24px"></th>
                 <th>Date</th><th>Dimensions mm</th><th>CBM</th><th>Cost ₹</th>
-                <th>Client</th><th>Species</th><th>Batch</th>
+                <th>Client</th><th>Species</th><th>Category</th><th>Batch</th>
                 <th style="width:56px"></th>
               </tr></thead>
               <tbody id="log-tbody"><tr><td colspan="9" style="text-align:center;padding:32px;color:var(--ink3)">Loading…</td></tr></tbody>
@@ -726,6 +754,15 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
           <select id="ep-species" style="background:var(--paper);border:1.5px solid var(--rule);color:var(--ink);padding:9px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;width:100%">
             <option value="">— select —</option>
             <option>White Oak</option><option>White Ash</option><option>Teak</option><option>Sheesham</option><option>Walnut</option><option>Mixed</option>
+          </select>
+        </div>
+        <div class="field mb12"><label>Category</label>
+          <select id="ep-category" style="background:var(--paper);border:1.5px solid var(--rule);color:var(--ink);padding:9px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;width:100%">
+            <option value="">— select —</option>
+            <option>Chair</option><option>Dining Table</option><option>Coffee Table</option>
+            <option>Side Table</option><option>Study Table</option><option>Bar Stool</option>
+            <option>Bench</option><option>Lounger / Sofa</option><option>Console / Cabinet</option>
+            <option>Other</option>
           </select>
         </div>
         <div class="field mb20"><label>Batch / Invoice</label>
@@ -853,7 +890,9 @@ async function apiPost(d){
 // ── BATCHES ──────────────────────────────────────────────
 async function loadBatches(){
   const msel=document.getElementById('mass-batch-sel');
+  const mcatsel=document.getElementById('mass-cat-sel');
   if(msel) msel.innerHTML='<option value="">— Loading… —</option>';
+  if(mcatsel) mcatsel.innerHTML='<option value="">— Category —</option>'+CATEGORIES.map(c=>`<option>${c}</option>`).join('');
   try{
     const r=await apiGet({action:'getBatches'});
     ST.batches=r.batches||[];
@@ -919,18 +958,54 @@ function massAssignBatch(){
   toast('Batch assigned to all rows ✓','ok');
 }
 // ── STORE ROWS ───────────────────────────────────────────
+const CATEGORIES = [
+  'Chair','Dining Table','Coffee Table','Side Table',
+  'Study Table','Bar Stool','Bench','Lounger / Sofa',
+  'Console / Cabinet','Other'
+];
 let rid=0;
+
+function catOpts(selVal){
+  return '<option value="">— category —</option>'+
+    CATEGORIES.map(c=>`<option ${c===selVal?'selected':''}>${c}</option>`).join('');
+}
 function batchOpts(selVal){
   return '<option value="">— batch —</option>'+
     ST.batches.map(b=>`<option value="${b.invoiceNo}" ${b.invoiceNo===selVal?'selected':''}>${b.invoiceNo} · ${b.species}</option>`).join('');
 }
-function addRow(preselBatch){
+
+function massAssignAll(){
+  const inv = document.getElementById('mass-batch-sel').value;
+  const cat = document.getElementById('mass-cat-sel').value;
+  if(!inv&&!cat){toast('Select a batch or category to apply','err');return;}
+  const b = inv ? ST.batches.find(x=>x.invoiceNo===inv) : null;
+  document.querySelectorAll('[id$="b"]').forEach(el=>{
+    const id=el.id.replace('b','');
+    if(!isNaN(id)&&parseInt(id)>0){
+      if(inv){ el.value=inv; el.style.borderColor=''; el.style.background='';
+        if(b&&b.species){ const sp=document.getElementById(id+'sp'); if(sp&&!sp.value) sp.value=b.species; }
+        cr(parseInt(id));
+      }
+    }
+  });
+  if(cat){
+    document.querySelectorAll('[id$="cat"]').forEach(el=>{
+      const id=el.id.replace('cat','');
+      if(!isNaN(id)&&parseInt(id)>0) el.value=cat;
+    });
+  }
+  toast(`${inv?'Batch':''}${inv&&cat?' + ':''}${cat?'Category':''} applied to all rows ✓`,'ok');
+}
+
+// Keep old name for compatibility
+function massAssignBatch(){ massAssignAll(); }
+
+function addRow(preselBatch, preselCat){
   const today=new Date().toISOString().split('T')[0];
   const id=++rid;
   const copts=(ST.clients||[]).map(c=>`<option>${c}</option>`).join('');
   const speciesOpts=['White Oak','White Ash','Teak','Sheesham','Walnut','Mixed']
     .map(s=>`<option>${s}</option>`).join('');
-  // Pre-fill species from batch if known
   const b=preselBatch?ST.batches.find(x=>x.invoiceNo===preselBatch):null;
   const preSpecies=b?b.species:'';
   const tr=document.createElement('tr');
@@ -942,12 +1017,12 @@ function addRow(preselBatch){
     <td><input type="number" placeholder="52" id="${id}t" oninput="cr(${id})" style="width:72px"></td>
     <td class="cc" id="${id}cbm">—</td>
     <td class="costc" id="${id}cost">—</td>
-    <td><select id="${id}sp" style="width:96px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;color:var(--ink)"><option value="">—</option>${speciesOpts}</select></td>
-    <td><input type="text" placeholder="Client name" id="${id}c" list="clist" style="width:126px"><datalist id="clist">${copts}</datalist></td>
-    <td><select id="${id}b" onchange="onRowBatchChange(${id})" style="width:196px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;color:var(--ink3)">${batchOpts(preselBatch||'')}</select></td>
+    <td><select id="${id}sp" style="width:96px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px"><option value="">—</option>${speciesOpts}</select></td>
+    <td><input type="text" placeholder="Client" id="${id}c" list="clist" style="width:126px"><datalist id="clist">${copts}</datalist></td>
+    <td><select id="${id}cat" style="width:156px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;color:var(--ink3)">${catOpts(preselCat||'')}</select></td>
+    <td><select id="${id}b" onchange="onRowBatchChange(${id})" style="width:186px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;color:var(--ink3)">${batchOpts(preselBatch||'')}</select></td>
     <td><button class="del-btn" onclick="delRow(${id})">✕</button></td>`;
   document.getElementById('slab-tbody').appendChild(tr);
-  // Set species from batch
   if(preSpecies) document.getElementById(id+'sp').value=preSpecies;
   cr(id);
 }
@@ -979,8 +1054,9 @@ async function saveIssuances(){
     const date=document.getElementById(id+'d')?.value||'';
     const inv=document.getElementById(id+'b')?.value||'';
     const species=document.getElementById(id+'sp')?.value||'';
+    const category=document.getElementById(id+'cat')?.value||'';
     if(!l||!w||!t){ok=false;return;}
-    rows.push({date,lengthMM:l,widthMM:w,thickMM:t,cbm:(l*w*t)/1e9,client,invoiceNo:inv,species});
+    rows.push({date,lengthMM:l,widthMM:w,thickMM:t,cbm:(l*w*t)/1e9,client,invoiceNo:inv,species,category});
   });
   if(!ok){toast('Please fill all dimensions for every row','err');return;}
   if(!rows.length){toast('No rows to save','err');return;}
@@ -1025,7 +1101,37 @@ async function procFile(file,type){
     const b64=await toB64(file);
     const mt=file.type==='application/pdf'?'application/pdf':'image/jpeg';
     const prompt=type==='pur'
-      ?`Read this timber purchase invoice. Extract: vendor name, invoice number, invoice date (YYYY-MM-DD), wood species, total CBM, number of pieces, thickness in mm, taxable value INR excluding GST, rate per CBM. Return ONLY JSON: {vendor,invoiceNo,date,species,totalCBM,slabCount,thicknessMM,taxableValue,rateCBM}`
+      ?`Read this timber/wood document. First determine: is this a CREDIT NOTE or a regular PURCHASE INVOICE?
+Credit notes say "Credit Note", "CN", reference a return/rejection, or have "Cr" amounts.
+
+Extract header fields:
+- isCreditNote: true or false
+- vendor: supplier company name
+- invoiceNo: document number (e.g. DL/PTIPL-21, LX/1824/25-26)
+- linkedInvoiceNo: if credit note, the original invoice number (look for "Original Invoice No.") — else null
+- date: document date in YYYY-MM-DD
+
+Then extract ALL wood species line items (there may be one or more):
+- species: map "WHITE OAK"/"OAK"/"W.OAK" → "White Oak", "ASH"/"IMPORTED ASH"/"WHITE ASH" → "White Ash", "TEAK" → "Teak"
+- quantityUnit: "CBM", "CFT", or "CUM"
+- rawQuantity: numeric quantity as written
+- totalCBM: convert to CBM — CFT × 0.0283168, CBM/CUM as-is
+- thicknessMM: thickness in mm if mentioned (e.g. "55mm", "52mm")
+- taxableValue: taxable value in INR for this line item excluding GST
+- rateCBM: rate per CBM — if rate given per CFT multiply by 35.3147
+- slabCount: number of pieces if mentioned, else null
+
+Return ONLY JSON, no other text:
+{
+  "isCreditNote": false,
+  "vendor": "Pyramid Timber Industries",
+  "invoiceNo": "DL/PTIPL-21",
+  "linkedInvoiceNo": null,
+  "date": "2026-04-03",
+  "lineItems": [
+    {"species":"White Oak","quantityUnit":"CFT","rawQuantity":67.5,"totalCBM":1.9114,"thicknessMM":55,"taxableValue":308250,"rateCBM":158916,"slabCount":null}
+  ]
+}`
       :`Read this furniture sales invoice. Extract: client name, invoice number, date (YYYY-MM-DD), and line items. Each item: itemName, wood (species), quantity, offerPrice (per unit excl GST), total. Return ONLY JSON: {client,invoiceNo,date,primarySpecies,lineItems:[],grandTotal}`;
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -1047,31 +1153,75 @@ async function procFile(file,type){
 function toB64(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});}
 
 function fillPur(d){
-  if(d.vendor) document.getElementById('p-vendor').value=d.vendor;
-  if(d.invoiceNo) document.getElementById('p-invno').value=d.invoiceNo;
-  if(d.date) document.getElementById('p-date').value=d.date;
-  if(d.species) {
-    const sp=d.species.toLowerCase();
-    const sel=document.getElementById('p-species');
-    if(sp.includes('ash')) sel.value='White Ash';
-    else if(sp.includes('oak')) sel.value='White Oak';
-    else if(sp.includes('teak')) sel.value='Teak';
-    else if(sp.includes('sheesham')) sel.value='Sheesham';
-    else if(sp.includes('walnut')) sel.value='Walnut';
-    else sel.value=d.species;
+  const cnBanner=document.getElementById('cn-banner');
+  const linkedRow=document.getElementById('p-linked-row');
+  if(d.isCreditNote){
+    cnBanner.style.display='flex';
+    linkedRow.style.display='block';
+    document.getElementById('p-linked').value=d.linkedInvoiceNo||'';
+    toast('⚠ Credit Note detected — will be subtracted from original batch','ok');
+  } else {
+    cnBanner.style.display='none';
+    linkedRow.style.display='none';
   }
-  if(d.totalCBM) document.getElementById('p-cbm').value=d.totalCBM;
-  if(d.slabCount) document.getElementById('p-pcs').value=d.slabCount;
-  if(d.thicknessMM) document.getElementById('p-thick').value=d.thicknessMM;
-  if(d.taxableValue) document.getElementById('p-tax').value=d.taxableValue;
-  if(d.rateCBM) document.getElementById('p-rate').value=Math.round(d.rateCBM);
-  calcRate();
+  if(d.vendor)   document.getElementById('p-vendor').value=d.vendor;
+  if(d.invoiceNo)document.getElementById('p-invno').value=d.invoiceNo;
+  if(d.date)     document.getElementById('p-date').value=d.date;
+
+  // Populate species rows from lineItems
+  document.getElementById('pur-species-tbody').innerHTML='';
+  const items = d.lineItems||[];
+  if(items.length===0){
+    // Single species bill — create one row from top-level fields
+    addPurSpeciesRow({
+      species:d.species||'', totalCBM:d.totalCBM||'',
+      slabCount:d.slabCount||'', thicknessMM:d.thicknessMM||'',
+      taxableValue:d.taxableValue||'', rateCBM:d.rateCBM||'',
+      quantityUnit:d.quantityUnit, rawQuantity:d.rawQuantity
+    });
+  } else {
+    items.forEach(item=>addPurSpeciesRow(item));
+  }
+  if(d.isCreditNote && d.lineItems && d.lineItems.length>0){
+    toast(`Credit Note: ${d.lineItems.length} species line item(s) detected`,'ok');
+  } else if(d.lineItems && d.lineItems.length>1){
+    toast(`${d.lineItems.length} species found — will save as separate batches`,'ok');
+  } else if(d.lineItems && d.lineItems[0] && d.lineItems[0].quantityUnit==='CFT'){
+    toast(`CFT → CBM conversion applied ✓`,'ok');
+  }
 }
-function calcRate(){
-  const cbm=parseFloat(document.getElementById('p-cbm').value)||0;
-  const tax=parseFloat(document.getElementById('p-tax').value)||0;
-  if(cbm>0&&tax>0) document.getElementById('p-rate').value=Math.round(tax/cbm);
+
+let purRowId=0;
+function addPurSpeciesRow(data){
+  const id=++purRowId;
+  const spOpts=['White Oak','White Ash','Teak','Sheesham','Walnut','Mixed']
+    .map(s=>`<option ${data&&data.species===s?'selected':''}>${s}</option>`).join('');
+  const cbm=data&&data.totalCBM?parseFloat(data.totalCBM).toFixed(4):'';
+  const rate=data&&data.rateCBM?Math.round(data.rateCBM):'';
+  const note=data&&data.quantityUnit&&data.quantityUnit!=='CBM'?` title="Converted from ${data.rawQuantity} ${data.quantityUnit}"`:'' ;
+  const tr=document.createElement('tr');
+  tr.id='psr'+id;
+  tr.style.borderBottom='1px solid var(--paper2)';
+  tr.innerHTML=`
+    <td style="padding:5px 6px"><select id="psr${id}sp" style="background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;width:110px">${spOpts}</select></td>
+    <td style="padding:5px 6px"><input type="number" id="psr${id}cbm" value="${cbm}" step="0.0001" placeholder="0.0000"${note} style="width:88px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--mono);font-size:12px" oninput="calcPsrRate(${id})"></td>
+    <td style="padding:5px 6px"><input type="number" id="psr${id}pcs" value="${data&&data.slabCount||''}" placeholder="—" style="width:60px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px"></td>
+    <td style="padding:5px 6px"><input type="number" id="psr${id}thick" value="${data&&data.thicknessMM||''}" placeholder="52" style="width:60px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px"></td>
+    <td style="padding:5px 6px"><input type="number" id="psr${id}tax" value="${data&&data.taxableValue||''}" placeholder="0" style="width:96px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px" oninput="calcPsrRate(${id})"></td>
+    <td style="padding:5px 6px"><input type="number" id="psr${id}rate" value="${rate}" style="width:88px;background:#fdf5ec;border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--mono);font-size:12px;font-weight:600" readonly></td>
+    <td style="padding:5px 6px"><button class="del-btn" onclick="document.getElementById('psr${id}').remove()">✕</button></td>`;
+  document.getElementById('pur-species-tbody').appendChild(tr);
+  calcPsrRate(id);
 }
+
+function calcPsrRate(id){
+  const cbm=parseFloat(document.getElementById('psr'+id+'cbm')?.value)||0;
+  const tax=parseFloat(document.getElementById('psr'+id+'tax')?.value)||0;
+  const el=document.getElementById('psr'+id+'rate');
+  if(el&&cbm>0&&tax>0) el.value=Math.round(tax/cbm);
+}
+
+function calcRate(){} // kept for compatibility
 
 function fillCli(d){
   if(d.client) document.getElementById('c-client').value=d.client;
@@ -1107,28 +1257,65 @@ function calcCliTotal(){
 async function saveBatch(){
   const btn=document.querySelector('#form-pur .btn-p');
   if(btn.disabled) return;
-  const d={vendor:document.getElementById('p-vendor').value.trim(),invoiceNo:document.getElementById('p-invno').value.trim(),date:document.getElementById('p-date').value,species:document.getElementById('p-species').value,totalCBM:parseFloat(document.getElementById('p-cbm').value)||0,slabCount:parseInt(document.getElementById('p-pcs').value)||0,thicknessMM:parseInt(document.getElementById('p-thick').value)||0,taxableValue:parseFloat(document.getElementById('p-tax').value)||0,rateCBM:parseFloat(document.getElementById('p-rate').value)||0,notes:document.getElementById('p-notes').value.trim()};
-  if(!d.vendor||!d.invoiceNo||!d.totalCBM){toast('Fill Vendor, Invoice No and CBM','err');return;}
-  btn.disabled=true;btn.innerHTML='<div class="spin"></div> Saving…';
-  try{
-    const r=await apiPost({action:'savePurchaseBatch',data:d});
-    if(r.success){toast('Batch saved ✓','ok');resetPur();await loadBatches();}
-    else if(r.duplicate){
-      btn.disabled=false;btn.innerHTML='💾 Save Batch';
-      showConfirm(
-        `Invoice <strong>${d.invoiceNo}</strong> already exists. Replace it with the new data?`,
-        async()=>{
-          btn.disabled=true;btn.innerHTML='<div class="spin"></div> Replacing…';
-          const r2=await apiPost({action:'savePurchaseBatch',data:{...d,replace:true}});
-          if(r2.success){toast('Batch replaced ✓','ok');resetPur();await loadBatches();}
-          else toast('Error: '+(r2.error||'Unknown'),'err');
-          btn.disabled=false;btn.innerHTML='💾 Save Batch';
+  const vendor   = document.getElementById('p-vendor').value.trim();
+  const invoiceNo= document.getElementById('p-invno').value.trim();
+  const date     = document.getElementById('p-date').value;
+  const notes    = document.getElementById('p-notes').value.trim();
+  const isCN     = document.getElementById('cn-banner').style.display!=='none';
+  const linked   = document.getElementById('p-linked').value.trim();
+
+  if(!vendor||!invoiceNo){toast('Fill Vendor and Invoice No','err');return;}
+
+  // Collect species rows
+  const speciesRows=[];
+  document.querySelectorAll('#pur-species-tbody tr').forEach(tr=>{
+    const id=tr.id.replace('psr','');
+    if(!id) return;
+    const sp   = document.getElementById('psr'+id+'sp')?.value||'';
+    const cbm  = parseFloat(document.getElementById('psr'+id+'cbm')?.value)||0;
+    const pcs  = parseInt(document.getElementById('psr'+id+'pcs')?.value)||0;
+    const thick= parseInt(document.getElementById('psr'+id+'thick')?.value)||0;
+    const tax  = parseFloat(document.getElementById('psr'+id+'tax')?.value)||0;
+    const rate = parseFloat(document.getElementById('psr'+id+'rate')?.value)||0;
+    if(sp&&cbm>0) speciesRows.push({species:sp,totalCBM:cbm,slabCount:pcs,thicknessMM:thick,taxableValue:tax,rateCBM:rate});
+  });
+  if(!speciesRows.length){toast('Add at least one species row with CBM','err');return;}
+
+  btn.disabled=true;
+  btn.innerHTML=`<div class="spin"></div> Saving ${speciesRows.length} batch(es)…`;
+
+  let saved=0, errors=[];
+  for(const row of speciesRows){
+    // Batch ID = invoiceNo-SPECIES_CODE if multiple species, else invoiceNo
+    const suffix = speciesRows.length>1 ? '-'+row.species.split(' ').map(w=>w[0]).join('') : '';
+    const batchId = invoiceNo+suffix;
+    const data={
+      vendor, invoiceNo:batchId, date, species:row.species,
+      totalCBM:row.totalCBM, slabCount:row.slabCount,
+      thicknessMM:row.thicknessMM, taxableValue:row.taxableValue,
+      rateCBM:row.rateCBM, notes, isCreditNote:isCN,
+      linkedInvoiceNo: isCN ? linked+(suffix) : ''
+    };
+    try{
+      const r=await apiPost({action:'savePurchaseBatch',data});
+      if(r.success) saved++;
+      else if(r.duplicate){
+        // Ask to replace
+        const ok=confirm(`Batch ${batchId} already exists. Replace?`);
+        if(ok){
+          const r2=await apiPost({action:'savePurchaseBatch',data:{...data,replace:true}});
+          if(r2.success) saved++;
+          else errors.push(batchId+': '+(r2.error||'Unknown'));
         }
-      );
-    }
-    else toast('Error: '+(r.error||'Unknown'),'err');
-  }catch(e){toast('Network error','err');}
-  btn.disabled=false;btn.innerHTML='💾 Save Batch';
+      }
+      else errors.push(batchId+': '+(r.error||'Unknown'));
+    }catch(e){ errors.push(batchId+': network error'); }
+  }
+
+  if(errors.length) toast('Errors: '+errors.join(', '),'err');
+  else toast(`${saved} batch(es) saved ✓`,'ok');
+  if(saved>0){ resetPur(); await loadBatches(); }
+  btn.disabled=false;btn.innerHTML='💾 Save All Batches';
 }
 async function saveCliInv(){
   const btn=document.querySelector('#form-cli .btn-p');
@@ -1161,7 +1348,17 @@ async function saveCliInv(){
   }catch(e){toast('Network error','err');}
   btn.disabled=false;btn.innerHTML='💾 Save Invoice';
 }
-function resetPur(){['p-vendor','p-invno','p-cbm','p-pcs','p-thick','p-tax','p-rate','p-notes'].forEach(i=>document.getElementById(i).value='');document.getElementById('form-pur').style.display='none';document.getElementById('prev-pur').style.display='none';document.getElementById('f-pur').value='';}
+function resetPur(){
+  ['p-vendor','p-invno','p-notes','p-linked'].forEach(i=>{const el=document.getElementById(i);if(el)el.value='';});
+  document.getElementById('p-date').value='';
+  document.getElementById('pur-species-tbody').innerHTML='';
+  document.getElementById('form-pur').style.display='none';
+  document.getElementById('prev-pur').style.display='none';
+  document.getElementById('f-pur').value='';
+  document.getElementById('cn-banner').style.display='none';
+  document.getElementById('p-linked-row').style.display='none';
+  purRowId=0;
+}
 function resetCli(){['c-client','c-invno'].forEach(i=>document.getElementById(i).value='');document.getElementById('li-tbody').innerHTML='';document.getElementById('form-cli').style.display='none';document.getElementById('prev-cli').style.display='none';document.getElementById('f-cli').value='';document.getElementById('cli-total').textContent='₹0';}
 
 // ── BATCHES TABLE ─────────────────────────────────────────
@@ -1181,7 +1378,7 @@ async function loadBatTable(){
 
 // ── DASHBOARD TAB SWITCH ──────────────────────────────────
 function switchDashTab(t){
-  ['client','species'].forEach(x=>{
+  ['client','species','category'].forEach(x=>{
     document.getElementById('dpanel-'+x).style.display=x===t?'block':'none';
     document.getElementById('dtab-'+x).classList.toggle('active',x===t);
   });
@@ -1258,6 +1455,53 @@ async function loadDash(){
         </table>`;
     } else sl.innerHTML='<div style="text-align:center;padding:24px;color:var(--ink3)">No species data yet — add issuances with species filled in</div>';
 
+    // ── By Category tab ──
+    const catEl=document.getElementById('category-conv-list');
+    if(d.byCategory&&d.byCategory.length){
+      catEl.innerHTML=`
+        <table class="tbl">
+          <thead><tr>
+            <th>Category</th>
+            <th>CBM Issued</th>
+            <th>Raw Cost ₹</th>
+            <th>Sale Value ₹</th>
+            <th>Conversion</th>
+            <th>Slabs</th>
+            <th>Species</th>
+          </tr></thead>
+          <tbody>
+          ${d.byCategory.map(c=>{
+            const ratio=parseFloat(c.convRatio||0);
+            const catColors={
+              'Dining Table':'var(--wood)','Coffee Table':'#7a6a4a',
+              'Side Table':'#6a7a4a','Chair':'var(--blue)',
+              'Bar Stool':'#4a7a6a','Bench':'#6a4a7a',
+              'Sofa':'var(--green)','Console / Desk':'var(--amber)',
+              'Cabinet':'var(--ink3)'
+            };
+            const col=catColors[c.category]||'var(--ink3)';
+            return `<tr>
+              <td><span style="display:inline-flex;align-items:center;gap:6px">
+                <span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0"></span>
+                <strong>${c.category}</strong>
+              </span></td>
+              <td class="mono">${parseFloat(c.cbmIssued||0).toFixed(3)}</td>
+              <td class="mono">₹${parseInt(c.rawCost||0).toLocaleString('en-IN')}</td>
+              <td class="mono">₹${parseInt(c.saleValue||0).toLocaleString('en-IN')}</td>
+              <td><span class="badge ${ratio>=8?'bg':ratio>=5?'ba':ratio>0?'br':'bb'}">${ratio>0?ratio.toFixed(1)+'x':'No invoice'}</span></td>
+              <td class="mono">${c.slabsIssued||0}</td>
+              <td style="font-size:11px;color:var(--ink3)">${(c.species||[]).join(', ')||'—'}</td>
+            </tr>`;
+          }).join('')}
+          </tbody>
+        </table>
+        <div style="margin-top:12px;padding:12px;background:var(--paper);border-radius:3px;font-size:12px;color:var(--ink3)">
+          💡 <strong>Tip:</strong> As you tag more issuances with categories, wastage % per category will become visible — helping you cost future orders more accurately.
+        </div>`;
+    } else {
+      catEl.innerHTML='<div style="text-align:center;padding:24px;color:var(--ink3)">No category data yet — assign categories when issuing slabs</div>';
+    }
+
     // ── Batch leakage ──
     const ll=document.getElementById('leak-list');
     if(d.batchLeakage&&d.batchLeakage.length){
@@ -1317,29 +1561,54 @@ async function readStoreSheet(file){
 
   try{
     const b64=await toB64(file);
-    const prompt=`This is a handwritten log of wood slab issuances from a furniture workshop. Read every row carefully and extract whatever data is present. Leave fields blank (null) if not visible — do not guess or assume.
+    const prompt=`This is a handwritten slab issuance register from a furniture workshop. Read every row carefully.
 
-Each row typically has some or all of: a date, slab dimensions in mm (L × W × T), a client/brand name, and sometimes a vendor/batch reference.
+COLUMN ORDER (left to right):
+1. Sr No — row number
+2. Date of Issue — DD/MM/YY format → convert to YYYY-MM-DD
+3. L — length in mm
+4. W — width in mm  
+5. T — thickness in mm
+6. Client — client/brand name
+7. Item Category — product being made
+8. Wood — wood species
+9. Vendor — supplier name
+10. Date (bill date) — DD/MM/YY → YYYY-MM-DD (this is the vendor invoice date, different from issue date)
+11. Carpenter — carpenter name (ignore for data purposes)
+12. Bill No — vendor invoice number (e.g. LX/1824/25-26, DL/PTIPL-21)
 
-DIMENSIONS: Written as numbers separated by × or x. e.g. "2500 x 270 x 52" → lengthMM=2500, widthMM=270, thickMM=52. If any dimension is missing, use null.
+DITTO MARKS (", ,, or similar) mean carry forward the value from the row above for that column.
 
-DATES: Written as "17MAR26", "16 MAR 26", "03APR26" etc → convert to YYYY-MM-DD. If a row has no date, carry forward the last seen date. If no date seen at all, use null.
+CLIENT NAMES — use EXACTLY these spellings:
+"Food Stories", "Shrine" (also Shuine), "Mayank", "Ogaan" (also Ogan),
+"Radheshyam", "Rio Bravo", "Sample"
 
-CLIENT NAMES: Match to the closest from this list — use EXACTLY these spellings:
-"Food Stories", "Shrine" (also written as Shuine/Shrein), "Mayank", "Ogaan" (also Ogan), "Radheshyam".
-If no client name is visible for a row, use null.
+CATEGORY — map to exactly one of:
+"Chair", "Dining Table", "Coffee Table", "Side Table", "Study Table",
+"Bar Stool", "Bench", "Lounger / Sofa", "Console / Cabinet", "Other"
+Mapping hints: round table/kongo/community → Dining Table, conference table → Study Table,
+knox chair/jungle jute/bengal → Chair, jute sisha/arco/siesta → Bench,
+rio bravo/orbit/nested → Side Table, sofa/lounger → Lounger / Sofa,
+console/cabinet/reception → Console / Cabinet
 
-BATCH/VENDOR: If the sheet mentions a vendor name (e.g. "Laxmi", "Pyramid") or invoice number (e.g. "LX/1824"), capture it in the "batch" field. Otherwise null.
+SPECIES — map to: "White Oak", "White Ash", "Teak", "Sheesham", "Walnut"
 
-SPECIES: If mentioned (e.g. "Oak", "Ash", "Teak"), map to: "White Oak", "White Ash", "Teak", "Sheesham", "Walnut", "Mixed". Otherwise null.
-
-Return ONLY a valid JSON array, no other text, no markdown fences:
-[{"date":"2026-03-17","lengthMM":2500,"widthMM":270,"thickMM":52,"client":"Food Stories","batch":null,"species":null},...]`;
+Return ONLY a valid JSON array, no markdown:
+[{
+  "date":"2026-03-17",
+  "lengthMM":2500,"widthMM":270,"thickMM":52,
+  "client":"Food Stories",
+  "category":"Dining Table",
+  "species":"White Oak",
+  "vendor":"Laxmi",
+  "billDate":"2026-03-17",
+  "invoiceNo":"LX/1824/25-26"
+},...]`;
 
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':CFG.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:[
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64.split(',')[1]}},
         {type:'text',text:prompt}
       ]}]})
@@ -1359,13 +1628,20 @@ Return ONLY a valid JSON array, no other text, no markdown fences:
     setMode('manual');
     document.getElementById('slab-tbody').innerHTML='';
 
-    // If AI found a batch reference, try to match it
-    const firstBatch=rows.find(r=>r.batch)?.batch||'';
+    // Match batch from invoice number or vendor name
+    const firstInvoice = rows.find(r=>r.invoiceNo)?.invoiceNo||'';
+    const firstVendor  = rows.find(r=>r.vendor)?.vendor||'';
     let matchedBatch='';
-    if(firstBatch){
+    if(firstInvoice){
       const matched=ST.batches.find(b=>
-        b.invoiceNo.toLowerCase().includes(firstBatch.toLowerCase())||
-        (b.vendor||'').toLowerCase().includes(firstBatch.toLowerCase())
+        b.invoiceNo.toLowerCase().includes(firstInvoice.toLowerCase()) ||
+        firstInvoice.toLowerCase().includes(b.invoiceNo.toLowerCase())
+      );
+      if(matched) matchedBatch=matched.invoiceNo;
+    }
+    if(!matchedBatch && firstVendor){
+      const matched=ST.batches.find(b=>
+        (b.vendor||'').toLowerCase().includes(firstVendor.toLowerCase())
       );
       if(matched) matchedBatch=matched.invoiceNo;
     }
@@ -1374,7 +1650,21 @@ Return ONLY a valid JSON array, no other text, no markdown fences:
     rows.forEach(r=>{
       const id=++rid;
       const copts=(ST.clients||[]).map(c=>`<option>${c}</option>`).join('');
-      const bOpts=batchOpts(r.batch?matchedBatch:'');
+      // Per-row batch matching — try row's own invoiceNo first, then vendor
+      let rowBatch = matchedBatch;
+      if(r.invoiceNo){
+        const rm = ST.batches.find(b=>
+          b.invoiceNo.toLowerCase().includes(r.invoiceNo.toLowerCase()) ||
+          r.invoiceNo.toLowerCase().includes(b.invoiceNo.toLowerCase())
+        );
+        if(rm) rowBatch = rm.invoiceNo;
+      } else if(r.vendor && !rowBatch){
+        const rm = ST.batches.find(b=>
+          (b.vendor||'').toLowerCase().includes(r.vendor.toLowerCase())
+        );
+        if(rm) rowBatch = rm.invoiceNo;
+      }
+      const bOpts=batchOpts(rowBatch);
       const tr=document.createElement('tr');
       tr.id='row'+id;
       tr.innerHTML=`
@@ -1384,17 +1674,18 @@ Return ONLY a valid JSON array, no other text, no markdown fences:
         <td><input type="number" value="${r.thickMM||''}" id="${id}t" oninput="cr(${id})" style="width:72px${!r.thickMM?';'+missingStyle:''}"></td>
         <td class="cc" id="${id}cbm">—</td>
         <td class="costc" id="${id}cost">—</td>
+        <td><select id="${id}sp" style="width:96px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px"><option value="">—</option>${['White Oak','White Ash','Teak','Sheesham','Walnut','Mixed'].map(s=>`<option ${r.species===s?'selected':''}>${s}</option>`).join('')}</select></td>
         <td><input type="text" value="${r.client||''}" id="${id}c" list="clist" style="width:126px${!r.client?';'+missingStyle:''}" placeholder="${!r.client?'⚠ client':''}"><datalist id="clist">${copts}</datalist></td>
-        <td><select id="${id}sp" style="width:96px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;color:var(--ink)"><option value="">—</option>${['White Oak','White Ash','Teak','Sheesham','Walnut','Mixed'].map(s=>`<option ${r.species===s?'selected':''}>${s}</option>`).join('')}</select></td>
-        <td><select id="${id}b" onchange="onRowBatchChange(${id})" style="width:196px;background:${matchedBatch?'var(--paper)':'#fef8e8'};border:1px solid ${matchedBatch?'var(--rule)':'var(--amber)'};padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;color:var(--ink3)">${bOpts}</select></td>
+        <td><select id="${id}cat" style="width:156px;background:${r.category?'var(--paper)':'#fef8e8'};border:1px solid ${r.category?'var(--rule)':'var(--amber)'};padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;color:var(--ink3)">${catOpts(r.category||'')}</select></td>
+        <td><select id="${id}b" onchange="onRowBatchChange(${id})" style="width:186px;background:${rowBatch?'var(--paper)':'#fef8e8'};border:1px solid ${rowBatch?'var(--rule)':'var(--amber)'};padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;color:var(--ink3)">${bOpts}</select></td>
         <td><button class="del-btn" onclick="delRow(${id})">✕</button></td>`;
       document.getElementById('slab-tbody').appendChild(tr);
       cr(id);
     });
 
-    const blanks=rows.filter(r=>!r.client||!r.lengthMM||!r.widthMM).length;
+    const blanks=rows.filter(r=>!r.client||!r.lengthMM||!r.widthMM||!r.category).length;
     resEl.style.display='block';
-    msgEl.textContent=`✓ AI read ${rows.length} rows${blanks>0?' — '+blanks+' row(s) have missing fields (amber)':''}. Use "Assign Batch to All" above to set the purchase batch.`;
+    msgEl.textContent=`✓ AI read ${rows.length} rows${blanks>0?' — '+blanks+' row(s) have missing fields (amber)':''}. Review categories, assign batches, then Save.`;
     toast(`${rows.length} rows read ✓`,'ok');
 
   }catch(e){
@@ -1584,6 +1875,7 @@ function renderLogTable(){
       <td class="mono" style="font-size:12px;color:var(--wood)">${r.cost>0?'₹'+Math.round(r.cost).toLocaleString('en-IN'):'—'}</td>
       <td style="font-size:13px">${r.client||'<span style="color:var(--amber)">—</span>'}</td>
       <td style="font-size:13px">${r.species||'<span style="color:var(--amber)">—</span>'}</td>
+      <td style="font-size:12px;color:var(--ink3)">${r.category||'<span style="color:var(--amber)">—</span>'}</td>
       <td class="mono" style="font-size:11px;color:var(--ink3)">${r.invoiceNo||'<span style="color:var(--amber)">—</span>'}</td>
       <td><button class="btn btn-g btn-sm" onclick="openEditPanel(${globalIdx})" style="font-size:11px;padding:4px 10px">Edit</button></td>
     </tr>`;
@@ -1600,6 +1892,7 @@ function openEditPanel(idx){
   document.getElementById('ep-t').value=r.thickMM||'';
   document.getElementById('ep-client').value=r.client||'';
   document.getElementById('ep-species').value=r.species||'';
+  document.getElementById('ep-category').value=r.category||'';
   document.getElementById('ep-batch').value=r.invoiceNo||'';
   calcEpCost();
   document.getElementById('edit-panel').style.display='block';
@@ -1640,6 +1933,7 @@ async function saveEditPanel(){
     lengthMM:   l, widthMM: w, thickMM: t, cbm,
     client:     document.getElementById('ep-client').value.trim(),
     species:    document.getElementById('ep-species').value,
+    category:   document.getElementById('ep-category').value,
     invoiceNo:  inv,
     cost,
     vendor:     b?b.vendor:r.vendor||''
