@@ -39,12 +39,12 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
 .lg-card{background:white;border:1px solid var(--rule);border-radius:4px;padding:32px;box-shadow:var(--sh)}
 .lg-lbl{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--ink3);margin-bottom:12px;display:block}
 .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px}
-.role-btn{background:var(--paper);border:1.5px solid var(--rule);border-radius:3px;padding:14px 10px;cursor:pointer;text-align:center;transition:all .15s;font-family:var(--sans)}
+.role-btn{background:var(--paper);border:1.5px solid var(--rule);border-radius:3px;padding:14px 10px;cursor:pointer;text-align:center;transition:all .15s;font-family:var(--sans);user-select:none;-webkit-user-select:none}
 .role-btn:hover{border-color:var(--wood)}
-.role-btn.sel{border-color:var(--wood);background:#fdf5ec}
-.ri{font-size:24px;display:block;margin-bottom:4px}
-.rn{font-size:12px;font-weight:600;color:var(--ink2)}
-.rd{font-size:10px;color:var(--ink3);margin-top:2px}
+.role-btn.sel{border-color:var(--wood);background:#fdf5ec;box-shadow:0 0 0 2px rgba(139,105,20,.15)}
+.ri{font-size:24px;display:block;margin-bottom:6px}
+.rn{font-size:12px;font-weight:600;color:var(--ink2);display:block}
+.rd{font-size:10px;color:var(--ink3);margin-top:2px;display:block}
 .pin-inp{width:100%;background:var(--paper);border:1.5px solid var(--rule);border-radius:3px;padding:14px;font-family:var(--mono);font-size:26px;letter-spacing:14px;text-align:center;color:var(--ink);transition:border-color .15s;margin-bottom:16px}
 .pin-inp:focus{outline:none;border-color:var(--wood)}
 .lg-go{width:100%;background:var(--wood);color:white;border:none;border-radius:3px;padding:14px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;transition:background .15s}
@@ -831,7 +831,12 @@ function selectRole(r){
 }
 async function doLogin(){
   const pin=document.getElementById('pin').value.trim();
-  if(!selRole){document.getElementById('lg-err').textContent='Please select a role';return;}
+  if(!selRole){
+    document.getElementById('lg-err').textContent='← Please select a role first';
+    document.querySelector('.role-grid').style.outline='2px solid var(--red)';
+    return;
+  }
+  document.querySelector('.role-grid').style.outline='';
   if(!pin){document.getElementById('lg-err').textContent='Please enter your PIN';return;}
   try{
     const r=await apiGet({action:'verifyPIN',pin});
