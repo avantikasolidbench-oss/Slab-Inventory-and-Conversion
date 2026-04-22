@@ -497,7 +497,10 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
         <!-- Batches -->
         <div id="panel-bat" style="display:none">
           <div class="card" style="margin:0">
-            <div class="ch"><span class="ct">All Purchase Batches</span></div>
+            <div class="ch">
+              <span class="ct">All Purchase Batches</span>
+              <span style="font-size:11px;color:var(--ink3)">To correct a batch — re-upload the bill via Purchase Bills → Replace option</span>
+            </div>
             <div style="overflow-x:auto">
               <table class="tbl">
                 <thead><tr>
@@ -1381,9 +1384,8 @@ async function loadBatTable(){
     if(!bats.length){tb.innerHTML='<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--ink3)">No batches yet</td></tr>';return;}
     tb.innerHTML=bats.map(b=>{
       const rem=parseFloat(b.remainingCBM);
-      const tax=parseFloat(b.taxableValue||0);
       const woodVal=parseFloat(b.woodValue||b.taxableValue||0);
-      const isCN=tax<0||parseFloat(b.totalCBM)<0;
+      const isCN=!!b.isCreditNote;
       const rem=parseFloat(b.remainingCBM);
       const st=isCN
         ? '<span class="badge br">⊖ Credit Note</span>'
