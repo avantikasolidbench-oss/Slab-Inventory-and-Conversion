@@ -804,7 +804,7 @@ let CFG={url:'',key:''};
 let ST={role:'',batches:[],clients:[]};
 
 function loadCfg(){
-  CFG.url=localStorage.getItem('st_url')||'https://script.google.com/macros/s/AKfycbxnnncTaWEYhStO0fzTrnimB7XuVJ65cMgsZO8eSWZdcXbc3iK7atVWkrtvLwDXKtV2Tg/exec';
+  CFG.url=localStorage.getItem('st_url')||'https://script.google.com/macros/s/AKfycbwYwwrqYv8A4J5BsthLsgF0KsVX6Q4eebrIflE5p9Srh5s88b8cBUAhjLEz3ZNkpwlvpw/exec';
   CFG.key=localStorage.getItem('st_key')||'';
 }
 function saveCfg(){
@@ -1158,6 +1158,7 @@ Return ONLY JSON, no other text:
 function toB64(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});}
 
 function fillPur(d){
+  window._isCreditNote = !!d.isCreditNote;
   const cnBanner=document.getElementById('cn-banner');
   const linkedRow=document.getElementById('p-linked-row');
   if(d.isCreditNote){
@@ -1274,7 +1275,7 @@ async function saveBatch(){
   const invoiceNo= document.getElementById('p-invno').value.trim();
   const date     = document.getElementById('p-date').value;
   const notes    = document.getElementById('p-notes').value.trim();
-  const isCN     = document.getElementById('cn-banner').style.display!=='none';
+  const isCN = window._isCreditNote === true;
   const linked   = document.getElementById('p-linked').value.trim();
 
   if(!vendor||!invoiceNo){toast('Fill Vendor and Invoice No','err');return;}
@@ -1369,6 +1370,7 @@ function resetPur(){
   document.getElementById('form-pur').style.display='none';
   document.getElementById('prev-pur').style.display='none';
   document.getElementById('f-pur').value='';
+  window._isCreditNote = false;
   document.getElementById('cn-banner').style.display='none';
   document.getElementById('p-linked-row').style.display='none';
   purRowId=0;
