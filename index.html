@@ -246,18 +246,18 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
     <div class="lg-card">
       <span class="lg-lbl">Select your role</span>
       <div class="role-grid">
-        <button class="role-btn" onclick="selectRole('finance')" id="role-finance">
+        <div class="role-btn" onclick="selectRole('finance')" id="role-finance">
           <span class="ri">💼</span><span class="rn">Finance</span><span class="rd">Invoices & purchases</span>
-        </button>
-        <button class="role-btn" onclick="selectRole('store')" id="role-store">
+        </div>
+        <div class="role-btn" onclick="selectRole('store')" id="role-store">
           <span class="ri">🪵</span><span class="rn">Store</span><span class="rd">Slab issuance</span>
-        </button>
-        <button class="role-btn" onclick="selectRole('viewer')" id="role-viewer">
+        </div>
+        <div class="role-btn" onclick="selectRole('viewer')" id="role-viewer">
           <span class="ri">📊</span><span class="rn">Viewer</span><span class="rd">Dashboard only</span>
-        </button>
-        <button class="role-btn" onclick="selectRole('admin')" id="role-admin">
+        </div>
+        <div class="role-btn" onclick="selectRole('admin')" id="role-admin">
           <span class="ri">🔑</span><span class="rn">Admin</span><span class="rd">Full access</span>
-        </button>
+        </div>
       </div>
       <input class="pin-inp" type="password" id="pin" maxlength="4" placeholder="····"
         oninput="document.getElementById('lg-err').textContent=''"
@@ -828,7 +828,6 @@ function selectRole(r){
   selRole=r;
   document.querySelectorAll('.role-btn').forEach(b=>b.classList.remove('sel'));
   document.getElementById('role-'+r).classList.add('sel');
-  document.getElementById('pin').focus();
 }
 async function doLogin(){
   const pin=document.getElementById('pin').value.trim();
