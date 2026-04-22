@@ -244,7 +244,15 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
       <span class="lg-sub">Solid Bench · Wood Inventory</span>
     </div>
     <div class="lg-card">
-      <span class="lg-lbl">Enter your PIN</span>
+      <span class="lg-lbl">Who are you?</span>
+      <select id="role-sel" onchange="document.getElementById('lg-err').textContent=''" style="width:100%;background:var(--paper);border:1.5px solid var(--rule);color:var(--ink);padding:12px 14px;border-radius:3px;font-family:var(--sans);font-size:14px;margin-bottom:12px;cursor:pointer">
+        <option value="">— Select your role —</option>
+        <option value="finance">💼 Finance</option>
+        <option value="store">🪵 Store</option>
+        <option value="viewer">📊 Viewer</option>
+        <option value="admin">🔑 Admin</option>
+      </select>
+      <span class="lg-lbl">Enter PIN</span>
       <input class="pin-inp" type="password" id="pin" maxlength="4" placeholder="····"
         oninput="document.getElementById('lg-err').textContent=''"
         onkeydown="if(event.key==='Enter')doLogin()">
@@ -815,14 +823,16 @@ function selectRole(r){
   document.getElementById('role-'+r).classList.add('sel');
 }
 async function doLogin(){
+  const role=document.getElementById('role-sel').value;
   const pin=document.getElementById('pin').value.trim();
+  if(!role){document.getElementById('lg-err').textContent='Please select your role';return;}
   if(!pin){document.getElementById('lg-err').textContent='Please enter your PIN';return;}
   if(!CFG.url){document.getElementById('lg-err').textContent='API URL not set — tap ⚙ Settings';showCfg();return;}
   const btn=document.querySelector('.lg-go');
   btn.disabled=true;btn.textContent='Checking…';
   try{
     const r=await apiGet({action:'verifyPIN',pin});
-    if(r.success) enterApp(r.role);
+    if(r.success) enterApp(r.role||role);
     else{document.getElementById('lg-err').textContent='Incorrect PIN — try again';document.getElementById('pin').value='';document.getElementById('pin').focus();}
   }catch(e){document.getElementById('lg-err').textContent='Cannot reach server — check Settings';}
   btn.disabled=false;btn.textContent='Enter →';
@@ -848,8 +858,8 @@ function logout(){
   document.getElementById('app').classList.remove('show');
   document.getElementById('login').classList.add('show');
   document.getElementById('pin').value='';
-  selRole='';
-  document.querySelectorAll('.role-btn').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('role-sel').value='';
+  document.getElementById('lg-err').textContent='';
 }
 
 // ── NAV ──────────────────────────────────────────────────
