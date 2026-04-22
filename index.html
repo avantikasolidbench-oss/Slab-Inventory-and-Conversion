@@ -501,9 +501,9 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
               <table class="tbl">
                 <thead><tr>
                   <th>Invoice</th><th>Date</th><th>Vendor</th><th>Species</th>
-                  <th>Slabs</th><th>CBM In</th><th>CBM Issued</th><th>CBM Left</th><th>Rate/CBM</th><th>Status</th>
+                  <th>Slabs</th><th>CBM</th><th>Taxable Value ₹</th><th>CBM Issued</th><th>CBM Left</th><th>Rate/CBM ₹</th><th>Status</th>
                 </tr></thead>
-                <tbody id="bat-tbody"><tr><td colspan="10" style="text-align:center;padding:32px;color:var(--ink3)">Loading…</td></tr></tbody>
+                <tbody id="bat-tbody"><tr><td colspan="11" style="text-align:center;padding:32px;color:var(--ink3)">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
@@ -1367,13 +1367,28 @@ async function loadBatTable(){
     const r=await apiGet({action:'getBatches'});
     const bats=r.batches||[];
     const tb=document.getElementById('bat-tbody');
-    if(!bats.length){tb.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--ink3)">No batches yet</td></tr>';return;}
+    if(!bats.length){tb.innerHTML='<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--ink3)">No batches yet</td></tr>';return;}
     tb.innerHTML=bats.map(b=>{
       const rem=parseFloat(b.remainingCBM);
-      const st=rem<0?'<span class="badge br">Over-issued</span>':rem<0.001?'<span class="badge bg">Depleted</span>':'<span class="badge ba">Active</span>';
-      return `<tr><td class="mono">${b.invoiceNo}</td><td>${b.date}</td><td>${b.vendor}</td><td>${b.species}</td><td>${b.slabCount}</td><td class="mono">${parseFloat(b.totalCBM).toFixed(4)}</td><td class="mono">${parseFloat(b.issuedCBM||0).toFixed(4)}</td><td class="mono" style="${rem<0?'color:var(--red)':''}">${rem.toFixed(4)}</td><td class="mono">₹${parseInt(b.rateCBM).toLocaleString('en-IN')}</td><td>${st}</td></tr>`;
+      const tax=parseFloat(b.taxableValue||0);
+      const isCN=tax<0||parseFloat(b.totalCBM)<0;
+      const st=isCN?'<span class="badge br">Credit Note</span>':rem<0?'<span class="badge br">Over-issued</span>':rem<0.001?'<span class="badge bg">Depleted</span>':'<span class="badge ba">Active</span>';
+      const taxStyle=isCN?'color:var(--red)':'color:var(--wood);font-weight:600';
+      return `<tr>
+        <td class="mono">${b.invoiceNo}</td>
+        <td>${b.date}</td>
+        <td>${b.vendor}</td>
+        <td>${b.species}</td>
+        <td class="mono">${b.slabCount||'—'}</td>
+        <td class="mono">${parseFloat(b.totalCBM).toFixed(4)}</td>
+        <td class="mono" style="${taxStyle}">₹${Math.abs(tax).toLocaleString('en-IN')}${isCN?' (CN)':''}</td>
+        <td class="mono">${parseFloat(b.issuedCBM||0).toFixed(4)}</td>
+        <td class="mono" style="${rem<0?'color:var(--red)':''}">${rem.toFixed(4)}</td>
+        <td class="mono">₹${parseInt(b.rateCBM).toLocaleString('en-IN')}</td>
+        <td>${st}</td>
+      </tr>`;
     }).join('');
-  }catch(e){document.getElementById('bat-tbody').innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--ink3);padding:24px">Error loading</td></tr>';}
+  }catch(e){document.getElementById('bat-tbody').innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--ink3);padding:24px">Error loading</td></tr>';}
 }
 
 // ── DASHBOARD TAB SWITCH ──────────────────────────────────
