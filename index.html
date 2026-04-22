@@ -422,7 +422,8 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
                       <th style="text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:2px solid var(--rule)">CBM</th>
                       <th style="text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:2px solid var(--rule)">Slabs</th>
                       <th style="text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:2px solid var(--rule)">Thick mm</th>
-                      <th style="text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:2px solid var(--rule)">Taxable ₹</th>
+                      <th style="text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:2px solid var(--rule)">Wood Value ₹ <span style="font-weight:400;font-size:9px">(excl freight)</span></th>
+                      <th style="text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:2px solid var(--rule)">Total Taxable ₹ <span style="font-weight:400;font-size:9px">(for rate calc)</span></th>
                       <th style="text-align:left;padding:7px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:2px solid var(--rule)">Rate/CBM ₹</th>
                       <th style="width:30px;border-bottom:2px solid var(--rule)"></th>
                     </tr>
@@ -501,7 +502,7 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
               <table class="tbl">
                 <thead><tr>
                   <th>Invoice</th><th>Date</th><th>Vendor</th><th>Species</th>
-                  <th>Slabs</th><th>CBM</th><th>Taxable Value ₹</th><th>CBM Issued</th><th>CBM Left</th><th>Rate/CBM ₹</th><th>Status</th>
+                  <th>Slabs</th><th>CBM</th><th title="Wood value only — excl freight, GST">Wood Value ₹</th><th>CBM Issued</th><th>CBM Left</th><th>Rate/CBM ₹</th><th>Status</th>
                 </tr></thead>
                 <tbody id="bat-tbody"><tr><td colspan="11" style="text-align:center;padding:32px;color:var(--ink3)">Loading…</td></tr></tbody>
               </table>
@@ -1117,8 +1118,9 @@ Then extract ALL wood species line items (there may be one or more):
 - rawQuantity: numeric quantity as written
 - totalCBM: convert to CBM — CFT × 0.0283168, CBM/CUM as-is
 - thicknessMM: thickness in mm if mentioned (e.g. "55mm", "52mm")
-- taxableValue: taxable value in INR for this line item excluding GST
-- rateCBM: rate per CBM — if rate given per CFT multiply by 35.3147
+- woodValue: calculate as rawQuantity × rate per unit (e.g. 67.5 CFT × ₹4,500 = ₹3,03,750). This is pure wood cost, no extras.
+- totalTaxableValue: the full taxable amount for this species line INCLUDING freight/cartage/labour if any are on the invoice — used for rate/CBM calculation. If the invoice shows a single wood line with no extras, this equals woodValue.
+- rateCBM: calculate as totalTaxableValue ÷ totalCBM (in CBM after conversion). If rate given per CFT multiply by 35.3147
 - slabCount: number of pieces if mentioned, else null
 
 Return ONLY JSON, no other text:
@@ -1129,7 +1131,7 @@ Return ONLY JSON, no other text:
   "linkedInvoiceNo": null,
   "date": "2026-04-03",
   "lineItems": [
-    {"species":"White Oak","quantityUnit":"CFT","rawQuantity":67.5,"totalCBM":1.9114,"thicknessMM":55,"taxableValue":308250,"rateCBM":158916,"slabCount":null}
+    {"species":"White Oak","quantityUnit":"CFT","rawQuantity":67.5,"totalCBM":1.9114,"thicknessMM":55,"woodValue":303750,"totalTaxableValue":308250,"rateCBM":161272,"slabCount":null}
   ]
 }`
       :`Read this furniture sales invoice. Extract: client name, invoice number, date (YYYY-MM-DD), and line items. Each item: itemName, wood (species), quantity, offerPrice (per unit excl GST), total. Return ONLY JSON: {client,invoiceNo,date,primarySpecies,lineItems:[],grandTotal}`;
@@ -1172,11 +1174,12 @@ function fillPur(d){
   document.getElementById('pur-species-tbody').innerHTML='';
   const items = d.lineItems||[];
   if(items.length===0){
-    // Single species bill — create one row from top-level fields
     addPurSpeciesRow({
       species:d.species||'', totalCBM:d.totalCBM||'',
       slabCount:d.slabCount||'', thicknessMM:d.thicknessMM||'',
-      taxableValue:d.taxableValue||'', rateCBM:d.rateCBM||'',
+      woodValue:d.woodValue||d.taxableValue||'',
+      totalTaxableValue:d.totalTaxableValue||d.taxableValue||'',
+      rateCBM:d.rateCBM||'',
       quantityUnit:d.quantityUnit, rawQuantity:d.rawQuantity
     });
   } else {
@@ -1196,18 +1199,25 @@ function addPurSpeciesRow(data){
   const id=++purRowId;
   const spOpts=['White Oak','White Ash','Teak','Sheesham','Walnut','Mixed']
     .map(s=>`<option ${data&&data.species===s?'selected':''}>${s}</option>`).join('');
-  const cbm=data&&data.totalCBM?parseFloat(data.totalCBM).toFixed(4):'';
-  const rate=data&&data.rateCBM?Math.round(data.rateCBM):'';
-  const note=data&&data.quantityUnit&&data.quantityUnit!=='CBM'?` title="Converted from ${data.rawQuantity} ${data.quantityUnit}"`:'' ;
+  const cbm  = data&&data.totalCBM ? parseFloat(data.totalCBM).toFixed(4) : '';
+  const rate = data&&data.rateCBM  ? Math.round(data.rateCBM) : '';
+  const wval = data&&data.woodValue ? Math.round(data.woodValue) : (data&&data.taxableValue ? Math.round(data.taxableValue) : '');
+  const tval = data&&data.totalTaxableValue ? Math.round(data.totalTaxableValue) : (data&&data.taxableValue ? Math.round(data.taxableValue) : '');
+  const note = data&&data.quantityUnit&&data.quantityUnit!=='CBM' ? ` title="Converted from ${data.rawQuantity} ${data.quantityUnit}"` : '';
   const tr=document.createElement('tr');
   tr.id='psr'+id;
   tr.style.borderBottom='1px solid var(--paper2)';
   tr.innerHTML=`
     <td style="padding:5px 6px"><select id="psr${id}sp" style="background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;width:110px">${spOpts}</select></td>
     <td style="padding:5px 6px"><input type="number" id="psr${id}cbm" value="${cbm}" step="0.0001" placeholder="0.0000"${note} style="width:88px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--mono);font-size:12px" oninput="calcPsrRate(${id})"></td>
-    <td style="padding:5px 6px"><input type="number" id="psr${id}pcs" value="${data&&data.slabCount||''}" placeholder="—" style="width:60px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px"></td>
-    <td style="padding:5px 6px"><input type="number" id="psr${id}thick" value="${data&&data.thicknessMM||''}" placeholder="52" style="width:60px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px"></td>
-    <td style="padding:5px 6px"><input type="number" id="psr${id}tax" value="${data&&data.taxableValue||''}" placeholder="0" style="width:96px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px" oninput="calcPsrRate(${id})"></td>
+    <td style="padding:5px 6px"><input type="number" id="psr${id}pcs" value="${data&&data.slabCount||''}" placeholder="—" style="width:55px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px"></td>
+    <td style="padding:5px 6px"><input type="number" id="psr${id}thick" value="${data&&data.thicknessMM||''}" placeholder="52" style="width:55px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px"></td>
+    <td style="padding:5px 6px" title="Wood value only — no freight/labour">
+      <input type="number" id="psr${id}wval" value="${wval}" placeholder="0" style="width:96px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--mono);font-size:12px">
+    </td>
+    <td style="padding:5px 6px" title="Full taxable incl freight — used for rate calc">
+      <input type="number" id="psr${id}tax" value="${tval}" placeholder="0" style="width:96px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--mono);font-size:12px" oninput="calcPsrRate(${id})">
+    </td>
     <td style="padding:5px 6px"><input type="number" id="psr${id}rate" value="${rate}" style="width:88px;background:#fdf5ec;border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--mono);font-size:12px;font-weight:600" readonly></td>
     <td style="padding:5px 6px"><button class="del-btn" onclick="document.getElementById('psr${id}').remove()">✕</button></td>`;
   document.getElementById('pur-species-tbody').appendChild(tr);
@@ -1275,9 +1285,10 @@ async function saveBatch(){
     const cbm  = parseFloat(document.getElementById('psr'+id+'cbm')?.value)||0;
     const pcs  = parseInt(document.getElementById('psr'+id+'pcs')?.value)||0;
     const thick= parseInt(document.getElementById('psr'+id+'thick')?.value)||0;
-    const tax  = parseFloat(document.getElementById('psr'+id+'tax')?.value)||0;
+    const wval = parseFloat(document.getElementById('psr'+id+'wval')?.value)||0;
+    const tax  = parseFloat(document.getElementById('psr'+id+'tax')?.value)||wval;
     const rate = parseFloat(document.getElementById('psr'+id+'rate')?.value)||0;
-    if(sp&&cbm>0) speciesRows.push({species:sp,totalCBM:cbm,slabCount:pcs,thicknessMM:thick,taxableValue:tax,rateCBM:rate});
+    if(sp&&cbm>0) speciesRows.push({species:sp,totalCBM:cbm,slabCount:pcs,thicknessMM:thick,woodValue:wval,taxableValue:tax,rateCBM:rate});
   });
   if(!speciesRows.length){toast('Add at least one species row with CBM','err');return;}
 
@@ -1371,9 +1382,10 @@ async function loadBatTable(){
     tb.innerHTML=bats.map(b=>{
       const rem=parseFloat(b.remainingCBM);
       const tax=parseFloat(b.taxableValue||0);
+      const woodVal=parseFloat(b.woodValue||b.taxableValue||0);
       const isCN=tax<0||parseFloat(b.totalCBM)<0;
       const st=isCN?'<span class="badge br">Credit Note</span>':rem<0?'<span class="badge br">Over-issued</span>':rem<0.001?'<span class="badge bg">Depleted</span>':'<span class="badge ba">Active</span>';
-      const taxStyle=isCN?'color:var(--red)':'color:var(--wood);font-weight:600';
+      const woodStyle=isCN?'color:var(--red)':'color:var(--wood);font-weight:600';
       return `<tr>
         <td class="mono">${b.invoiceNo}</td>
         <td>${b.date}</td>
@@ -1381,7 +1393,7 @@ async function loadBatTable(){
         <td>${b.species}</td>
         <td class="mono">${b.slabCount||'—'}</td>
         <td class="mono">${parseFloat(b.totalCBM).toFixed(4)}</td>
-        <td class="mono" style="${taxStyle}">₹${Math.abs(tax).toLocaleString('en-IN')}${isCN?' (CN)':''}</td>
+        <td class="mono" style="${woodStyle}" title="Wood value only — excl freight &amp; GST">₹${Math.abs(woodVal).toLocaleString('en-IN')}${isCN?' (CN)':''}</td>
         <td class="mono">${parseFloat(b.issuedCBM||0).toFixed(4)}</td>
         <td class="mono" style="${rem<0?'color:var(--red)':''}">${rem.toFixed(4)}</td>
         <td class="mono">₹${parseInt(b.rateCBM).toLocaleString('en-IN')}</td>
