@@ -1382,7 +1382,12 @@ async function loadBatTable(){
     tb.innerHTML=bats.map(b=>{
       const rem=parseFloat(b.remainingCBM);
       const woodVal=parseFloat(b.woodValue||b.taxableValue||0);
-      const isCN=!!b.isCreditNote;
+      const isCN=!!b.isCreditNote
+        || parseFloat(b.totalCBM)<0
+        || parseFloat(b.taxableValue)<0
+        || /\/CN\//i.test(b.invoiceNo||'')
+        || /credit/i.test(b.notes||'')
+        || !!(b.linkedInvoiceNo);
       const st=isCN
         ? '<span class="badge br">⊖ Credit Note</span>'
         : rem<0?'<span class="badge br">Over-issued</span>'
