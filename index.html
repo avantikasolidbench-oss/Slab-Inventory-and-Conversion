@@ -804,7 +804,7 @@ let CFG={url:'',key:''};
 let ST={role:'',batches:[],clients:[]};
 
 function loadCfg(){
-  CFG.url=localStorage.getItem('st_url')||'https://script.google.com/macros/s/AKfycbwYwwrqYv8A4J5BsthLsgF0KsVX6Q4eebrIflE5p9Srh5s88b8cBUAhjLEz3ZNkpwlvpw/exec';
+  CFG.url=localStorage.getItem('st_url')||'https://script.google.com/macros/s/AKfycby3MjS3xpul-qFHyUmvKaYJWEdiTicbKE9wRmGZbJmXMzuxcVW9GjYVFvovHULXbH_4/exec';
   CFG.key=localStorage.getItem('st_key')||'';
 }
 function saveCfg(){
@@ -1299,7 +1299,7 @@ async function saveBatch(){
   btn.disabled=true;
   btn.innerHTML=`<div class="spin"></div> Saving ${speciesRows.length} batch(es)…`;
 
-  let saved=0, errors=[];
+  let saved=0, errors=[], savedCN=false;
   for(const row of speciesRows){
     // Batch ID = invoiceNo-SPECIES_CODE if multiple species, else invoiceNo
     const suffix = speciesRows.length>1 ? '-'+row.species.split(' ').map(w=>w[0]).join('') : '';
@@ -1313,7 +1313,7 @@ async function saveBatch(){
     };
     try{
       const r=await apiPost({action:'savePurchaseBatch',data});
-      if(r.success) saved++;
+      if(r.success){ saved++; if(isCN) savedCN=true; }
       else if(r.duplicate){
         // Ask to replace
         const ok=confirm(`Batch ${batchId} already exists. Replace?`);
@@ -1330,6 +1330,17 @@ async function saveBatch(){
   if(errors.length) toast('Errors: '+errors.join(', '),'err');
   else toast(`${saved} batch(es) saved ✓`,'ok');
   if(saved>0){ resetPur(); await loadBatches(); }
+  if(savedCN){
+    setTimeout(()=>showConfirm(
+      `⚠️ <strong>Action required for Credit Note</strong><br><br>
+      Go to <strong>Google Sheet → Purchases tab</strong> and find the credit note row.<br><br>
+      Manually make these two values <strong>negative</strong>:<br>
+      • Column E (TotalCBM) — add a minus sign<br>
+      • Column H (TaxableValue) — add a minus sign<br><br>
+      This ensures the credit note deducts correctly from inventory.`,
+      ()=>{}
+    ), 500);
+  }
   btn.disabled=false;btn.innerHTML='💾 Save All Batches';
 }
 async function saveCliInv(){
