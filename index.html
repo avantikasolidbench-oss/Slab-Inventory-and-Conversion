@@ -1384,16 +1384,28 @@ async function loadBatTable(){
       const tax=parseFloat(b.taxableValue||0);
       const woodVal=parseFloat(b.woodValue||b.taxableValue||0);
       const isCN=tax<0||parseFloat(b.totalCBM)<0;
-      const st=isCN?'<span class="badge br">Credit Note</span>':rem<0?'<span class="badge br">Over-issued</span>':rem<0.001?'<span class="badge bg">Depleted</span>':'<span class="badge ba">Active</span>';
+      const rem=parseFloat(b.remainingCBM);
+      const st=isCN
+        ? '<span class="badge br">⊖ Credit Note</span>'
+        : rem<0?'<span class="badge br">Over-issued</span>'
+        : rem<0.001?'<span class="badge bg">Depleted</span>'
+        :'<span class="badge ba">Active</span>';
+      const rowStyle=isCN?'background:#fef8e8;border-left:3px solid var(--amber)':'';
       const woodStyle=isCN?'color:var(--red)':'color:var(--wood);font-weight:600';
-      return `<tr>
-        <td class="mono">${b.invoiceNo}</td>
+      const cbmDisplay=isCN
+        ? `<span style="color:var(--red)">${parseFloat(b.totalCBM).toFixed(4)}</span>`
+        : parseFloat(b.totalCBM).toFixed(4);
+      const woodDisplay=isCN
+        ? `<span style="color:var(--red)">−₹${Math.abs(woodVal).toLocaleString('en-IN')}</span>`
+        : `<span style="${woodStyle}">₹${Math.abs(woodVal).toLocaleString('en-IN')}</span>`;
+      return `<tr style="${rowStyle}">
+        <td class="mono">${b.invoiceNo}${isCN?' <span style="font-size:10px;color:var(--amber);font-weight:600">CN</span>':''}</td>
         <td>${b.date}</td>
         <td>${b.vendor}</td>
         <td>${b.species}</td>
         <td class="mono">${b.slabCount||'—'}</td>
-        <td class="mono">${parseFloat(b.totalCBM).toFixed(4)}</td>
-        <td class="mono" style="${woodStyle}" title="Wood value only — excl freight &amp; GST">₹${Math.abs(woodVal).toLocaleString('en-IN')}${isCN?' (CN)':''}</td>
+        <td class="mono">${cbmDisplay}</td>
+        <td class="mono">${woodDisplay}</td>
         <td class="mono">${parseFloat(b.issuedCBM||0).toFixed(4)}</td>
         <td class="mono" style="${rem<0?'color:var(--red)':''}">${rem.toFixed(4)}</td>
         <td class="mono">₹${parseInt(b.rateCBM).toLocaleString('en-IN')}</td>
