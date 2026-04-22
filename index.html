@@ -465,7 +465,7 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
                 <div class="g2 mb12">
                   <div class="field"><label>Invoice Date</label><input type="date" id="c-date"></div>
                   <div class="field"><label>Primary Species</label>
-                    <select id="c-species"><option>White Oak</option><option>White Ash</option><option>Teak</option><option>Mixed</option></select>
+                    <select id="c-species"><option>White Oak</option><option>White Ash</option><option>Rosewood</option><option>Uttarakhand Teak</option><option>CP Teak</option><option>Siris</option><option>Agar</option><option>Eucalyptus</option><option>Cedar</option></select>
                   </div>
                 </div>
                 <div class="divider"></div>
@@ -754,7 +754,7 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
         <div class="field mb12"><label>Species</label>
           <select id="ep-species" style="background:var(--paper);border:1.5px solid var(--rule);color:var(--ink);padding:9px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;width:100%">
             <option value="">— select —</option>
-            <option>White Oak</option><option>White Ash</option><option>Teak</option><option>Sheesham</option><option>Walnut</option><option>Mixed</option>
+            <option>White Oak</option><option>White Ash</option><option>Rosewood</option><option>Uttarakhand Teak</option><option>CP Teak</option><option>Siris</option><option>Agar</option><option>Eucalyptus</option><option>Cedar</option>
           </select>
         </div>
         <div class="field mb12"><label>Category</label>
@@ -804,7 +804,7 @@ let CFG={url:'',key:''};
 let ST={role:'',batches:[],clients:[]};
 
 function loadCfg(){
-  CFG.url=localStorage.getItem('st_url')||'https://script.google.com/macros/s/AKfycbw511IPne0m4V3XjuGd78RcJF4X6X0iM6MUg_FemzYdv3IOtDMUdo_5QqexS9s3qHE3OQ/exec';
+  CFG.url=localStorage.getItem('st_url')||'https://script.google.com/macros/s/AKfycbxnnncTaWEYhStO0fzTrnimB7XuVJ65cMgsZO8eSWZdcXbc3iK7atVWkrtvLwDXKtV2Tg/exec';
   CFG.key=localStorage.getItem('st_key')||'';
 }
 function saveCfg(){
@@ -1008,7 +1008,7 @@ function addRow(preselBatch, preselCat){
   const today=new Date().toISOString().split('T')[0];
   const id=++rid;
   const copts=(ST.clients||[]).map(c=>`<option>${c}</option>`).join('');
-  const speciesOpts=['White Oak','White Ash','Teak','Sheesham','Walnut','Mixed']
+  const speciesOpts=['White Oak', 'White Ash', 'Rosewood', 'Uttarakhand Teak', 'CP Teak', 'Siris', 'Agar', 'Eucalyptus', 'Cedar']
     .map(s=>`<option>${s}</option>`).join('');
   const b=preselBatch?ST.batches.find(x=>x.invoiceNo===preselBatch):null;
   const preSpecies=b?b.species:'';
@@ -1116,7 +1116,7 @@ Extract header fields:
 - date: document date in YYYY-MM-DD
 
 Then extract ALL wood species line items (there may be one or more):
-- species: map "WHITE OAK"/"OAK"/"W.OAK" → "White Oak", "ASH"/"IMPORTED ASH"/"WHITE ASH" → "White Ash", "TEAK" → "Teak"
+- species: map "WHITE OAK"/"OAK"/"W.OAK" → "White Oak", "ASH"/"IMPORTED ASH"/"WHITE ASH" → "White Ash", "ROSEWOOD" → "Rosewood", "TEAK"/"U.K TEAK"/"UTTARAKHAND" → "Uttarakhand Teak", "CP TEAK" → "CP Teak", "SIRIS" → "Siris", "AGAR" → "Agar", "EUCALYPTUS" → "Eucalyptus", "CEDAR" → "Cedar"
 - quantityUnit: "CBM", "CFT", or "CUM"
 - rawQuantity: numeric quantity as written
 - totalCBM: convert to CBM — CFT × 0.0283168, CBM/CUM as-is
@@ -1200,7 +1200,7 @@ function fillPur(d){
 let purRowId=0;
 function addPurSpeciesRow(data){
   const id=++purRowId;
-  const spOpts=['White Oak','White Ash','Teak','Sheesham','Walnut','Mixed']
+  const spOpts=['White Oak', 'White Ash', 'Rosewood', 'Uttarakhand Teak', 'CP Teak', 'Siris', 'Agar', 'Eucalyptus', 'Cedar']
     .map(s=>`<option ${data&&data.species===s?'selected':''}>${s}</option>`).join('');
   const cbm  = data&&data.totalCBM ? parseFloat(data.totalCBM).toFixed(4) : '';
   const rate = data&&data.rateCBM  ? Math.round(data.rateCBM) : '';
@@ -1248,7 +1248,7 @@ function fillCli(d){
 function addLine(d){
   const tb=document.getElementById('li-tbody');
   const tr=document.createElement('tr');
-  const wopts=['White Oak','White Ash','Teak','Sheesham','Walnut','Mixed'].map(w=>`<option ${d&&d.wood===w?'selected':''}>${w}</option>`).join('');
+  const wopts=['White Oak', 'White Ash', 'Rosewood', 'Uttarakhand Teak', 'CP Teak', 'Siris', 'Agar', 'Eucalyptus', 'Cedar'].map(w=>`<option ${d&&d.wood===w?'selected':''}>${w}</option>`).join('');
   tr.innerHTML=`
     <td><input type="text" value="${d&&d.itemName||''}" placeholder="Item name"></td>
     <td><select>${wopts}</select></td>
@@ -1395,6 +1395,7 @@ async function loadBatTable(){
         ? '<span class="badge br">⊖ Credit Note</span>'
         : rem<0?'<span class="badge br">Over-issued</span>'
         : rem<0.001?'<span class="badge bg">Depleted</span>'
+        : b.hasCreditNote?'<span class="badge ba">Active <span style="font-size:9px">CN adj.</span></span>'
         :'<span class="badge ba">Active</span>';
       const rowStyle=isCN?'background:#fef8e8;border-left:3px solid var(--amber)':'';
       const woodStyle=isCN?'color:var(--red)':'color:var(--wood);font-weight:600';
@@ -1636,7 +1637,7 @@ knox chair/jungle jute/bengal → Chair, jute sisha/arco/siesta → Bench,
 rio bravo/orbit/nested → Side Table, sofa/lounger → Lounger / Sofa,
 console/cabinet/reception → Console / Cabinet
 
-SPECIES — map to: "White Oak", "White Ash", "Teak", "Sheesham", "Walnut"
+SPECIES — map to: "White Oak", "White Ash", "Rosewood", "Uttarakhand Teak", "CP Teak", "Siris", "Agar", "Eucalyptus", "Cedar"
 
 Return ONLY a valid JSON array, no markdown:
 [{
@@ -1719,7 +1720,7 @@ Return ONLY a valid JSON array, no markdown:
         <td><input type="number" value="${r.thickMM||''}" id="${id}t" oninput="cr(${id})" style="width:72px${!r.thickMM?';'+missingStyle:''}"></td>
         <td class="cc" id="${id}cbm">—</td>
         <td class="costc" id="${id}cost">—</td>
-        <td><select id="${id}sp" style="width:96px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px"><option value="">—</option>${['White Oak','White Ash','Teak','Sheesham','Walnut','Mixed'].map(s=>`<option ${r.species===s?'selected':''}>${s}</option>`).join('')}</select></td>
+        <td><select id="${id}sp" style="width:96px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px"><option value="">—</option>${['White Oak', 'White Ash', 'Rosewood', 'Uttarakhand Teak', 'CP Teak', 'Siris', 'Agar', 'Eucalyptus', 'Cedar'].map(s=>`<option ${r.species===s?'selected':''}>${s}</option>`).join('')}</select></td>
         <td><input type="text" value="${r.client||''}" id="${id}c" list="clist" style="width:126px${!r.client?';'+missingStyle:''}" placeholder="${!r.client?'⚠ client':''}"><datalist id="clist">${copts}</datalist></td>
         <td><select id="${id}cat" style="width:156px;background:${r.category?'var(--paper)':'#fef8e8'};border:1px solid ${r.category?'var(--rule)':'var(--amber)'};padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;color:var(--ink3)">${catOpts(r.category||'')}</select></td>
         <td><select id="${id}b" onchange="onRowBatchChange(${id})" style="width:186px;background:${rowBatch?'var(--paper)':'#fef8e8'};border:1px solid ${rowBatch?'var(--rule)':'var(--amber)'};padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;color:var(--ink3)">${bOpts}</select></td>
@@ -1756,7 +1757,7 @@ function toggleObEdit(){
 function addObRow(data){
   const i = obRowCount++;
   const tr = document.createElement('tr');
-  const spOpts = ['White Oak','White Ash','Teak','Sheesham','Walnut','Mixed']
+  const spOpts = ['White Oak', 'White Ash', 'Rosewood', 'Uttarakhand Teak', 'CP Teak', 'Siris', 'Agar', 'Eucalyptus', 'Cedar']
     .map(s=>`<option ${data&&data.species===s?'selected':''}>${s}</option>`).join('');
   tr.innerHTML = `
     <td><select id="ob-sp-${i}" style="background:var(--paper);border:1px solid var(--rule);padding:7px 10px;border-radius:3px;font-family:var(--sans);font-size:13px;width:130px">${spOpts}</select></td>
