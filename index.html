@@ -244,25 +244,11 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
       <span class="lg-sub">Solid Bench · Wood Inventory</span>
     </div>
     <div class="lg-card">
-      <span class="lg-lbl">Select your role</span>
-      <div class="role-grid">
-        <div class="role-btn" onclick="selectRole('finance')" id="role-finance">
-          <span class="ri">💼</span><span class="rn">Finance</span><span class="rd">Invoices & purchases</span>
-        </div>
-        <div class="role-btn" onclick="selectRole('store')" id="role-store">
-          <span class="ri">🪵</span><span class="rn">Store</span><span class="rd">Slab issuance</span>
-        </div>
-        <div class="role-btn" onclick="selectRole('viewer')" id="role-viewer">
-          <span class="ri">📊</span><span class="rn">Viewer</span><span class="rd">Dashboard only</span>
-        </div>
-        <div class="role-btn" onclick="selectRole('admin')" id="role-admin">
-          <span class="ri">🔑</span><span class="rn">Admin</span><span class="rd">Full access</span>
-        </div>
-      </div>
+      <span class="lg-lbl">Enter your PIN</span>
       <input class="pin-inp" type="password" id="pin" maxlength="4" placeholder="····"
         oninput="document.getElementById('lg-err').textContent=''"
         onkeydown="if(event.key==='Enter')doLogin()">
-      <button class="lg-go" onclick="doLogin()">Enter</button>
+      <button class="lg-go" onclick="doLogin()">Enter →</button>
       <div class="lg-err" id="lg-err"></div>
     </div>
   </div>
@@ -809,7 +795,6 @@ let ST={role:'',batches:[],clients:[]};
 function loadCfg(){
   CFG.url=localStorage.getItem('st_url')||'';
   CFG.key=localStorage.getItem('st_key')||'';
-  if(!CFG.url) showCfg();
 }
 function saveCfg(){
   CFG.url=document.getElementById('cfg-url').value.trim();
@@ -831,23 +816,16 @@ function selectRole(r){
 }
 async function doLogin(){
   const pin=document.getElementById('pin').value.trim();
-  if(!selRole){
-    document.getElementById('lg-err').textContent='← Please select a role first';
-    document.querySelector('.role-grid').style.outline='2px solid var(--red)';
-    return;
-  }
-  document.querySelector('.role-grid').style.outline='';
   if(!pin){document.getElementById('lg-err').textContent='Please enter your PIN';return;}
-  if(!CFG.url){
-    document.getElementById('lg-err').textContent='API URL not set — tap ⚙ Settings';
-    showCfg();
-    return;
-  }
+  if(!CFG.url){document.getElementById('lg-err').textContent='API URL not set — tap ⚙ Settings';showCfg();return;}
+  const btn=document.querySelector('.lg-go');
+  btn.disabled=true;btn.textContent='Checking…';
   try{
     const r=await apiGet({action:'verifyPIN',pin});
-    if(r.success) enterApp(r.role||selRole);
-    else{document.getElementById('lg-err').textContent='Incorrect PIN';document.getElementById('pin').value='';}
+    if(r.success) enterApp(r.role);
+    else{document.getElementById('lg-err').textContent='Incorrect PIN — try again';document.getElementById('pin').value='';document.getElementById('pin').focus();}
   }catch(e){document.getElementById('lg-err').textContent='Cannot reach server — check Settings';}
+  btn.disabled=false;btn.textContent='Enter →';
 }
 function enterApp(role){
   ST.role=role;
@@ -895,7 +873,7 @@ async function apiGet(p){
   return r.json();
 }
 async function apiPost(d){
-  if(!CFG.url){showCfg();throw new Error('No URL');}
+  if(!CFG.url) throw new Error('No URL configured');
   const r=await fetch(CFG.url,{method:'POST',body:JSON.stringify(d)});
   return r.json();
 }
@@ -1809,7 +1787,7 @@ async function loadLog(){
   document.getElementById('log-batch').value='';
   document.getElementById('log-search').value='';
   try{
-    if(!CFG.url){showCfg();return;}
+    if(!CFG.url){document.getElementById('log-tbody').innerHTML='<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--red)">API URL not set — go to ⚙ Settings</td></tr>';return;}
     const resp = await fetch(CFG.url+'?action=getIssuances');
     const text = await resp.text();
     let r;
