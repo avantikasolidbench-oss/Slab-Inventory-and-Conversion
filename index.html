@@ -607,7 +607,7 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
               <p style="font-size:12px;color:var(--ink3);margin-bottom:16px">Enter stock on hand as on 31 Mar 2026 — one row per species. Value excludes GST.</p>
               <table class="tbl" style="margin-bottom:12px">
                 <thead><tr>
-                  <th>Species</th><th>CBM on 31 Mar</th><th>Total Value ₹ (excl GST)</th><th>Implied Rate/CBM</th><th></th>
+                  <th>Species</th><th>CBM on 31 Mar</th><th>Total Value ₹ (excl GST)</th><th>Implied Rate/CBM</th><th>Slabs Purchased</th><th>Slabs Left</th><th></th>
                 </tr></thead>
                 <tbody id="ob-tbody"></tbody>
               </table>
@@ -1910,6 +1910,8 @@ function addObRow(data){
     <td><input type="number" id="ob-cbm-${i}" value="${data&&data.cbm||''}" step="0.0001" placeholder="0.0000" style="width:110px;background:var(--paper);border:1px solid var(--rule);padding:7px 10px;border-radius:3px;font-family:var(--mono);font-size:13px" oninput="calcObRate(${i})"></td>
     <td><input type="number" id="ob-val-${i}" value="${data&&data.value||''}" placeholder="0" style="width:130px;background:var(--paper);border:1px solid var(--rule);padding:7px 10px;border-radius:3px;font-family:var(--sans);font-size:13px" oninput="calcObRate(${i})"></td>
     <td><input type="number" id="ob-rate-${i}" value="${data&&data.rate||''}" style="width:110px;background:#fdf5ec;border:1px solid var(--rule);padding:7px 10px;border-radius:3px;font-family:var(--mono);font-size:13px;font-weight:600" readonly></td>
+    <td><input type="number" id="ob-spurch-${i}" value="${data&&data.slabsPurchased||''}" placeholder="0" style="width:80px;background:var(--paper);border:1px solid var(--rule);padding:7px 10px;border-radius:3px;font-family:var(--mono);font-size:13px"></td>
+    <td><input type="number" id="ob-sleft-${i}" value="${data&&data.slabsLeft||''}" placeholder="0" style="width:80px;background:#fdf5ec;border:1px solid var(--rule);padding:7px 10px;border-radius:3px;font-family:var(--mono);font-size:13px;font-weight:600"></td>
     <td><button class="del-btn" onclick="this.closest('tr').remove()">✕</button></td>`;
   document.getElementById('ob-tbody').appendChild(tr);
 }
@@ -1922,11 +1924,14 @@ function calcObRate(i){
 async function saveOpeningBalance(){
   const rows=[];
   document.querySelectorAll('#ob-tbody tr').forEach((tr,i)=>{
-    const sp=tr.querySelector('select').value;
-    const cbm=parseFloat(tr.querySelectorAll('input')[0].value)||0;
-    const val=parseFloat(tr.querySelectorAll('input')[1].value)||0;
-    const rate=parseFloat(tr.querySelectorAll('input')[2].value)||0;
-    if(sp&&cbm>0&&val>0) rows.push({species:sp,cbm,value:val,rate});
+    const sp      = tr.querySelector('select').value;
+    const inputs  = tr.querySelectorAll('input');
+    const cbm     = parseFloat(inputs[0].value)||0;
+    const val     = parseFloat(inputs[1].value)||0;
+    const rate    = parseFloat(inputs[2].value)||0;
+    const slabsPurchased = parseInt(inputs[3].value)||0;
+    const slabsLeft      = parseInt(inputs[4].value)||0;
+    if(sp&&cbm>0&&val>0) rows.push({species:sp,cbm,value:val,rate,slabsPurchased,slabsLeft});
   });
   if(!rows.length){toast('Please add at least one species row','err');return;}
   const btn=document.getElementById('ob-save-btn');
@@ -2180,6 +2185,7 @@ async function loadInv(){
           <div class="kpi-lbl">${o.species}</div>
           <div style="font-family:var(--serif);font-size:20px;color:var(--wood)">₹${parseInt(o.value||0).toLocaleString('en-IN')}</div>
           <div style="font-family:var(--mono);font-size:11px;color:var(--ink3)">${parseFloat(o.cbm||0).toFixed(4)} CBM · ₹${parseInt(o.rate||0).toLocaleString('en-IN')}/CBM</div>
+          ${o.slabsLeft?`<div style="font-size:11px;color:var(--ink2);margin-top:4px">${o.slabsLeft} slabs in stock</div>`:''}
         </div>`).join('');
       // Pre-fill edit form with existing values
       if(!obEditing){
