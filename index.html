@@ -980,7 +980,7 @@ function catOpts(selVal){
 }
 function batchOpts(selVal){
   return '<option value="">— batch —</option>'+
-    ST.batches.map(b=>`<option value="${b.invoiceNo}" ${b.invoiceNo===selVal?'selected':''}>${b.invoiceNo} · ${b.species}</option>`).join('');
+    ST.batches.map(b=>`<option value="${b.invoiceNo}" ${b.invoiceNo===selVal?'selected':''}>${b.invoiceNo} · ${b.species} · ${b.date}</option>`).join('');
 }
 
 function massAssignAll(){
@@ -988,22 +988,26 @@ function massAssignAll(){
   const cat = document.getElementById('mass-cat-sel').value;
   if(!inv&&!cat){toast('Select a batch or category to apply','err');return;}
   const b = inv ? ST.batches.find(x=>x.invoiceNo===inv) : null;
-  document.querySelectorAll('[id$="b"]').forEach(el=>{
-    const id=el.id.replace('b','');
-    if(!isNaN(id)&&parseInt(id)>0){
-      if(inv){ el.value=inv; el.style.borderColor=''; el.style.background='';
-        if(b&&b.species){ const sp=document.getElementById(id+'sp'); if(sp&&!sp.value) sp.value=b.species; }
-        cr(parseInt(id));
-      }
+  let batchCount=0, catCount=0;
+  // Use more precise selector — row batch selects have id like "1b","2b" etc
+  document.querySelectorAll('#slab-tbody select[id$="b"]').forEach(el=>{
+    if(inv){
+      el.value=inv;
+      el.style.borderColor='';
+      el.style.background='';
+      const rowId=el.id.slice(0,-1); // remove trailing 'b'
+      if(b&&b.species){ const sp=document.getElementById(rowId+'sp'); if(sp&&!sp.value) sp.value=b.species; }
+      cr(parseInt(rowId));
+      batchCount++;
     }
   });
   if(cat){
-    document.querySelectorAll('[id$="cat"]').forEach(el=>{
-      const id=el.id.replace('cat','');
-      if(!isNaN(id)&&parseInt(id)>0) el.value=cat;
+    document.querySelectorAll('#slab-tbody select[id$="cat"]').forEach(el=>{
+      el.value=cat;
+      catCount++;
     });
   }
-  toast(`${inv?'Batch':''}${inv&&cat?' + ':''}${cat?'Category':''} applied to all rows ✓`,'ok');
+  toast(`${inv?'Batch applied to '+batchCount+' rows':''}${inv&&cat?' · ':''}${cat?'Category applied to '+catCount+' rows':''}  ✓`,'ok');
 }
 
 // Keep old name for compatibility
@@ -1999,7 +2003,15 @@ function populateLogFilters(){
   const epclist=document.getElementById('ep-clist');
   if(epclist) epclist.innerHTML=clients.map(c=>`<option>${c}</option>`).join('');
   const epbatch=document.getElementById('ep-batch');
-  if(epbatch) epbatch.innerHTML='<option value="">— no batch —</option>'+ST.batches.map(b=>`<option value="${b.invoiceNo}">${b.invoiceNo} · ${b.species}</option>`).join('');
+  if(epbatch) {
+    // Ensure batches loaded — use then() since we may not be in async context
+    const fillBatchDrop = () => {
+      epbatch.innerHTML='<option value="">— no batch —</option>'+
+        ST.batches.map(b=>`<option value="${b.invoiceNo}">${b.invoiceNo} · ${b.species} · ${b.date}</option>`).join('');
+    };
+    if(!ST.batches.length) loadBatches().then(fillBatchDrop);
+    else fillBatchDrop();
+  }
 }
 
 function applyLogFilters(){
@@ -2144,11 +2156,17 @@ async function saveEditPanel(){
     const res=await apiPost({action:'updateIssuance',data:updated});
     if(res.success){
       toast('Issuance updated ✓','ok');
+      btn.disabled=false;btn.textContent='💾 Save Changes';
       closeEditPanel();
-      await loadLog();
-    } else toast('Error: '+(res.error||'Unknown'),'err');
-  }catch(e){toast('Network error','err');}
-  btn.disabled=false;btn.innerHTML='💾 Save Changes';
+      setTimeout(async()=>{ try{ await loadLog(); }catch(e){ console.error('loadLog after save:', e); }}, 500);
+    } else {
+      toast('Error: '+(res.error||'Unknown'),'err');
+      btn.disabled=false;btn.innerHTML='💾 Save Changes';
+    }
+  }catch(e){
+    toast('Network error: '+e.message,'err');
+    btn.disabled=false;btn.innerHTML='💾 Save Changes';
+  }
 }
 
 async function deleteIssuance(){
