@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>SangwariTrack — Wood Seasoning & Dispatch</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0f0e0c;--bg2:#1a1814;--bg3:#242018;--bg4:#2e2a22;
+  --ink:#f0ebe0;--ink2:#c8c0ae;--ink3:#8a8070;
+  --wood:#d4843e;--wood2:#b5692a;--wood3:#7a4218;
+  --green:#4a9a6a;--red:#c04a3a;--amber:#c8960a;--blue:#3a7ab0;
+  --seasoned:#4a9a6a;--gas:#3a7ab0;--solar:#c8960a;--raw:#8a8070;
+  --rule:rgba(255,255,255,.08);
+  --sans:'DM Sans',sans-serif;--mono:'Space Mono',monospace;
+  --r:6px;--r2:12px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{height:100%;-webkit-text-size-adjust:100%}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;min-height:100%;overscroll-behavior:none}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
+
+/* ── LOGIN ── */
+#login{display:none;position:fixed;inset:0;background:var(--bg);z-index:200;align-items:center;justify-content:center;flex-direction:column;padding:24px}
+#login.show{display:flex}
+.lg-logo{font-family:var(--mono);font-size:11px;letter-spacing:4px;color:var(--ink3);text-transform:uppercase;margin-bottom:8px}
+.lg-title{font-family:var(--mono);font-size:28px;color:var(--wood);margin-bottom:4px;letter-spacing:-1px}
+.lg-sub{font-size:12px;color:var(--ink3);margin-bottom:48px;letter-spacing:2px;text-transform:uppercase}
+.lg-box{background:var(--bg2);border:1px solid var(--rule);border-radius:var(--r2);padding:32px 28px;width:100%;max-width:360px}
+.lg-label{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--ink3);margin-bottom:10px;display:block}
+.lg-pin{width:100%;background:var(--bg3);border:1.5px solid var(--rule);color:var(--ink);padding:16px;border-radius:var(--r);font-family:var(--mono);font-size:28px;letter-spacing:12px;text-align:center;margin-bottom:16px;-webkit-appearance:none}
+.lg-pin:focus{outline:none;border-color:var(--wood)}
+.lg-btn{width:100%;background:var(--wood);color:white;border:none;border-radius:var(--r);padding:16px;font-family:var(--sans);font-size:15px;font-weight:600;cursor:pointer;letter-spacing:.5px}
+.lg-btn:active{background:var(--wood2)}
+.lg-err{color:var(--red);font-size:12px;margin-top:10px;text-align:center;min-height:18px}
+
+/* ── APP SHELL ── */
+#app{display:none;min-height:100vh;flex-direction:column}
+#app.show{display:flex}
+
+/* ── TOP BAR ── */
+.topbar{background:var(--bg2);border-bottom:1px solid var(--rule);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.tb-logo{font-family:var(--mono);font-size:14px;color:var(--wood);font-weight:700;letter-spacing:-0.5px}
+.tb-right{display:flex;align-items:center;gap:10px}
+.tb-pill{background:var(--bg3);border:1px solid var(--rule);padding:4px 10px;border-radius:20px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3)}
+.tb-out{background:none;border:1px solid var(--rule);color:var(--ink3);padding:6px 12px;border-radius:var(--r);cursor:pointer;font-size:12px;font-family:var(--sans)}
+.tb-out:active{color:var(--red);border-color:var(--red)}
+
+/* ── BOTTOM NAV ── */
+.bot-nav{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--rule);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 4px;cursor:pointer;border:none;background:none;color:var(--ink3);font-family:var(--sans);font-size:10px;letter-spacing:.5px;gap:4px;-webkit-tap-highlight-color:transparent}
+.bn-item.active{color:var(--wood)}
+.bn-icon{font-size:20px;line-height:1}
+
+/* ── CONTENT ── */
+.content{flex:1;overflow-y:auto;padding-bottom:80px}
+.screen{display:none;padding:16px}
+.screen.active{display:block}
+
+/* ── CARDS ── */
+.card{background:var(--bg2);border:1px solid var(--rule);border-radius:var(--r2);margin-bottom:16px;overflow:hidden}
+.card-head{padding:14px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--ink3);font-weight:600}
+.card-body{padding:16px}
+
+/* ── KPI GRID ── */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.kpi{background:var(--bg2);border:1px solid var(--rule);border-radius:var(--r2);padding:14px}
+.kpi-lbl{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);margin-bottom:6px}
+.kpi-val{font-family:var(--mono);font-size:22px;color:var(--ink);line-height:1}
+.kpi-sub{font-size:11px;color:var(--ink3);margin-top:4px}
+
+/* ── STATUS BADGES ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+.b-raw{background:rgba(138,128,112,.2);color:var(--raw)}
+.b-gas{background:rgba(58,122,176,.2);color:var(--gas)}
+.b-solar{background:rgba(200,150,10,.2);color:var(--solar)}
+.b-seasoned{background:rgba(74,154,106,.2);color:var(--seasoned)}
+.b-red{background:rgba(192,74,58,.2);color:var(--red)}
+.b-wood{background:rgba(212,132,62,.2);color:var(--wood)}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 20px;border-radius:var(--r);border:none;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:opacity .15s}
+.btn:active{opacity:.75}
+.btn-primary{background:var(--wood);color:white}
+.btn-sec{background:var(--bg3);color:var(--ink2);border:1px solid var(--rule)}
+.btn-danger{background:rgba(192,74,58,.2);color:var(--red);border:1px solid rgba(192,74,58,.3)}
+.btn-full{width:100%}
+.btn-sm{padding:8px 14px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── FORMS ── */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);margin-bottom:8px}
+.field input,.field select,.field textarea{width:100%;background:var(--bg3);border:1.5px solid var(--rule);color:var(--ink);padding:12px 14px;border-radius:var(--r);font-family:var(--sans);font-size:15px;-webkit-appearance:none}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--wood)}
+.field textarea{resize:vertical;min-height:80px}
+select option{background:var(--bg3);color:var(--ink)}
+
+/* ── BATCH LIST ── */
+.batch-item{padding:14px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:flex-start;gap:12px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.batch-item:last-child{border-bottom:none}
+.batch-item:active{background:var(--bg3)}
+.bi-main{flex:1;min-width:0}
+.bi-inv{font-family:var(--mono);font-size:13px;color:var(--wood);font-weight:700}
+.bi-meta{font-size:12px;color:var(--ink3);margin-top:2px}
+.bi-nums{text-align:right;flex-shrink:0}
+.bi-cft{font-family:var(--mono);font-size:14px;color:var(--ink);font-weight:700}
+.bi-val{font-size:11px;color:var(--ink3);margin-top:2px}
+
+/* ── SLAB LIST ── */
+.slab-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--rule)}
+.slab-item:last-child{border-bottom:none}
+.slab-cb{width:22px;height:22px;border:2px solid var(--rule);border-radius:4px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;background:var(--bg3)}
+.slab-cb.checked{background:var(--wood);border-color:var(--wood)}
+.slab-cb.checked::after{content:'✓';color:white;font-size:13px;font-weight:700}
+.slab-main{flex:1;min-width:0}
+.slab-dims{font-family:var(--mono);font-size:13px;color:var(--ink)}
+.slab-meta{font-size:11px;color:var(--ink3);margin-top:2px}
+.slab-cft{font-family:var(--mono);font-size:13px;color:var(--wood);flex-shrink:0}
+
+/* ── STATUS BAR for bulk update ── */
+.bulk-bar{position:fixed;bottom:60px;left:0;right:0;background:var(--wood);padding:12px 16px;display:none;align-items:center;justify-content:space-between;z-index:99;border-top:1px solid rgba(255,255,255,.2)}
+.bulk-bar.show{display:flex}
+.bulk-count{font-size:13px;font-weight:600;color:white}
+.bulk-actions{display:flex;gap:8px}
+.bulk-btn{background:rgba(255,255,255,.2);border:none;color:white;padding:6px 12px;border-radius:var(--r);font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer}
+.bulk-btn:active{background:rgba(255,255,255,.35)}
+
+/* ── MODAL ── */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;align-items:flex-end;justify-content:center}
+.modal.show{display:flex}
+.modal-box{background:var(--bg2);border-radius:var(--r2) var(--r2) 0 0;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:20px 20px calc(20px + env(safe-area-inset-bottom))}
+.modal-handle{width:36px;height:4px;background:var(--bg4);border-radius:2px;margin:0 auto 16px}
+.modal-title{font-family:var(--mono);font-size:16px;color:var(--ink);margin-bottom:4px;font-weight:700}
+.modal-sub{font-size:12px;color:var(--ink3);margin-bottom:20px}
+
+/* ── TOAST ── */
+.toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:var(--bg4);color:var(--ink);padding:10px 20px;border-radius:20px;font-size:13px;z-index:500;white-space:nowrap;border:1px solid var(--rule)}
+.toast.ok{background:rgba(74,154,106,.9);border-color:var(--seasoned)}
+.toast.err{background:rgba(192,74,58,.9);border-color:var(--red)}
+
+/* ── DIVIDER ── */
+.divider{height:1px;background:var(--rule);margin:16px 0}
+
+/* ── SECTION TITLE ── */
+.sec-title{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--ink3);font-weight:600;margin-bottom:12px;margin-top:20px}
+.sec-title:first-child{margin-top:0}
+
+/* ── UPLOAD ZONE ── */
+.uz{border:2px dashed var(--rule);border-radius:var(--r2);padding:32px 20px;text-align:center;cursor:pointer;position:relative;background:var(--bg3)}
+.uz:active{border-color:var(--wood);background:var(--bg4)}
+.uz input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.uz-icon{font-size:32px;margin-bottom:8px}
+.uz-title{font-size:14px;font-weight:600;color:var(--ink2);margin-bottom:4px}
+.uz-sub{font-size:12px;color:var(--ink3)}
+.ai-spin-wrap{display:none;align-items:center;gap:10px;padding:12px 16px;background:rgba(58,122,176,.15);border-radius:var(--r);border:1px solid rgba(58,122,176,.3);margin-top:12px;font-size:13px;color:var(--blue)}
+.ai-spin-wrap.show{display:flex}
+.ai-spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(58,122,176,.3);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── TABLE ── */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-bottom:1px solid var(--rule);white-space:nowrap}
+.tbl td{padding:10px;border-bottom:1px solid var(--rule);color:var(--ink2)}
+.tbl tr:last-child td{border-bottom:none}
+.mono{font-family:var(--mono);font-size:12px}
+
+/* ── SPECIES TAG ── */
+.sp-tag{display:inline-block;background:rgba(212,132,62,.15);color:var(--wood);border-radius:3px;padding:2px 6px;font-size:11px;font-weight:600}
+
+/* ── PROGRESS BAR ── */
+.prog-bar{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-top:6px}
+.prog-fill{height:100%;border-radius:3px;transition:width .6s ease}
+
+/* ── DISPATCH TABLE (slab entry) ── */
+.dtbl{width:100%;border-collapse:collapse;min-width:360px}
+.dtbl th{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);padding:6px 8px;border-bottom:1px solid var(--rule);text-align:left}
+.dtbl td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.04)}
+.dtbl input,.dtbl select{background:var(--bg3);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;font-family:var(--sans);font-size:13px;width:100%}
+.dtbl input:focus,.dtbl select:focus{outline:none;border-color:var(--wood)}
+
+/* ── STATUS PICKER ── */
+.status-pick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.sp-opt{padding:12px;border-radius:var(--r);border:2px solid var(--rule);cursor:pointer;text-align:center;-webkit-tap-highlight-color:transparent}
+.sp-opt.sel-raw{border-color:var(--raw);background:rgba(138,128,112,.15)}
+.sp-opt.sel-gas{border-color:var(--gas);background:rgba(58,122,176,.15)}
+.sp-opt.sel-solar{border-color:var(--solar);background:rgba(200,150,10,.15)}
+.sp-opt.sel-seasoned{border-color:var(--seasoned);background:rgba(74,154,106,.15)}
+.sp-opt-icon{font-size:20px;margin-bottom:4px}
+.sp-opt-lbl{font-size:12px;font-weight:600}
+.sp-opt-sub{font-size:10px;color:var(--ink3);margin-top:2px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login" class="show">
+  <div style="text-align:center;margin-bottom:40px">
+    <div class="lg-logo">Xpertpack</div>
+    <div class="lg-title">SangwariTrack</div>
+    <div class="lg-sub">Wood Seasoning & Dispatch</div>
+  </div>
+  <div class="lg-box">
+    <span class="lg-label">Enter PIN</span>
+    <input class="lg-pin" type="password" id="pin" maxlength="4" placeholder="····"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="lg-btn" onclick="doLogin()">Enter →</button>
+    <div class="lg-err" id="lg-err"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="tb-logo">🪵 SangwariTrack</div>
+    <div class="tb-right">
+      <span class="tb-pill" id="user-pill">Manager</span>
+      <button class="tb-out" onclick="showSWCfg()" style="font-size:11px">⚙</button>
+      <button class="tb-out" onclick="logout()">Out</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="screen active" id="screen-dash">
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-lbl">Total Stock</div><div class="kpi-val" id="k-stock">—</div><div class="kpi-sub">CFT in yard</div></div>
+        <div class="kpi"><div class="kpi-lbl">Seasoned</div><div class="kpi-val" id="k-seasoned" style="color:var(--seasoned)">—</div><div class="kpi-sub">ready to dispatch</div></div>
+        <div class="kpi"><div class="kpi-lbl">In Chamber</div><div class="kpi-val" id="k-chamber" style="color:var(--amber)">—</div><div class="kpi-sub">gas + solar</div></div>
+        <div class="kpi"><div class="kpi-lbl">Unseasoned</div><div class="kpi-val" id="k-raw" style="color:var(--ink3)">—</div><div class="kpi-sub">not yet started</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title">Stock by Species</span></div>
+        <div id="species-list"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title">Recent Dispatches to Solid Bench</span></div>
+        <div id="recent-dispatch"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title">Batches Needing Attention</span></div>
+        <div id="attention-list"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- INVENTORY (Slab level with seasoning) -->
+    <div class="screen" id="screen-inv">
+      <div style="display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px">
+        <button class="btn btn-sm" id="flt-all" onclick="filterSlabs('all')" style="background:var(--wood);color:white;white-space:nowrap">All</button>
+        <button class="btn btn-sm btn-sec" id="flt-raw" onclick="filterSlabs('Unseasoned')" style="white-space:nowrap">🪵 Unseasoned</button>
+        <button class="btn btn-sm btn-sec" id="flt-gas" onclick="filterSlabs('Gas Chamber')" style="white-space:nowrap">⚗️ Gas</button>
+        <button class="btn btn-sm btn-sec" id="flt-solar" onclick="filterSlabs('Solar Chamber')" style="white-space:nowrap">☀️ Solar</button>
+        <button class="btn btn-sm btn-sec" id="flt-seasoned" onclick="filterSlabs('Seasoned')" style="white-space:nowrap">✅ Seasoned</button>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-sec btn-sm" onclick="selectAllSlabs()" id="sel-all-btn">Select All</button>
+        <span style="font-size:12px;color:var(--ink3);align-self:center" id="slab-count-lbl">— slabs</span>
+      </div>
+
+      <div class="card" id="slab-list">
+        <div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div>
+      </div>
+    </div>
+
+    <!-- PURCHASES (Bills) -->
+    <div class="screen" id="screen-pur">
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button class="btn btn-primary btn-sm" onclick="showPurModal()">+ New Bill</button>
+        <button class="btn btn-sec btn-sm" onclick="switchPurTab('batches')">All Batches</button>
+      </div>
+
+      <div class="card" id="pur-batches">
+        <div class="card-head"><span class="card-title">Purchase Batches</span></div>
+        <div id="batch-list"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- DISPATCH -->
+    <div class="screen" id="screen-dis">
+      <button class="btn btn-primary btn-full" onclick="showDispatchModal()" style="margin-bottom:16px">+ New Dispatch to Solid Bench</button>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title">Dispatch History</span></div>
+        <div id="dispatch-list"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- BOTTOM NAV -->
+  <nav class="bot-nav">
+    <button class="bn-item active" id="nav-dash" onclick="goTo('dash')">
+      <span class="bn-icon">📊</span>Dashboard
+    </button>
+    <button class="bn-item" id="nav-inv" onclick="goTo('inv')">
+      <span class="bn-icon">🪵</span>Inventory
+    </button>
+    <button class="bn-item" id="nav-pur" onclick="goTo('pur')">
+      <span class="bn-icon">📦</span>Purchase
+    </button>
+    <button class="bn-item" id="nav-dis" onclick="goTo('dis')">
+      <span class="bn-icon">🚚</span>Dispatch
+    </button>
+  </nav>
+</div>
+
+<!-- BULK STATUS BAR -->
+<div class="bulk-bar" id="bulk-bar">
+  <span class="bulk-count" id="bulk-count">0 selected</span>
+  <div class="bulk-actions">
+    <button class="bulk-btn" onclick="showBulkStatus()">Change Status</button>
+    <button class="bulk-btn" onclick="clearSelection()" style="background:rgba(255,255,255,.1)">✕</button>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal" id="sw-cfg-modal">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">⚙ Settings</div>
+    <div class="modal-sub">Saved in this browser only</div>
+    <div class="field">
+      <label>Claude API Key (for AI bill reading)</label>
+      <input type="password" id="sw-cfg-key" placeholder="sk-ant-...">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-sec" onclick="closeSWCfg()" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSWCfg()" style="flex:2">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- PURCHASE MODAL -->
+<div class="modal" id="pur-modal">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">New Purchase Bill</div>
+    <div class="modal-sub">Upload vendor bill — AI reads automatically</div>
+
+    <div class="uz" id="uz-pur" onclick="document.getElementById('f-pur').click()">
+      <input type="file" accept="image/*,.pdf" id="f-pur" onchange="procPurFile(event)" style="display:none">
+      <div class="uz-icon">📄</div>
+      <div class="uz-title">Tap to upload bill</div>
+      <div class="uz-sub">JPG, PNG or PDF</div>
+    </div>
+    <div class="ai-spin-wrap" id="ai-pur"><div class="ai-spin"></div> Reading invoice…</div>
+    <img id="prev-pur" style="display:none;max-width:100%;border-radius:var(--r);margin-top:12px;border:1px solid var(--rule)">
+
+    <div id="pur-form" style="display:none;margin-top:16px">
+      <div class="field"><label>Vendor</label><input type="text" id="p-vendor"></div>
+      <div class="field"><label>Invoice No.</label><input type="text" id="p-invno"></div>
+      <div class="field"><label>Date</label><input type="date" id="p-date"></div>
+      <div class="field"><label>Species</label>
+        <select id="p-species">
+          <option>White Oak</option><option>White Ash</option><option>Rosewood</option>
+          <option>Uttarakhand Teak</option><option>CP Teak</option><option>Siris</option>
+          <option>Agar</option><option>Eucalyptus</option><option>Cedar</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>Total CFT</label><input type="number" id="p-cft" step="0.01" oninput="calcPurCBM()"></div>
+        <div class="field"><label>Total CBM (auto)</label><input type="number" id="p-cbm" step="0.0001" readonly style="opacity:.6"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>Slabs</label><input type="number" id="p-slabs"></div>
+        <div class="field"><label>Thickness mm</label><input type="number" id="p-thick"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>Wood Value ₹</label><input type="number" id="p-woodval" oninput="calcPurRate()"></div>
+        <div class="field"><label>Total Taxable ₹</label><input type="number" id="p-taxable" oninput="calcPurRate()"></div>
+      </div>
+      <div class="field"><label>Rate/CFT ₹ (auto)</label><input type="number" id="p-ratecft" readonly style="background:#1a2a1a;opacity:.8"></div>
+      <div class="field"><label>Initial Seasoning Status</label>
+        <select id="p-status">
+          <option value="Unseasoned">🪵 Unseasoned</option>
+          <option value="Gas Chamber">⚗️ In Gas Chamber</option>
+          <option value="Solar Chamber">☀️ In Solar Chamber</option>
+          <option value="Seasoned">✅ Seasoned</option>
+        </select>
+      </div>
+      <div class="field"><label>Notes</label><textarea id="p-notes" placeholder="Any notes about this batch…"></textarea></div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-sec" onclick="closePurModal()" style="flex:1">Cancel</button>
+        <button class="btn btn-primary" onclick="savePurchase()" style="flex:2" id="pur-save-btn">💾 Save Batch</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px" id="pur-manual-btn-wrap">
+      <button class="btn btn-sec btn-full" onclick="showPurForm()">Enter Manually</button>
+    </div>
+    <button class="btn btn-sec btn-full" onclick="closePurModal()" style="margin-top:8px">Close</button>
+  </div>
+</div>
+
+<!-- BULK STATUS MODAL -->
+<div class="modal" id="status-modal">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="bulk-modal-title">Update Status</div>
+    <div class="modal-sub" id="bulk-modal-sub">Select new seasoning status</div>
+    <div class="status-pick">
+      <div class="sp-opt" onclick="setBulkStatus('Unseasoned')">
+        <div class="sp-opt-icon">🪵</div>
+        <div class="sp-opt-lbl" style="color:var(--raw)">Unseasoned</div>
+        <div class="sp-opt-sub">Just arrived</div>
+      </div>
+      <div class="sp-opt" onclick="setBulkStatus('Gas Chamber')">
+        <div class="sp-opt-icon">⚗️</div>
+        <div class="sp-opt-lbl" style="color:var(--gas)">Gas Chamber</div>
+        <div class="sp-opt-sub">In treatment</div>
+      </div>
+      <div class="sp-opt" onclick="setBulkStatus('Solar Chamber')">
+        <div class="sp-opt-icon">☀️</div>
+        <div class="sp-opt-lbl" style="color:var(--solar)">Solar Chamber</div>
+        <div class="sp-opt-sub">Solar drying</div>
+      </div>
+      <div class="sp-opt" onclick="setBulkStatus('Seasoned')">
+        <div class="sp-opt-icon">✅</div>
+        <div class="sp-opt-lbl" style="color:var(--seasoned)">Seasoned</div>
+        <div class="sp-opt-sub">Ready to ship</div>
+      </div>
+    </div>
+    <button class="btn btn-sec btn-full" onclick="closeStatusModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- DISPATCH MODAL -->
+<div class="modal" id="dis-modal">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Dispatch to Solid Bench</div>
+    <div class="modal-sub">Enter dispatch bill details and slab dimensions</div>
+
+    <div class="field"><label>Xpertpack Bill No.</label><input type="text" id="d-billno" placeholder="XP/001/2026-27"></div>
+    <div class="field"><label>Dispatch Date</label><input type="date" id="d-date"></div>
+    <div class="field"><label>Source Batch</label>
+      <select id="d-batch" onchange="updateDispatchRate()">
+        <option value="">— select batch —</option>
+      </select>
+    </div>
+    <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:14px;display:flex;gap:16px;flex-wrap:wrap" id="d-rate-info" style="display:none">
+      <div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px">Vendor Rate/CFT</div><div style="font-family:var(--mono);color:var(--ink);margin-top:2px" id="d-vendor-rate">—</div></div>
+      <div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px">Markup</div><div style="font-family:var(--mono);color:var(--amber);margin-top:2px">+₹300</div></div>
+      <div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px">Bill Rate/CFT</div><div style="font-family:var(--mono);color:var(--wood);font-weight:700;margin-top:2px" id="d-bill-rate">—</div></div>
+    </div>
+
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:8px">Slabs Being Dispatched</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn btn-sec btn-sm" onclick="document.getElementById('f-dis-sheet').click()">📷 Upload Register</button>
+      <button class="btn btn-sec btn-sm" onclick="addDisRow()">+ Add Row</button>
+      <input type="file" id="f-dis-sheet" accept="image/*" onchange="readDisSheet(event)" style="display:none">
+    </div>
+    <div class="ai-spin-wrap" id="ai-dis"><div class="ai-spin"></div> Reading register…</div>
+    <div style="overflow-x:auto;margin-bottom:12px">
+      <table class="dtbl">
+        <thead><tr>
+          <th>L mm</th><th>W mm</th><th>T mm</th><th>CFT</th><th>Cost ₹</th><th></th>
+        </tr></thead>
+        <tbody id="dis-rows"></tbody>
+      </table>
+    </div>
+
+    <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:12px;color:var(--ink3)">Total Slabs</span>
+        <span class="mono" id="d-total-slabs" style="color:var(--ink)">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:12px;color:var(--ink3)">Total CFT</span>
+        <span class="mono" id="d-total-cft" style="color:var(--ink)">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="font-size:12px;color:var(--ink3)">Total Bill Value</span>
+        <span class="mono" id="d-total-val" style="color:var(--wood);font-weight:700">—</span>
+      </div>
+    </div>
+
+    <div class="field"><label>Notes</label><textarea id="d-notes" placeholder="Any notes…" style="min-height:60px"></textarea></div>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sec" onclick="closeDisModal()" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="saveDispatch()" style="flex:2" id="dis-save-btn">🚚 Save Dispatch</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──
+const CFG = {
+  url: localStorage.getItem('sw_url') || 'https://script.google.com/macros/s/AKfycbweEVPc_MBvUl_yYyl-X4yor_wjpg_mVseMK2wM8GmC2sAwddXuhCE_2VbEWC609Mimkw/exec',
+  key: localStorage.getItem('sw_key') || '',
+  pin: localStorage.getItem('sw_pin') || '5678',  // default manager PIN
+  markup: 300  // ₹ per CFT markup
+};
+
+// ── STATE ──
+let ST = { batches: [], slabs: [], dispatches: [], role: '' };
+let selectedSlabs = new Set();
+let slabFilter = 'all';
+let disRowId = 0;
+
+function showSWCfg(){ document.getElementById('sw-cfg-key').value=CFG.key||''; document.getElementById('sw-cfg-modal').classList.add('show'); }
+function closeSWCfg(){ document.getElementById('sw-cfg-modal').classList.remove('show'); }
+function saveSWCfg(){
+  CFG.key=document.getElementById('sw-cfg-key').value.trim();
+  localStorage.setItem('sw_key',CFG.key);
+  closeSWCfg(); toast('Settings saved ✓','ok');
+}
+
+// ── LOGIN ──
+async function doLogin() {
+  const pin = document.getElementById('pin').value.trim();
+  if (!pin) { document.getElementById('lg-err').textContent = 'Enter PIN'; return; }
+  const btn = document.querySelector('.lg-btn');
+  btn.disabled = true; btn.textContent = 'Checking…';
+  try {
+    if (CFG.url) {
+      const r = await apiGet({ action: 'verifyPIN', pin });
+      if (r.success) { enterApp(r.role || 'manager'); return; }
+      else { document.getElementById('lg-err').textContent = 'Incorrect PIN'; }
+    } else {
+      // Fallback local PIN check
+      if (pin === CFG.pin || pin === '2222') enterApp(pin === '2222' ? 'viewer' : 'manager');
+      else document.getElementById('lg-err').textContent = 'Incorrect PIN';
+    }
+  } catch(e) {
+    document.getElementById('lg-err').textContent = 'Connection error';
+  }
+  btn.disabled = false; btn.textContent = 'Enter →';
+}
+
+function enterApp(role) {
+  ST.role = role;
+  document.getElementById('login').classList.remove('show');
+  document.getElementById('app').classList.add('show');
+  document.getElementById('user-pill').textContent = role.charAt(0).toUpperCase() + role.slice(1);
+  document.getElementById('pin').value = '';
+  // Hide purchase/dispatch for viewer
+  if (role === 'viewer') {
+    document.querySelectorAll('#nav-pur,#nav-dis').forEach(el => el.style.display = 'none');
+  }
+  loadAll();
+}
+
+function logout() {
+  ST.role = '';
+  document.getElementById('app').classList.remove('show');
+  document.getElementById('login').classList.add('show');
+  document.getElementById('pin').value = '';
+}
+
+// ── API ──
+async function apiGet(p) {
+  if (!CFG.url) throw new Error('No URL');
+  const qs = Object.entries(p).map(([k,v]) => k + '=' + encodeURIComponent(v)).join('&');
+  const r = await fetch(CFG.url + '?' + qs);
+  return r.json();
+}
+async function apiPost(d) {
+  if (!CFG.url) throw new Error('No URL');
+  const r = await fetch(CFG.url, { method: 'POST', body: JSON.stringify(d) });
+  return r.json();
+}
+
+// ── NAV ──
+function goTo(s) {
+  document.querySelectorAll('.screen').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.bn-item').forEach(x => x.classList.remove('active'));
+  document.getElementById('screen-' + s).classList.add('active');
+  document.getElementById('nav-' + s).classList.add('active');
+}
+
+// ── LOAD ALL ──
+async function loadAll() {
+  await loadBatches();
+  loadDash();
+  loadSlabs();
+  loadDispatches();
+}
+
+// ── LOAD BATCHES ──
+async function loadBatches() {
+  if (!CFG.url) { renderBatches([]); return; }
+  try {
+    const r = await apiGet({ action: 'getSWBatches' });
+    ST.batches = r.batches || [];
+    renderBatches(ST.batches);
+    populateDispatchBatchDrop();
+  } catch(e) { renderBatches([]); }
+}
+
+function renderBatches(batches) {
+  const el = document.getElementById('batch-list');
+  if (!batches.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No batches yet — add a purchase bill</div>'; return; }
+  el.innerHTML = batches.map(b => {
+    const badge = statusBadge(b.seasoningStatus);
+    const cft = parseFloat(b.totalCFT || 0).toFixed(2);
+    const remCFT = parseFloat(b.remainingCFT || cft).toFixed(2);
+    return `<div class="batch-item" onclick="openBatchDetail('${b.invoiceNo}')">
+      <div class="bi-main">
+        <div class="bi-inv">${b.invoiceNo}</div>
+        <div class="bi-meta">${b.vendor} · <span class="sp-tag">${b.species}</span> · ${b.date}</div>
+        <div style="margin-top:6px">${badge}</div>
+      </div>
+      <div class="bi-nums">
+        <div class="bi-cft">${remCFT} CFT</div>
+        <div class="bi-val">of ${cft} CFT</div>
+        <div class="bi-val" style="margin-top:2px">₹${parseInt(b.woodValue||b.taxableValue||0).toLocaleString('en-IN')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── LOAD SLABS (slab-level view with seasoning) ──
+async function loadSlabs() {
+  if (!CFG.url) { renderSlabs([]); return; }
+  try {
+    const r = await apiGet({ action: 'getSWSlabs' });
+    ST.slabs = r.slabs || [];
+    renderSlabs(ST.slabs);
+  } catch(e) { renderSlabs([]); }
+}
+
+function renderSlabs(slabs) {
+  const filtered = slabFilter === 'all' ? slabs : slabs.filter(s => s.status === slabFilter);
+  const el = document.getElementById('slab-list');
+  document.getElementById('slab-count-lbl').textContent = filtered.length + ' slabs';
+
+  if (!filtered.length) {
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No slabs found</div>';
+    return;
+  }
+
+  el.innerHTML = filtered.map(s => {
+    const checked = selectedSlabs.has(s.slabId);
+    const badge = statusBadge(s.status);
+    const cft = parseFloat(s.cft || 0).toFixed(3);
+    return `<div class="slab-item" id="si-${s.slabId}">
+      <div class="slab-cb ${checked ? 'checked' : ''}" onclick="toggleSlab('${s.slabId}')"></div>
+      <div class="slab-main">
+        <div class="slab-dims">${s.lengthMM}×${s.widthMM}×${s.thickMM} mm</div>
+        <div class="slab-meta">${s.invoiceNo} · <span class="sp-tag">${s.species}</span> · ${s.dateIn||s.date}</div>
+        <div style="margin-top:4px">${badge}</div>
+      </div>
+      <div class="slab-cft">${cft} CFT</div>
+    </div>`;
+  }).join('');
+}
+
+function filterSlabs(f) {
+  slabFilter = f;
+  ['all','raw','gas','solar','seasoned'].forEach(x => {
+    const el = document.getElementById('flt-' + x);
+    if (el) el.style.background = '';
+  });
+  const map = { 'all': 'flt-all', 'Unseasoned': 'flt-raw', 'Gas Chamber': 'flt-gas', 'Solar Chamber': 'flt-solar', 'Seasoned': 'flt-seasoned' };
+  const btn = document.getElementById(map[f] || 'flt-all');
+  if (btn) btn.style.background = 'var(--wood)';
+  renderSlabs(ST.slabs);
+}
+
+function toggleSlab(id) {
+  if (selectedSlabs.has(id)) selectedSlabs.delete(id);
+  else selectedSlabs.add(id);
+  // Update checkbox visual
+  const cb = document.querySelector(`#si-${id} .slab-cb`);
+  if (cb) cb.classList.toggle('checked', selectedSlabs.has(id));
+  updateBulkBar();
+}
+
+function selectAllSlabs() {
+  const filtered = slabFilter === 'all' ? ST.slabs : ST.slabs.filter(s => s.status === slabFilter);
+  const allSelected = filtered.every(s => selectedSlabs.has(s.slabId));
+  filtered.forEach(s => allSelected ? selectedSlabs.delete(s.slabId) : selectedSlabs.add(s.slabId));
+  renderSlabs(ST.slabs);
+  updateBulkBar();
+}
+
+function clearSelection() {
+  selectedSlabs.clear();
+  renderSlabs(ST.slabs);
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  if (selectedSlabs.size > 0) {
+    bar.classList.add('show');
+    document.getElementById('bulk-count').textContent = selectedSlabs.size + ' slab' + (selectedSlabs.size > 1 ? 's' : '') + ' selected';
+  } else {
+    bar.classList.remove('show');
+  }
+}
+
+function showBulkStatus() {
+  document.getElementById('bulk-modal-title').textContent = 'Update ' + selectedSlabs.size + ' Slabs';
+  document.getElementById('bulk-modal-sub').textContent = 'Move selected slabs to:';
+  document.getElementById('status-modal').classList.add('show');
+}
+
+async function setBulkStatus(status) {
+  closeStatusModal();
+  if (!selectedSlabs.size) return;
+  const ids = [...selectedSlabs];
+  try {
+    const r = await apiPost({ action: 'updateSlabStatus', data: { slabIds: ids, status } });
+    if (r.success) {
+      toast(ids.length + ' slabs → ' + status + ' ✓', 'ok');
+      clearSelection();
+      await loadSlabs();
+      loadDash();
+    } else toast('Error: ' + (r.error || 'Failed'), 'err');
+  } catch(e) { toast('Network error', 'err'); }
+}
+
+function closeStatusModal() { document.getElementById('status-modal').classList.remove('show'); }
+
+// ── LOAD DISPATCHES ──
+async function loadDispatches() {
+  if (!CFG.url) { renderDispatches([]); return; }
+  try {
+    const r = await apiGet({ action: 'getSWDispatches' });
+    ST.dispatches = r.dispatches || [];
+    renderDispatches(ST.dispatches);
+  } catch(e) { renderDispatches([]); }
+}
+
+function renderDispatches(dispatches) {
+  const el = document.getElementById('dispatch-list');
+  if (!dispatches.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No dispatches yet</div>'; return; }
+  el.innerHTML = dispatches.slice(0, 20).map(d => `
+    <div class="batch-item">
+      <div class="bi-main">
+        <div class="bi-inv">${d.billNo}</div>
+        <div class="bi-meta">${d.date} · ${d.invoiceNo} · <span class="sp-tag">${d.species||'—'}</span></div>
+        <div style="margin-top:4px"><span class="badge b-wood">${d.slabCount} slabs</span></div>
+      </div>
+      <div class="bi-nums">
+        <div class="bi-cft">${parseFloat(d.totalCFT||0).toFixed(2)} CFT</div>
+        <div class="bi-val">₹${parseInt(d.totalValue||0).toLocaleString('en-IN')}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ── DASHBOARD ──
+function loadDash() {
+  const totalCFT = ST.batches.reduce((s, b) => s + parseFloat(b.remainingCFT || b.totalCFT || 0), 0);
+  const seasonedCFT = ST.slabs.filter(s => s.status === 'Seasoned').reduce((s, x) => s + parseFloat(x.cft || 0), 0);
+  const chamberCFT = ST.slabs.filter(s => s.status === 'Gas Chamber' || s.status === 'Solar Chamber').reduce((s, x) => s + parseFloat(x.cft || 0), 0);
+  const rawCFT = ST.slabs.filter(s => s.status === 'Unseasoned').reduce((s, x) => s + parseFloat(x.cft || 0), 0);
+
+  document.getElementById('k-stock').textContent = totalCFT.toFixed(1);
+  document.getElementById('k-seasoned').textContent = seasonedCFT.toFixed(1);
+  document.getElementById('k-chamber').textContent = chamberCFT.toFixed(1);
+  document.getElementById('k-raw').textContent = rawCFT.toFixed(1);
+
+  // Species breakdown
+  const speciesMap = {};
+  ST.batches.forEach(b => {
+    if (!b.species) return;
+    if (!speciesMap[b.species]) speciesMap[b.species] = { cft: 0, value: 0, seasoned: 0 };
+    speciesMap[b.species].cft += parseFloat(b.remainingCFT || b.totalCFT || 0);
+    speciesMap[b.species].value += parseFloat(b.woodValue || b.taxableValue || 0);
+  });
+  ST.slabs.filter(s => s.status === 'Seasoned').forEach(s => {
+    if (s.species && speciesMap[s.species]) speciesMap[s.species].seasoned += parseFloat(s.cft || 0);
+  });
+
+  const maxCFT = Math.max(...Object.values(speciesMap).map(x => x.cft), 1);
+  document.getElementById('species-list').innerHTML = Object.entries(speciesMap).map(([sp, d]) => `
+    <div style="padding:14px 16px;border-bottom:1px solid var(--rule)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-weight:600;font-size:14px">${sp}</span>
+        <span class="mono" style="color:var(--wood)">${d.cft.toFixed(1)} CFT</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink3);margin-bottom:6px">
+        <span>₹${Math.round(d.value).toLocaleString('en-IN')} value</span>
+        <span style="color:var(--seasoned)">${d.seasoned.toFixed(1)} CFT seasoned</span>
+      </div>
+      <div class="prog-bar">
+        <div class="prog-fill" style="width:${(d.cft/maxCFT*100).toFixed(0)}%;background:var(--wood)"></div>
+      </div>
+    </div>`).join('') || '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No data yet</div>';
+
+  // Recent dispatches
+  document.getElementById('recent-dispatch').innerHTML = ST.dispatches.slice(0, 5).map(d => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--rule)">
+      <div>
+        <div class="mono" style="color:var(--wood);font-size:13px">${d.billNo}</div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:2px">${d.date} · ${d.slabCount} slabs</div>
+      </div>
+      <div class="mono" style="color:var(--ink)">${parseFloat(d.totalCFT||0).toFixed(2)} CFT</div>
+    </div>`).join('') || '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No dispatches yet</div>';
+
+  // Attention needed
+  const needsAttention = ST.batches.filter(b => b.seasoningStatus === 'Unseasoned' && parseFloat(b.remainingCFT||b.totalCFT||0) > 0);
+  document.getElementById('attention-list').innerHTML = needsAttention.map(b => `
+    <div style="padding:14px 16px;border-bottom:1px solid var(--rule)">
+      <div style="display:flex;justify-content:space-between">
+        <div>
+          <div class="mono" style="color:var(--wood);font-size:13px">${b.invoiceNo}</div>
+          <div style="font-size:11px;color:var(--ink3);margin-top:2px">${b.species} · ${parseFloat(b.remainingCFT||b.totalCFT||0).toFixed(1)} CFT</div>
+        </div>
+        <span class="badge b-raw">Unseasoned</span>
+      </div>
+    </div>`).join('') || '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">✓ All stock in seasoning or ready</div>';
+}
+
+// ── PURCHASE FORM ──
+function showPurModal() {
+  document.getElementById('pur-modal').classList.add('show');
+  document.getElementById('p-date').value = new Date().toISOString().slice(0, 10);
+}
+function closePurModal() {
+  document.getElementById('pur-modal').classList.remove('show');
+  document.getElementById('pur-form').style.display = 'none';
+  document.getElementById('pur-manual-btn-wrap').style.display = 'flex';
+  document.getElementById('ai-pur').classList.remove('show');
+  document.getElementById('prev-pur').style.display = 'none';
+  document.getElementById('f-pur').value = '';
+}
+function showPurForm() {
+  document.getElementById('pur-form').style.display = 'block';
+  document.getElementById('pur-manual-btn-wrap').style.display = 'none';
+}
+
+function calcPurCBM() {
+  const cft = parseFloat(document.getElementById('p-cft').value) || 0;
+  document.getElementById('p-cbm').value = (cft / 35.3147).toFixed(4);
+  calcPurRate();
+}
+function calcPurRate() {
+  const cft = parseFloat(document.getElementById('p-cft').value) || 0;
+  const tax = parseFloat(document.getElementById('p-taxable').value) || 0;
+  if (cft > 0 && tax > 0) document.getElementById('p-ratecft').value = Math.round(tax / cft);
+}
+
+async function procPurFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.type.startsWith('image/')) { document.getElementById('prev-pur').src = URL.createObjectURL(file); document.getElementById('prev-pur').style.display = 'block'; }
+  if (!CFG.key) { showPurForm(); return; }
+  document.getElementById('ai-pur').classList.add('show');
+  try {
+    const b64 = await toB64(file);
+    const mt = file.type === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
+    const prompt = `Read this timber/wood purchase invoice. Extract:
+- vendor: supplier name
+- invoiceNo: document number
+- date: YYYY-MM-DD
+- species: map to "White Oak", "White Ash", "Rosewood", "Uttarakhand Teak", "CP Teak", "Siris", "Agar", "Eucalyptus", "Cedar"
+- totalCFT: total quantity in CFT (convert from CBM if needed: CBM × 35.3147)
+- slabCount: number of slabs if mentioned
+- thicknessMM: thickness in mm
+- woodValue: quantity × rate, wood only, no freight
+- totalTaxable: full taxable amount including freight/labour
+- rateCFT: totalTaxable ÷ totalCFT
+Return ONLY JSON: {"vendor":"","invoiceNo":"","date":"","species":"","totalCFT":0,"slabCount":0,"thicknessMM":0,"woodValue":0,"totalTaxable":0,"rateCFT":0}`;
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{ role: 'user', content: [{ type: mt === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: mt, data: b64.split(',')[1] } }, { type: 'text', text: prompt }] }] })
+    });
+    const data = await resp.json();
+    const txt = data.content?.[0]?.text || '{}';
+    const d = JSON.parse(txt.replace(/```json|```/g, '').trim());
+    document.getElementById('ai-pur').classList.remove('show');
+    if (d.vendor) document.getElementById('p-vendor').value = d.vendor;
+    if (d.invoiceNo) document.getElementById('p-invno').value = d.invoiceNo;
+    if (d.date) document.getElementById('p-date').value = d.date;
+    if (d.species) document.getElementById('p-species').value = d.species;
+    if (d.totalCFT) { document.getElementById('p-cft').value = d.totalCFT.toFixed(2); calcPurCBM(); }
+    if (d.slabCount) document.getElementById('p-slabs').value = d.slabCount;
+    if (d.thicknessMM) document.getElementById('p-thick').value = d.thicknessMM;
+    if (d.woodValue) document.getElementById('p-woodval').value = Math.round(d.woodValue);
+    if (d.totalTaxable) document.getElementById('p-taxable').value = Math.round(d.totalTaxable);
+    calcPurRate();
+    showPurForm();
+    toast('Bill read ✓', 'ok');
+  } catch(e) { document.getElementById('ai-pur').classList.remove('show'); showPurForm(); toast('AI read failed — enter manually', 'err'); }
+}
+
+async function savePurchase() {
+  const btn = document.getElementById('pur-save-btn');
+  const data = {
+    vendor: document.getElementById('p-vendor').value.trim(),
+    invoiceNo: document.getElementById('p-invno').value.trim(),
+    date: document.getElementById('p-date').value,
+    species: document.getElementById('p-species').value,
+    totalCFT: parseFloat(document.getElementById('p-cft').value) || 0,
+    totalCBM: parseFloat(document.getElementById('p-cbm').value) || 0,
+    slabCount: parseInt(document.getElementById('p-slabs').value) || 0,
+    thicknessMM: parseInt(document.getElementById('p-thick').value) || 0,
+    woodValue: parseFloat(document.getElementById('p-woodval').value) || 0,
+    taxableValue: parseFloat(document.getElementById('p-taxable').value) || 0,
+    rateCFT: parseFloat(document.getElementById('p-ratecft').value) || 0,
+    seasoningStatus: document.getElementById('p-status').value,
+    notes: document.getElementById('p-notes').value.trim()
+  };
+  if (!data.vendor || !data.invoiceNo || !data.totalCFT) { toast('Fill vendor, invoice no and CFT', 'err'); return; }
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const r = await apiPost({ action: 'saveSWBatch', data });
+    if (r.success) { toast('Batch saved ✓', 'ok'); closePurModal(); await loadBatches(); loadDash(); }
+    else toast('Error: ' + (r.error || 'Failed'), 'err');
+  } catch(e) { toast('Network error', 'err'); }
+  btn.disabled = false; btn.innerHTML = '💾 Save Batch';
+}
+
+// ── DISPATCH ──
+function populateDispatchBatchDrop() {
+  const sel = document.getElementById('d-batch');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— select batch —</option>' +
+    ST.batches.filter(b => parseFloat(b.remainingCFT || b.totalCFT || 0) > 0 && b.seasoningStatus === 'Seasoned')
+    .map(b => `<option value="${b.invoiceNo}">${b.invoiceNo} · ${b.species} · ${parseFloat(b.remainingCFT||b.totalCFT||0).toFixed(1)} CFT</option>`).join('');
+}
+
+function updateDispatchRate() {
+  const inv = document.getElementById('d-batch').value;
+  const b = ST.batches.find(x => x.invoiceNo === inv);
+  const info = document.getElementById('d-rate-info');
+  if (b) {
+    const vendorRate = parseFloat(b.rateCFT || b.rateCBM / 35.3147 || 0);
+    const billRate = vendorRate + CFG.markup;
+    document.getElementById('d-vendor-rate').textContent = '₹' + Math.round(vendorRate).toLocaleString('en-IN');
+    document.getElementById('d-bill-rate').textContent = '₹' + Math.round(billRate).toLocaleString('en-IN');
+    info.style.display = 'flex';
+  } else { info.style.display = 'none'; }
+  calcDispatchTotals();
+}
+
+function showDispatchModal() {
+  document.getElementById('dis-modal').classList.add('show');
+  document.getElementById('d-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('dis-rows').innerHTML = '';
+  disRowId = 0;
+  addDisRow();
+}
+function closeDisModal() { document.getElementById('dis-modal').classList.remove('show'); }
+
+let disRowCount = 0;
+function addDisRow() {
+  const id = ++disRowCount;
+  const tr = document.createElement('tr');
+  tr.id = 'dr' + id;
+  tr.innerHTML = `
+    <td><input type="number" id="dr${id}l" placeholder="3000" oninput="calcDisRow(${id})" style="width:70px"></td>
+    <td><input type="number" id="dr${id}w" placeholder="280" oninput="calcDisRow(${id})" style="width:65px"></td>
+    <td><input type="number" id="dr${id}t" placeholder="55" oninput="calcDisRow(${id})" style="width:55px"></td>
+    <td class="mono" id="dr${id}cft" style="color:var(--wood);padding:8px">—</td>
+    <td class="mono" id="dr${id}cost" style="color:var(--ink3);padding:8px">—</td>
+    <td><button onclick="document.getElementById('dr${id}').remove();calcDispatchTotals()" style="background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer;padding:4px 8px">✕</button></td>`;
+  document.getElementById('dis-rows').appendChild(tr);
+}
+
+function calcDisRow(id) {
+  const l = parseFloat(document.getElementById('dr'+id+'l')?.value) || 0;
+  const w = parseFloat(document.getElementById('dr'+id+'w')?.value) || 0;
+  const t = parseFloat(document.getElementById('dr'+id+'t')?.value) || 0;
+  const cbm = (l * w * t) / 1e9;
+  const cft = cbm * 35.3147;
+  const inv = document.getElementById('d-batch').value;
+  const b = ST.batches.find(x => x.invoiceNo === inv);
+  const vendorRate = b ? parseFloat(b.rateCFT || (b.rateCBM || 0) / 35.3147 || 0) : 0;
+  const billRate = vendorRate + CFG.markup;
+  const cost = cft * billRate;
+  const cftEl = document.getElementById('dr'+id+'cft');
+  const costEl = document.getElementById('dr'+id+'cost');
+  if (cftEl) cftEl.textContent = cft > 0 ? cft.toFixed(3) : '—';
+  if (costEl) costEl.textContent = cost > 0 ? '₹' + Math.round(cost).toLocaleString('en-IN') : '—';
+  calcDispatchTotals();
+}
+
+function calcDispatchTotals() {
+  let totalCFT = 0, totalVal = 0, slabCount = 0;
+  document.querySelectorAll('#dis-rows tr').forEach(tr => {
+    const id = tr.id.replace('dr', '');
+    const l = parseFloat(document.getElementById('dr'+id+'l')?.value) || 0;
+    const w = parseFloat(document.getElementById('dr'+id+'w')?.value) || 0;
+    const t = parseFloat(document.getElementById('dr'+id+'t')?.value) || 0;
+    if (!l||!w||!t) return;
+    const cbm = (l * w * t) / 1e9;
+    const cft = cbm * 35.3147;
+    const inv = document.getElementById('d-batch').value;
+    const b = ST.batches.find(x => x.invoiceNo === inv);
+    const vendorRate = b ? parseFloat(b.rateCFT || (b.rateCBM||0)/35.3147 || 0) : 0;
+    const billRate = vendorRate + CFG.markup;
+    totalCFT += cft;
+    totalVal += cft * billRate;
+    slabCount++;
+  });
+  document.getElementById('d-total-slabs').textContent = slabCount > 0 ? slabCount + ' slabs' : '—';
+  document.getElementById('d-total-cft').textContent = totalCFT > 0 ? totalCFT.toFixed(3) + ' CFT' : '—';
+  document.getElementById('d-total-val').textContent = totalVal > 0 ? '₹' + Math.round(totalVal).toLocaleString('en-IN') : '—';
+}
+
+async function readDisSheet(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!CFG.key) { toast('Claude API key not set — enter rows manually', 'err'); return; }
+  document.getElementById('ai-dis').classList.add('show');
+  try {
+    const b64 = await toB64(file);
+    const prompt = `This is a handwritten slab dispatch register from a wood yard. Read every row.
+Each row has: Sr No, L (length mm), W (width mm), T/H (thickness mm).
+Read all numeric dimensions carefully. Return ONLY a JSON array:
+[{"lengthMM":3000,"widthMM":280,"thickMM":55},...]
+No other text.`;
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64.split(',')[1] } },
+        { type: 'text', text: prompt }
+      ]}]})
+    });
+    const data = await resp.json();
+    const txt = data.content?.[0]?.text || '[]';
+    let rows;
+    try { rows = JSON.parse(txt.replace(/```json|```/g,'').trim()); }
+    catch(e) {
+      const lastClose = txt.lastIndexOf('}');
+      if (lastClose > 0) rows = JSON.parse(txt.substring(0, lastClose+1) + ']');
+      else throw e;
+    }
+    document.getElementById('ai-dis').classList.remove('show');
+    if (!rows.length) { toast('Could not read rows — try manual entry', 'err'); return; }
+    rows.forEach(r => {
+      const id = ++disRowCount;
+      const tr = document.createElement('tr');
+      tr.id = 'dr' + id;
+      tr.innerHTML = `
+        <td><input type="number" id="dr${id}l" value="${r.lengthMM||''}" placeholder="3000" oninput="calcDisRow(${id})" style="width:70px"></td>
+        <td><input type="number" id="dr${id}w" value="${r.widthMM||''}" placeholder="280" oninput="calcDisRow(${id})" style="width:65px"></td>
+        <td><input type="number" id="dr${id}t" value="${r.thickMM||''}" placeholder="55" oninput="calcDisRow(${id})" style="width:55px"></td>
+        <td class="mono" id="dr${id}cft" style="color:var(--wood);padding:8px">—</td>
+        <td class="mono" id="dr${id}cost" style="color:var(--ink3);padding:8px">—</td>
+        <td><button onclick="document.getElementById('dr${id}').remove();calcDispatchTotals()" style="background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer;padding:4px 8px">✕</button></td>`;
+      document.getElementById('dis-rows').appendChild(tr);
+      calcDisRow(id);
+    });
+    toast(rows.length + ' rows read ✓', 'ok');
+  } catch(e) {
+    document.getElementById('ai-dis').classList.remove('show');
+    toast('Read failed: ' + e.message, 'err');
+  }
+  document.getElementById('f-dis-sheet').value = '';
+}
+
+async function saveDispatch() {
+  const btn = document.getElementById('dis-save-btn');
+  const billNo = document.getElementById('d-billno').value.trim();
+  const date = document.getElementById('d-date').value;
+  const invoiceNo = document.getElementById('d-batch').value;
+  if (!billNo || !invoiceNo) { toast('Fill bill number and batch', 'err'); return; }
+
+  const rows = [];
+  document.querySelectorAll('#dis-rows tr').forEach(tr => {
+    const id = tr.id.replace('dr', '');
+    const l = parseFloat(document.getElementById('dr'+id+'l')?.value) || 0;
+    const w = parseFloat(document.getElementById('dr'+id+'w')?.value) || 0;
+    const t = parseFloat(document.getElementById('dr'+id+'t')?.value) || 0;
+    if (l && w && t) {
+      const cbm = (l * w * t) / 1e9;
+      const cft = cbm * 35.3147;
+      const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
+      const vendorRate = b ? parseFloat(b.rateCFT || (b.rateCBM||0)/35.3147 || 0) : 0;
+      const billRate = vendorRate + CFG.markup;
+      rows.push({ lengthMM: l, widthMM: w, thickMM: t, cbm, cft, cost: cft * billRate, billRate });
+    }
+  });
+  if (!rows.length) { toast('Add at least one slab', 'err'); return; }
+
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
+  const data = {
+    billNo, date, invoiceNo,
+    species: b?.species || '',
+    vendor: b?.vendor || '',
+    slabs: rows,
+    totalCFT: rows.reduce((s, r) => s + r.cft, 0),
+    totalValue: rows.reduce((s, r) => s + r.cost, 0),
+    notes: document.getElementById('d-notes').value.trim()
+  };
+  try {
+    const r = await apiPost({ action: 'saveSWDispatch', data });
+    if (r.success) { toast('Dispatch saved ✓', 'ok'); closeDisModal(); await loadAll(); }
+    else toast('Error: ' + (r.error || 'Failed'), 'err');
+  } catch(e) { toast('Network error', 'err'); }
+  btn.disabled = false; btn.innerHTML = '🚚 Save Dispatch';
+}
+
+// ── BATCH DETAIL (for seasoning status update) ──
+function openBatchDetail(invoiceNo) {
+  const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
+  if (!b) return;
+  // Select all slabs from this batch
+  const batchSlabs = ST.slabs.filter(s => s.invoiceNo === invoiceNo);
+  if (!batchSlabs.length) { toast('No individual slabs tracked for this batch yet', ''); return; }
+  batchSlabs.forEach(s => selectedSlabs.add(s.slabId));
+  goTo('inv');
+  renderSlabs(ST.slabs);
+  updateBulkBar();
+  toast(batchSlabs.length + ' slabs from ' + invoiceNo + ' selected', 'ok');
+}
+
+// ── HELPERS ──
+function statusBadge(status) {
+  const map = {
+    'Unseasoned': '<span class="badge b-raw">🪵 Unseasoned</span>',
+    'Gas Chamber': '<span class="badge b-gas">⚗️ Gas Chamber</span>',
+    'Solar Chamber': '<span class="badge b-solar">☀️ Solar Chamber</span>',
+    'Seasoned': '<span class="badge b-seasoned">✅ Seasoned</span>'
+  };
+  return map[status] || '<span class="badge b-raw">' + (status || 'Unknown') + '</span>';
+}
+
+function toB64(f) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); }); }
+
+function toast(msg, type = '') {
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' ' + type : '');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ── INIT ──
+window.onload = () => {
+  // Set today's date
+  const today = new Date().toISOString().slice(0, 10);
+  const dateFields = document.querySelectorAll('input[type=date]');
+  dateFields.forEach(f => { if (!f.value) f.value = today; });
+};
+</script>
+</body>
+</html>
