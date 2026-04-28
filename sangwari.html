@@ -843,8 +843,8 @@ function calcPurCBM() {
 }
 function calcPurRate() {
   const cft = parseFloat(document.getElementById('p-cft').value) || 0;
-  const tax = parseFloat(document.getElementById('p-taxable').value) || 0;
-  if (cft > 0 && tax > 0) document.getElementById('p-ratecft').value = Math.round(tax / cft);
+  const woodval = parseFloat(document.getElementById('p-woodval').value) || 0;
+  if (cft > 0 && woodval > 0) document.getElementById('p-ratecft').value = Math.round(woodval / cft);
 }
 
 async function procPurFile(event) {
@@ -864,9 +864,9 @@ async function procPurFile(event) {
 - totalCFT: total quantity in CFT (convert from CBM if needed: CBM × 35.3147)
 - slabCount: number of slabs if mentioned
 - thicknessMM: thickness in mm
-- woodValue: quantity × rate, wood only, no freight
+- woodValue: quantity × rate per CFT — pure wood cost, no freight or labour
 - totalTaxable: full taxable amount including freight/labour
-- rateCFT: totalTaxable ÷ totalCFT
+- rateCFT: woodValue ÷ totalCFT (wood rate only, no extras)
 Return ONLY JSON: {"vendor":"","invoiceNo":"","date":"","species":"","totalCFT":0,"slabCount":0,"thicknessMM":0,"woodValue":0,"totalTaxable":0,"rateCFT":0}`;
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
