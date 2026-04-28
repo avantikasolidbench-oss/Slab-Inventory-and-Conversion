@@ -390,7 +390,8 @@ select option{background:var(--bg3);color:var(--ink)}
 <div class="bulk-bar" id="bulk-bar">
   <span class="bulk-count" id="bulk-count">0 selected</span>
   <div class="bulk-actions">
-    <button class="bulk-btn" onclick="showBulkStatus()">Change Status</button>
+    <button class="bulk-btn" onclick="showSendToHyd()">🚛 Send to Hyd</button>
+    <button class="bulk-btn" onclick="showBulkStatus()">↕ Status</button>
     <button class="bulk-btn" onclick="clearSelection()" style="background:rgba(255,255,255,.1)">✕</button>
   </div>
 </div>
@@ -451,6 +452,10 @@ select option{background:var(--bg3);color:var(--ink)}
         <div class="field"><label>Wood Value ₹</label><input type="number" id="p-woodval" oninput="calcPurRate()"></div>
         <div class="field"><label>Total Taxable ₹</label><input type="number" id="p-taxable" oninput="calcPurRate()"></div>
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>Freight ₹</label><input type="number" id="p-freight" placeholder="0" oninput="calcPurRate()"></div>
+        <div class="field"><label>Labour ₹</label><input type="number" id="p-labour" placeholder="0" oninput="calcPurRate()"></div>
+      </div>
       <div class="field"><label>Rate/CFT ₹ (auto)</label><input type="number" id="p-ratecft" readonly style="background:#1a2a1a;opacity:.8"></div>
       <div class="field"><label>Initial Seasoning Status</label>
         <select id="p-status">
@@ -471,6 +476,51 @@ select option{background:var(--bg3);color:var(--ink)}
       <button class="btn btn-sec btn-full" onclick="showPurForm()">Enter Manually</button>
     </div>
     <button class="btn btn-sec btn-full" onclick="closePurModal()" style="margin-top:8px">Close</button>
+  </div>
+</div>
+
+<!-- SEND TO HYDERABAD MODAL -->
+<div class="modal" id="hyd-modal">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🚛 Send to Hyderabad</div>
+    <div class="modal-sub" id="hyd-modal-sub">Confirm dispatch details</div>
+
+    <div class="field">
+      <label>Date Sent</label>
+      <input type="date" id="hyd-date">
+    </div>
+    <div class="field">
+      <label>Vehicle / Reference No. (optional)</label>
+      <input type="text" id="hyd-ref" placeholder="e.g. DL01AB1234">
+    </div>
+    <div class="field">
+      <label>Notes (optional)</label>
+      <input type="text" id="hyd-notes" placeholder="e.g. Trip 1 — White Oak batch">
+    </div>
+
+    <!-- Upload handwritten note -->
+    <div style="margin-bottom:14px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:8px">Or upload handwritten note with sizes</div>
+      <button class="btn btn-sec btn-sm btn-full" onclick="document.getElementById('f-hyd-sheet').click()">📷 Upload Slab List</button>
+      <input type="file" id="f-hyd-sheet" accept="image/*" onchange="readHydSheet(event)" style="display:none">
+      <div class="ai-spin-wrap" id="ai-hyd" style="margin-top:8px"><div class="ai-spin"></div> Reading slab list…</div>
+    </div>
+
+    <!-- Slab summary -->
+    <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:16px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);margin-bottom:8px">Slabs being sent</div>
+      <div id="hyd-slab-summary"></div>
+      <div style="border-top:1px solid var(--rule);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between">
+        <span style="font-size:12px;color:var(--ink3)">Total</span>
+        <span class="mono" id="hyd-total" style="color:var(--wood)">—</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sec" onclick="closeHydModal()" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSendToHyd()" style="flex:2" id="hyd-save-btn">🚛 Confirm Dispatch</button>
+    </div>
   </div>
 </div>
 
@@ -786,6 +836,109 @@ function updateBulkBar() {
   }
 }
 
+function showSendToHyd() {
+  if (!selectedSlabs.size) return;
+  const ids = [...selectedSlabs];
+  const slabs = ST.slabs.filter(s => ids.includes(s.slabId));
+  const batchMap = {};
+  slabs.forEach(s => {
+    if (!batchMap[s.invoiceNo]) batchMap[s.invoiceNo] = { invoiceNo: s.invoiceNo, species: s.species, count: 0, cft: 0 };
+    batchMap[s.invoiceNo].count++;
+    batchMap[s.invoiceNo].cft += parseFloat(s.cft || 0);
+  });
+  const totalCFT = slabs.reduce((s, x) => s + parseFloat(x.cft || 0), 0);
+  document.getElementById('hyd-modal-sub').textContent = `${slabs.length} slab${slabs.length > 1 ? 's' : ''} selected`;
+  document.getElementById('hyd-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('hyd-ref').value = '';
+  document.getElementById('hyd-notes').value = '';
+  document.getElementById('hyd-slab-summary').innerHTML = Object.values(batchMap).map(b => `
+    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px">
+      <div><span class="mono" style="color:var(--wood)">${b.invoiceNo}</span> <span class="sp-tag">${b.species}</span></div>
+      <div style="color:var(--ink3)">${b.count} slabs · <span class="mono">${b.cft.toFixed(3)} CFT</span></div>
+    </div>`).join('');
+  document.getElementById('hyd-total').textContent = `${slabs.length} slabs · ${totalCFT.toFixed(3)} CFT`;
+  document.getElementById('hyd-modal').classList.add('show');
+}
+
+async function readHydSheet(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!CFG.key) { toast('Claude API key not set', 'err'); return; }
+  document.getElementById('ai-hyd').classList.add('show');
+  try {
+    const b64 = await toB64(file);
+    const prompt = `This is a handwritten note listing slabs being sent for seasoning. Read every row.
+Each row has dimensions: L (length mm), W (width mm), T/H (thickness mm), and optionally a batch/invoice number.
+Return ONLY a JSON array:
+[{"lengthMM":3000,"widthMM":280,"thickMM":55,"invoiceNo":"PCPL/2570"},...]
+If invoice number is not readable, omit it. No other text.`;
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64.split(',')[1] } },
+        { type: 'text', text: prompt }
+      ]}]})
+    });
+    const data = await resp.json();
+    const txt = data.content?.[0]?.text || '[]';
+    let rows;
+    try { rows = JSON.parse(txt.replace(/```json|```/g,'').trim()); }
+    catch(e) { const lc = txt.lastIndexOf('}'); rows = lc > 0 ? JSON.parse(txt.substring(0,lc+1)+']') : []; }
+
+    document.getElementById('ai-hyd').classList.remove('show');
+    if (!rows.length) { toast('Could not read — select slabs manually', 'err'); return; }
+
+    // Match slabs from ST.slabs by dimensions
+    let matched = 0;
+    rows.forEach(r => {
+      const slab = ST.slabs.find(s =>
+        Math.abs(s.lengthMM - r.lengthMM) < 10 &&
+        Math.abs(s.widthMM  - r.widthMM)  < 10 &&
+        Math.abs(s.thickMM  - r.thickMM)  < 5  &&
+        (!r.invoiceNo || s.invoiceNo === r.invoiceNo) &&
+        s.status !== 'Sent to Hyderabad' &&
+        s.status !== 'Seasoned'
+      );
+      if (slab && !selectedSlabs.has(slab.slabId)) {
+        selectedSlabs.add(slab.slabId);
+        matched++;
+      }
+    });
+
+    // Re-render and update summary
+    renderSlabs(ST.slabs);
+    updateBulkBar();
+    showSendToHyd(); // refresh modal with new selection
+    toast(`${matched} of ${rows.length} slabs matched ✓`, 'ok');
+  } catch(e) {
+    document.getElementById('ai-hyd').classList.remove('show');
+    toast('Read failed: ' + e.message, 'err');
+  }
+  document.getElementById('f-hyd-sheet').value = '';
+}
+
+async function saveSendToHyd() {
+  const btn = document.getElementById('hyd-save-btn');
+  const date = document.getElementById('hyd-date').value;
+  if (!date) { toast('Enter date', 'err'); return; }
+  const ids = [...selectedSlabs];
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const r = await apiPost({ action: 'sendSlabsToHyd', data: {
+      slabIds: ids, date,
+      ref:   document.getElementById('hyd-ref').value.trim(),
+      notes: document.getElementById('hyd-notes').value.trim()
+    }});
+    if (r.success) {
+      toast(`${ids.length} slabs marked "Sent to Hyderabad" ✓`, 'ok');
+      closeHydModal(); clearSelection();
+      await loadSlabs(); loadDash();
+    } else toast('Error: ' + (r.error || 'Failed'), 'err');
+  } catch(e) { toast('Network error', 'err'); }
+  btn.disabled = false; btn.innerHTML = '🚛 Confirm Dispatch';
+}
+
 function showBulkStatus() {
   document.getElementById('bulk-modal-title').textContent = 'Update ' + selectedSlabs.size + ' Slabs';
   document.getElementById('bulk-modal-sub').textContent = 'Move selected slabs to:';
@@ -947,9 +1100,11 @@ async function procPurFile(event) {
 - slabCount: number of slabs if mentioned
 - thicknessMM: thickness in mm
 - woodValue: quantity × rate per CFT — pure wood cost, no freight or labour
+- freight: freight/cartage charges shown separately on bill (₹ total)
+- labour: labour charges shown separately on bill (₹ total)
 - totalTaxable: full taxable amount including freight/labour
-- rateCFT: woodValue ÷ totalCFT (wood rate only, no extras)
-Return ONLY JSON: {"vendor":"","invoiceNo":"","date":"","species":"","totalCFT":0,"slabCount":0,"thicknessMM":0,"woodValue":0,"totalTaxable":0,"rateCFT":0}`;
+- rateCFT: woodValue ÷ totalCFT (wood rate only)
+Return ONLY JSON: {"vendor":"","invoiceNo":"","date":"","species":"","totalCFT":0,"slabCount":0,"thicknessMM":0,"woodValue":0,"freight":0,"labour":0,"totalTaxable":0,"rateCFT":0}`;
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
@@ -967,6 +1122,8 @@ Return ONLY JSON: {"vendor":"","invoiceNo":"","date":"","species":"","totalCFT":
     if (d.slabCount) document.getElementById('p-slabs').value = d.slabCount;
     if (d.thicknessMM) document.getElementById('p-thick').value = d.thicknessMM;
     if (d.woodValue) document.getElementById('p-woodval').value = Math.round(d.woodValue);
+    if (d.freight)   document.getElementById('p-freight').value = Math.round(d.freight);
+    if (d.labour)    document.getElementById('p-labour').value  = Math.round(d.labour);
     if (d.totalTaxable) document.getElementById('p-taxable').value = Math.round(d.totalTaxable);
     calcPurRate();
     showPurForm();
@@ -986,6 +1143,8 @@ async function savePurchase() {
     slabCount: parseInt(document.getElementById('p-slabs').value) || 0,
     thicknessMM: parseInt(document.getElementById('p-thick').value) || 0,
     woodValue: parseFloat(document.getElementById('p-woodval').value) || 0,
+    freight:   parseFloat(document.getElementById('p-freight').value) || 0,
+    labour:    parseFloat(document.getElementById('p-labour').value) || 0,
     taxableValue: parseFloat(document.getElementById('p-taxable').value) || 0,
     rateCFT: parseFloat(document.getElementById('p-ratecft').value) || 0,
     seasoningStatus: document.getElementById('p-status').value,
@@ -1326,7 +1485,7 @@ function renderMarginSummary(margins) {
   if (!margins.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No margin data yet — add batches and cost bills</div>'; return; }
   el.innerHTML = margins.map(m => {
     const marginOk = m.marginPerCFT >= 0;
-    const pct = m.totalRevenue > 0 ? ((m.totalMargin / m.totalRevenue) * 100).toFixed(1) : 0;
+    const pct = m.totalCostPerCFT > 0 ? ((m.marginPerCFT / m.totalCostPerCFT) * 100).toFixed(1) : 0;
     return `<div style="padding:14px 16px;border-bottom:1px solid var(--rule)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
         <div>
@@ -1335,24 +1494,27 @@ function renderMarginSummary(margins) {
         </div>
         <span class="badge ${marginOk ? 'b-seasoned' : 'b-red'}" style="font-size:11px">${marginOk ? '✓' : '⚠'} ₹${Math.round(m.marginPerCFT)}/CFT</span>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;font-size:11px">
         <div style="background:var(--bg3);padding:8px;border-radius:4px">
           <div style="color:var(--ink3);margin-bottom:2px">Cost/CFT</div>
           <div class="mono" style="color:var(--ink)">₹${Math.round(m.totalCostPerCFT)}</div>
         </div>
         <div style="background:var(--bg3);padding:8px;border-radius:4px">
-          <div style="color:var(--ink3);margin-bottom:2px">Bill Rate/CFT</div>
+          <div style="color:var(--ink3);margin-bottom:2px">SP/CFT</div>
           <div class="mono" style="color:var(--amber)">₹${Math.round(m.billRatePerCFT)}</div>
         </div>
+        <div style="background:var(--bg3);padding:8px;border-radius:4px">
+          <div style="color:var(--ink3);margin-bottom:2px">Margin/CFT</div>
+          <div class="mono" style="color:${marginOk?'var(--seasoned)':'var(--red)'}">₹${Math.round(m.marginPerCFT)}</div>
+        </div>
         <div style="background:${marginOk?'rgba(74,154,106,.1)':'rgba(192,74,58,.1)'};padding:8px;border-radius:4px">
-          <div style="color:var(--ink3);margin-bottom:2px">Margin</div>
+          <div style="color:var(--ink3);margin-bottom:2px">Margin %</div>
           <div class="mono" style="color:${marginOk?'var(--seasoned)':'var(--red)'}">${pct}%</div>
         </div>
       </div>
-      <div style="margin-top:8px;font-size:11px;color:var(--ink3)">
-        Wood: ₹${Math.round(m.woodCostPerCFT)}/CFT · 
-        Frt+Lab: ₹${Math.round(m.freightPerCFT)}/CFT · 
-        ${m.hydCostPerCFT > 0 ? `Hyd: ₹${Math.round(m.hydCostPerCFT)}/CFT` : 'No Hyd cost'}
+      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px">
+        <span style="color:var(--ink3)">₹300 markup − Frt+Lab ₹${Math.round(m.freightPerCFT)}${m.hydCostPerCFT > 0 ? ` − Hyd ₹${Math.round(m.hydCostPerCFT)}` : ''}/CFT = <strong style="color:${marginOk?'var(--seasoned)':'var(--red)'}">₹${Math.round(m.marginPerCFT)}/CFT margin</strong></span>
+        <span class="mono" style="color:${marginOk?'var(--seasoned)':'var(--red)'}">₹${Math.round(m.totalMargin).toLocaleString('en-IN')}</span>
       </div>
     </div>`;
   }).join('');
