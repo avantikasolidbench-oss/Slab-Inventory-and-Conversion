@@ -267,6 +267,7 @@ select option{background:var(--bg3);color:var(--ink)}
       </div>
 
       <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-primary btn-sm" onclick="openHydModal()">🚛 Send to Hyd</button>
         <button class="btn btn-sec btn-sm" onclick="selectAllSlabs()" id="sel-all-btn">Select All</button>
         <span style="font-size:12px;color:var(--ink3);align-self:center" id="slab-count-lbl">— slabs</span>
       </div>
@@ -303,52 +304,73 @@ select option{background:var(--bg3);color:var(--ink)}
     <div class="screen" id="screen-costs">
       <div class="sec-title">Add External Cost Bill</div>
       <div class="card" style="margin-bottom:16px">
-        <div class="card-head"><span class="card-title">New Cost Bill</span></div>
+        <div class="card-head"><span class="card-title">New Hyderabad Cost Bill</span></div>
         <div class="card-body">
-          <div class="field">
-            <label>Bill Type</label>
-            <select id="cost-type">
-              <option value="hyd_seasoning">🏭 Hyderabad Seasoning</option>
-              <option value="hyd_transit">🚛 Hyderabad Transit (Freight)</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Bill Amount ₹</label>
-            <input type="number" id="cost-amount" placeholder="50000">
-          </div>
-          <div class="field">
-            <label>Bill Date</label>
-            <input type="date" id="cost-date">
-          </div>
-          <div class="field">
-            <label>Covers slabs sent to Hyd between</label>
-            <div style="display:flex;gap:8px;align-items:center">
-              <input type="date" id="cost-from" style="flex:1">
-              <span style="color:var(--ink3);font-size:12px">to</span>
-              <input type="date" id="cost-to" style="flex:1">
-            </div>
-          </div>
-          <div class="field">
-            <label>Bill / Reference No.</label>
-            <input type="text" id="cost-billno" placeholder="HYD/001/2026">
-          </div>
-          <button class="btn btn-sec btn-full" onclick="previewCostApportionment()" style="margin-bottom:10px">Preview Apportionment →</button>
 
-          <!-- Preview -->
-          <div id="cost-preview" style="display:none">
-            <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:12px">
-              <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);margin-bottom:8px">Cost will be split across:</div>
-              <div id="cost-preview-rows"></div>
-              <div style="border-top:1px solid var(--rule);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between">
-                <span style="font-size:12px;color:var(--ink3)">Total CFT covered</span>
-                <span class="mono" id="cost-total-cft" style="color:var(--wood)">—</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;margin-top:4px">
-                <span style="font-size:12px;color:var(--ink3)">Rate per CFT</span>
-                <span class="mono" id="cost-per-cft" style="color:var(--amber)">—</span>
+          <!-- Upload or Manual toggle -->
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button class="btn btn-sm" id="cost-mode-upload" onclick="setCostMode('upload')" style="background:var(--wood);color:white;flex:1">📷 Upload Bill</button>
+            <button class="btn btn-sec btn-sm" id="cost-mode-manual" onclick="setCostMode('manual')" style="flex:1">✏️ Enter Manually</button>
+          </div>
+
+          <!-- Upload zone -->
+          <div id="cost-upload-zone" style="margin-bottom:14px">
+            <div class="uz" onclick="document.getElementById('f-cost-bill').click()" style="padding:20px">
+              <input type="file" id="f-cost-bill" accept="image/*,.pdf" onchange="procCostBill(event)" style="display:none">
+              <div class="uz-icon" style="font-size:24px">📄</div>
+              <div class="uz-title" style="font-size:13px">Upload Hyd seasoning or freight bill</div>
+              <div class="uz-sub">AI extracts amount and date</div>
+            </div>
+            <div class="ai-spin-wrap" id="ai-cost"><div class="ai-spin"></div> Reading bill…</div>
+          </div>
+
+          <!-- Manual / AI-filled form -->
+          <div id="cost-form">
+            <div class="field">
+              <label>Bill Type</label>
+              <select id="cost-type">
+                <option value="hyd_seasoning">🏭 Hyderabad Seasoning</option>
+                <option value="hyd_transit">🚛 Hyderabad Transit (Freight)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Bill Amount ₹</label>
+              <input type="number" id="cost-amount" placeholder="50000">
+            </div>
+            <div class="field">
+              <label>Bill Date</label>
+              <input type="date" id="cost-date">
+            </div>
+            <div class="field">
+              <label>Bill / Reference No.</label>
+              <input type="text" id="cost-billno" placeholder="HYD/001/2026">
+            </div>
+            <div class="field">
+              <label>Covers slabs sent to Hyd between</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="date" id="cost-from" style="flex:1">
+                <span style="color:var(--ink3);font-size:12px">to</span>
+                <input type="date" id="cost-to" style="flex:1">
               </div>
             </div>
-            <button class="btn btn-primary btn-full" onclick="saveCostBill()" id="cost-save-btn">💾 Save & Apportion</button>
+            <button class="btn btn-sec btn-full" onclick="previewCostApportionment()" style="margin-bottom:10px">Preview Apportionment →</button>
+
+            <!-- Preview -->
+            <div id="cost-preview" style="display:none">
+              <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:12px">
+                <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);margin-bottom:8px">Cost will be split across:</div>
+                <div id="cost-preview-rows"></div>
+                <div style="border-top:1px solid var(--rule);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between">
+                  <span style="font-size:12px;color:var(--ink3)">Total CFT covered</span>
+                  <span class="mono" id="cost-total-cft" style="color:var(--wood)">—</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:4px">
+                  <span style="font-size:12px;color:var(--ink3)">Rate per CFT</span>
+                  <span class="mono" id="cost-per-cft" style="color:var(--amber)">—</span>
+                </div>
+              </div>
+              <button class="btn btn-primary btn-full" onclick="saveCostBill()" id="cost-save-btn">💾 Save & Apportion</button>
+            </div>
           </div>
         </div>
       </div>
@@ -484,42 +506,43 @@ select option{background:var(--bg3);color:var(--ink)}
   <div class="modal-box">
     <div class="modal-handle"></div>
     <div class="modal-title">🚛 Send to Hyderabad</div>
-    <div class="modal-sub" id="hyd-modal-sub">Confirm dispatch details</div>
+    <div class="modal-sub">Enter slab dimensions being sent</div>
 
-    <div class="field">
-      <label>Date Sent</label>
-      <input type="date" id="hyd-date">
+    <div class="field"><label>Date Sent</label><input type="date" id="hyd-date"></div>
+    <div class="field"><label>Source Batch</label>
+      <select id="hyd-batch" onchange="updateHydBatch()">
+        <option value="">— select batch —</option>
+      </select>
     </div>
-    <div class="field">
-      <label>Vehicle / Reference No. (optional)</label>
+    <div class="field"><label>Vehicle / Reference No. (optional)</label>
       <input type="text" id="hyd-ref" placeholder="e.g. DL01AB1234">
     </div>
-    <div class="field">
-      <label>Notes (optional)</label>
-      <input type="text" id="hyd-notes" placeholder="e.g. Trip 1 — White Oak batch">
-    </div>
 
-    <!-- Upload handwritten note -->
-    <div style="margin-bottom:14px">
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:8px">Or upload handwritten note with sizes</div>
-      <button class="btn btn-sec btn-sm btn-full" onclick="document.getElementById('f-hyd-sheet').click()">📷 Upload Slab List</button>
+    <!-- Slab entry -->
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn btn-sec btn-sm" onclick="document.getElementById('f-hyd-sheet').click()">📷 Upload Register</button>
+      <button class="btn btn-sec btn-sm" onclick="addHydRow()">+ Add Row</button>
       <input type="file" id="f-hyd-sheet" accept="image/*" onchange="readHydSheet(event)" style="display:none">
-      <div class="ai-spin-wrap" id="ai-hyd" style="margin-top:8px"><div class="ai-spin"></div> Reading slab list…</div>
+    </div>
+    <div class="ai-spin-wrap" id="ai-hyd" style="margin-bottom:8px"><div class="ai-spin"></div> Reading register…</div>
+
+    <div style="overflow-x:auto;margin-bottom:12px">
+      <table class="dtbl">
+        <thead><tr>
+          <th>L mm</th><th>W mm</th><th>T mm</th><th>CFT</th><th></th>
+        </tr></thead>
+        <tbody id="hyd-rows"></tbody>
+      </table>
     </div>
 
-    <!-- Slab summary -->
-    <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:16px">
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);margin-bottom:8px">Slabs being sent</div>
-      <div id="hyd-slab-summary"></div>
-      <div style="border-top:1px solid var(--rule);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between">
-        <span style="font-size:12px;color:var(--ink3)">Total</span>
-        <span class="mono" id="hyd-total" style="color:var(--wood)">—</span>
-      </div>
+    <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px;margin-bottom:14px;display:flex;justify-content:space-between">
+      <span style="font-size:12px;color:var(--ink3)">Total</span>
+      <span class="mono" id="hyd-total" style="color:var(--wood)">—</span>
     </div>
 
     <div style="display:flex;gap:8px">
       <button class="btn btn-sec" onclick="closeHydModal()" style="flex:1">Cancel</button>
-      <button class="btn btn-primary" onclick="saveSendToHyd()" style="flex:2" id="hyd-save-btn">🚛 Confirm Dispatch</button>
+      <button class="btn btn-primary" onclick="saveSendToHyd()" style="flex:2" id="hyd-save-btn">🚛 Confirm & Save Slabs</button>
     </div>
   </div>
 </div>
@@ -836,28 +859,51 @@ function updateBulkBar() {
   }
 }
 
-function showSendToHyd() {
-  if (!selectedSlabs.size) return;
-  const ids = [...selectedSlabs];
-  const slabs = ST.slabs.filter(s => ids.includes(s.slabId));
-  const batchMap = {};
-  slabs.forEach(s => {
-    if (!batchMap[s.invoiceNo]) batchMap[s.invoiceNo] = { invoiceNo: s.invoiceNo, species: s.species, count: 0, cft: 0 };
-    batchMap[s.invoiceNo].count++;
-    batchMap[s.invoiceNo].cft += parseFloat(s.cft || 0);
-  });
-  const totalCFT = slabs.reduce((s, x) => s + parseFloat(x.cft || 0), 0);
-  document.getElementById('hyd-modal-sub').textContent = `${slabs.length} slab${slabs.length > 1 ? 's' : ''} selected`;
+let hydRowCount = 0;
+
+function openHydModal() {
   document.getElementById('hyd-date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('hyd-ref').value = '';
-  document.getElementById('hyd-notes').value = '';
-  document.getElementById('hyd-slab-summary').innerHTML = Object.values(batchMap).map(b => `
-    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px">
-      <div><span class="mono" style="color:var(--wood)">${b.invoiceNo}</span> <span class="sp-tag">${b.species}</span></div>
-      <div style="color:var(--ink3)">${b.count} slabs · <span class="mono">${b.cft.toFixed(3)} CFT</span></div>
-    </div>`).join('');
-  document.getElementById('hyd-total').textContent = `${slabs.length} slabs · ${totalCFT.toFixed(3)} CFT`;
+  document.getElementById('hyd-rows').innerHTML = '';
+  hydRowCount = 0;
+  const sel = document.getElementById('hyd-batch');
+  sel.innerHTML = '<option value="">— select batch —</option>' +
+    ST.batches.filter(b => parseFloat(b.remainingCFT||b.totalCFT||0) > 0)
+    .map(b => `<option value="${b.invoiceNo}">${b.invoiceNo} · ${b.species} · ${parseFloat(b.remainingCFT||b.totalCFT||0).toFixed(1)} CFT</option>`).join('');
+  addHydRow();
   document.getElementById('hyd-modal').classList.add('show');
+}
+function showSendToHyd() { openHydModal(); }
+
+function updateHydBatch() { calcHydTotals(); }
+
+function addHydRow() {
+  const id = ++hydRowCount;
+  const tr = document.createElement('tr');
+  tr.id = 'hdr' + id;
+  tr.innerHTML = `
+    <td><input type="number" id="hdr${id}l" placeholder="3000" oninput="calcHydTotals()" style="width:70px"></td>
+    <td><input type="number" id="hdr${id}w" placeholder="280" oninput="calcHydTotals()" style="width:65px"></td>
+    <td><input type="number" id="hdr${id}t" placeholder="55" oninput="calcHydTotals()" style="width:55px"></td>
+    <td class="mono" id="hdr${id}cft" style="color:var(--wood);padding:8px">—</td>
+    <td><button onclick="document.getElementById('hdr${id}').remove();calcHydTotals()" style="background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer;padding:4px 8px">✕</button></td>`;
+  document.getElementById('hyd-rows').appendChild(tr);
+}
+
+function calcHydTotals() {
+  let totalCFT = 0, count = 0;
+  document.querySelectorAll('#hyd-rows tr').forEach(tr => {
+    const id = tr.id.replace('hdr','');
+    const l = parseFloat(document.getElementById('hdr'+id+'l')?.value)||0;
+    const w = parseFloat(document.getElementById('hdr'+id+'w')?.value)||0;
+    const t = parseFloat(document.getElementById('hdr'+id+'t')?.value)||0;
+    if (!l||!w||!t) return;
+    const cft = (l*w*t)/1e9*35.3147;
+    totalCFT += cft; count++;
+    const el = document.getElementById('hdr'+id+'cft');
+    if (el) el.textContent = cft.toFixed(3);
+  });
+  document.getElementById('hyd-total').textContent = count > 0 ? `${count} slabs · ${totalCFT.toFixed(3)} CFT` : '—';
 }
 
 async function readHydSheet(event) {
@@ -867,11 +913,8 @@ async function readHydSheet(event) {
   document.getElementById('ai-hyd').classList.add('show');
   try {
     const b64 = await toB64(file);
-    const prompt = `This is a handwritten note listing slabs being sent for seasoning. Read every row.
-Each row has dimensions: L (length mm), W (width mm), T/H (thickness mm), and optionally a batch/invoice number.
-Return ONLY a JSON array:
-[{"lengthMM":3000,"widthMM":280,"thickMM":55,"invoiceNo":"PCPL/2570"},...]
-If invoice number is not readable, omit it. No other text.`;
+    const prompt = `Read this handwritten slab list. Each row has L (length mm), W (width mm), T (thickness mm). Return ONLY JSON array:
+[{"lengthMM":3000,"widthMM":280,"thickMM":55},...]`;
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
@@ -885,32 +928,23 @@ If invoice number is not readable, omit it. No other text.`;
     let rows;
     try { rows = JSON.parse(txt.replace(/```json|```/g,'').trim()); }
     catch(e) { const lc = txt.lastIndexOf('}'); rows = lc > 0 ? JSON.parse(txt.substring(0,lc+1)+']') : []; }
-
     document.getElementById('ai-hyd').classList.remove('show');
-    if (!rows.length) { toast('Could not read — select slabs manually', 'err'); return; }
-
-    // Match slabs from ST.slabs by dimensions
-    let matched = 0;
+    if (!rows.length) { toast('Could not read — enter manually', 'err'); return; }
     rows.forEach(r => {
-      const slab = ST.slabs.find(s =>
-        Math.abs(s.lengthMM - r.lengthMM) < 10 &&
-        Math.abs(s.widthMM  - r.widthMM)  < 10 &&
-        Math.abs(s.thickMM  - r.thickMM)  < 5  &&
-        (!r.invoiceNo || s.invoiceNo === r.invoiceNo) &&
-        s.status !== 'Sent to Hyderabad' &&
-        s.status !== 'Seasoned'
-      );
-      if (slab && !selectedSlabs.has(slab.slabId)) {
-        selectedSlabs.add(slab.slabId);
-        matched++;
-      }
+      const id = ++hydRowCount;
+      const tr = document.createElement('tr');
+      tr.id = 'hdr' + id;
+      const cft = r.lengthMM && r.widthMM && r.thickMM ? ((r.lengthMM*r.widthMM*r.thickMM)/1e9*35.3147).toFixed(3) : '—';
+      tr.innerHTML = `
+        <td><input type="number" id="hdr${id}l" value="${r.lengthMM||''}" oninput="calcHydTotals()" style="width:70px"></td>
+        <td><input type="number" id="hdr${id}w" value="${r.widthMM||''}" oninput="calcHydTotals()" style="width:65px"></td>
+        <td><input type="number" id="hdr${id}t" value="${r.thickMM||''}" oninput="calcHydTotals()" style="width:55px"></td>
+        <td class="mono" id="hdr${id}cft" style="color:var(--wood);padding:8px">${cft}</td>
+        <td><button onclick="document.getElementById('hdr${id}').remove();calcHydTotals()" style="background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer;padding:4px 8px">✕</button></td>`;
+      document.getElementById('hyd-rows').appendChild(tr);
     });
-
-    // Re-render and update summary
-    renderSlabs(ST.slabs);
-    updateBulkBar();
-    showSendToHyd(); // refresh modal with new selection
-    toast(`${matched} of ${rows.length} slabs matched ✓`, 'ok');
+    calcHydTotals();
+    toast(rows.length + ' rows read ✓', 'ok');
   } catch(e) {
     document.getElementById('ai-hyd').classList.remove('show');
     toast('Read failed: ' + e.message, 'err');
@@ -918,25 +952,36 @@ If invoice number is not readable, omit it. No other text.`;
   document.getElementById('f-hyd-sheet').value = '';
 }
 
+function closeHydModal() { document.getElementById('hyd-modal').classList.remove('show'); }
+
 async function saveSendToHyd() {
   const btn = document.getElementById('hyd-save-btn');
   const date = document.getElementById('hyd-date').value;
+  const invoiceNo = document.getElementById('hyd-batch').value;
   if (!date) { toast('Enter date', 'err'); return; }
-  const ids = [...selectedSlabs];
+  if (!invoiceNo) { toast('Select a batch', 'err'); return; }
+  const slabs = [];
+  document.querySelectorAll('#hyd-rows tr').forEach(tr => {
+    const id = tr.id.replace('hdr','');
+    const l = parseFloat(document.getElementById('hdr'+id+'l')?.value)||0;
+    const w = parseFloat(document.getElementById('hdr'+id+'w')?.value)||0;
+    const t = parseFloat(document.getElementById('hdr'+id+'t')?.value)||0;
+    if (l&&w&&t) { const cbm=(l*w*t)/1e9; slabs.push({lengthMM:l,widthMM:w,thickMM:t,cbm,cft:cbm*35.3147}); }
+  });
+  if (!slabs.length) { toast('Add at least one slab', 'err'); return; }
+  const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
     const r = await apiPost({ action: 'sendSlabsToHyd', data: {
-      slabIds: ids, date,
-      ref:   document.getElementById('hyd-ref').value.trim(),
-      notes: document.getElementById('hyd-notes').value.trim()
+      invoiceNo, date, species: b?.species||'', vendor: b?.vendor||'',
+      ref: document.getElementById('hyd-ref').value.trim(), slabs
     }});
     if (r.success) {
-      toast(`${ids.length} slabs marked "Sent to Hyderabad" ✓`, 'ok');
-      closeHydModal(); clearSelection();
-      await loadSlabs(); loadDash();
-    } else toast('Error: ' + (r.error || 'Failed'), 'err');
+      toast(`${slabs.length} slabs created & sent to Hyd ✓`, 'ok');
+      closeHydModal(); await loadSlabs(); await loadBatches(); loadDash();
+    } else toast('Error: ' + (r.error||'Failed'), 'err');
   } catch(e) { toast('Network error', 'err'); }
-  btn.disabled = false; btn.innerHTML = '🚛 Confirm Dispatch';
+  btn.disabled = false; btn.innerHTML = '🚛 Confirm & Save Slabs';
 }
 
 function showBulkStatus() {
@@ -1356,6 +1401,53 @@ function openBatchDetail(invoiceNo) {
   renderSlabs(ST.slabs);
   updateBulkBar();
   toast(batchSlabs.length + ' slabs from ' + invoiceNo + ' selected', 'ok');
+}
+
+function setCostMode(mode) {
+  document.getElementById('cost-upload-zone').style.display = mode === 'upload' ? 'block' : 'none';
+  document.getElementById('cost-mode-upload').style.background = mode === 'upload' ? 'var(--wood)' : '';
+  document.getElementById('cost-mode-upload').style.color = mode === 'upload' ? 'white' : '';
+  document.getElementById('cost-mode-manual').style.background = mode === 'manual' ? 'var(--wood)' : '';
+  document.getElementById('cost-mode-manual').style.color = mode === 'manual' ? 'white' : '';
+}
+
+async function procCostBill(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!CFG.key) { toast('Claude API key not set', 'err'); return; }
+  document.getElementById('ai-cost').classList.add('show');
+  try {
+    const b64 = await toB64(file);
+    const mt = file.type === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
+    const prompt = `Read this invoice/bill. It is either a seasoning bill or a freight/transport bill.
+Extract:
+- billType: "hyd_seasoning" if seasoning/treatment bill, "hyd_transit" if freight/transport bill
+- amount: total bill amount in INR (numbers only)
+- date: bill date in YYYY-MM-DD
+- billNo: invoice or reference number
+Return ONLY JSON: {"billType":"hyd_seasoning","amount":50000,"date":"2026-04-01","billNo":"HYD/001/2026"}`;
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, messages: [{ role: 'user', content: [
+        { type: mt === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: mt, data: b64.split(',')[1] } },
+        { type: 'text', text: prompt }
+      ]}]})
+    });
+    const data = await resp.json();
+    const txt = data.content?.[0]?.text || '{}';
+    const d = JSON.parse(txt.replace(/```json|```/g,'').trim());
+    document.getElementById('ai-cost').classList.remove('show');
+    if (d.billType) document.getElementById('cost-type').value = d.billType;
+    if (d.amount)   document.getElementById('cost-amount').value = Math.round(d.amount);
+    if (d.date)     document.getElementById('cost-date').value = d.date;
+    if (d.billNo)   document.getElementById('cost-billno').value = d.billNo;
+    toast('Bill read ✓ — now set date range and preview', 'ok');
+  } catch(e) {
+    document.getElementById('ai-cost').classList.remove('show');
+    toast('Read failed — enter manually', 'err');
+  }
+  document.getElementById('f-cost-bill').value = '';
 }
 
 // ── COSTS & APPORTIONMENT ────────────────────────────────
