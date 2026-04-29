@@ -455,30 +455,28 @@ select option{background:var(--bg3);color:var(--ink)}
       <div class="field"><label>Vendor</label><input type="text" id="p-vendor"></div>
       <div class="field"><label>Invoice No.</label><input type="text" id="p-invno"></div>
       <div class="field"><label>Date</label><input type="date" id="p-date"></div>
-      <div class="field"><label>Species</label>
-        <select id="p-species">
-          <option>White Oak</option><option>White Ash</option><option>Rosewood</option>
-          <option>Uttarakhand Teak</option><option>CP Teak</option><option>Siris</option>
-          <option>Agar</option><option>Eucalyptus</option><option>Cedar</option>
-        </select>
+
+      <!-- Species rows table -->
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:8px">
+        Species & Quantities <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px">— one row per species, saved as separate batches</span>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="field"><label>Total CFT</label><input type="number" id="p-cft" step="0.01" oninput="calcPurCBM()"></div>
-        <div class="field"><label>Total CBM (auto)</label><input type="number" id="p-cbm" step="0.0001" readonly style="opacity:.6"></div>
+      <div style="overflow-x:auto;margin-bottom:8px">
+        <table style="width:100%;border-collapse:collapse;min-width:500px" id="sw-species-tbl">
+          <thead><tr style="background:var(--bg3)">
+            <th style="text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);border-bottom:1px solid var(--rule)">Species</th>
+            <th style="text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);border-bottom:1px solid var(--rule)">CFT</th>
+            <th style="text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);border-bottom:1px solid var(--rule)">Slabs</th>
+            <th style="text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);border-bottom:1px solid var(--rule)">Thick mm</th>
+            <th style="text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);border-bottom:1px solid var(--rule)">Wood ₹</th>
+            <th style="text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);border-bottom:1px solid var(--rule)">Freight ₹</th>
+            <th style="text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);border-bottom:1px solid var(--rule)">Rate/CFT</th>
+            <th style="width:28px;border-bottom:1px solid var(--rule)"></th>
+          </tr></thead>
+          <tbody id="sw-species-tbody"></tbody>
+        </table>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="field"><label>Slabs</label><input type="number" id="p-slabs"></div>
-        <div class="field"><label>Thickness mm</label><input type="number" id="p-thick"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="field"><label>Wood Value ₹</label><input type="number" id="p-woodval" oninput="calcPurRate()"></div>
-        <div class="field"><label>Total Taxable ₹</label><input type="number" id="p-taxable" oninput="calcPurRate()"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="field"><label>Freight ₹</label><input type="number" id="p-freight" placeholder="0" oninput="calcPurRate()"></div>
-        <div class="field"><label>Labour ₹</label><input type="number" id="p-labour" placeholder="0" oninput="calcPurRate()"></div>
-      </div>
-      <div class="field"><label>Rate/CFT ₹ (auto)</label><input type="number" id="p-ratecft" readonly style="background:#1a2a1a;opacity:.8"></div>
+      <button class="btn btn-sec btn-sm" onclick="addSWSpeciesRow()" style="margin-bottom:14px">+ Add Species</button>
+
       <div class="field"><label>Initial Seasoning Status</label>
         <select id="p-status">
           <option value="Unseasoned">🪵 Unseasoned</option>
@@ -487,10 +485,10 @@ select option{background:var(--bg3);color:var(--ink)}
           <option value="Seasoned">✅ Seasoned</option>
         </select>
       </div>
-      <div class="field"><label>Notes</label><textarea id="p-notes" placeholder="Any notes about this batch…"></textarea></div>
+      <div class="field"><label>Notes</label><textarea id="p-notes" placeholder="Any notes…" style="min-height:60px"></textarea></div>
       <div style="display:flex;gap:8px;margin-top:4px">
         <button class="btn btn-sec" onclick="closePurModal()" style="flex:1">Cancel</button>
-        <button class="btn btn-primary" onclick="savePurchase()" style="flex:2" id="pur-save-btn">💾 Save Batch</button>
+        <button class="btn btn-primary" onclick="savePurchase()" style="flex:2" id="pur-save-btn">💾 Save Batch(es)</button>
       </div>
     </div>
 
@@ -1113,21 +1111,46 @@ function closePurModal() {
   document.getElementById('ai-pur').classList.remove('show');
   document.getElementById('prev-pur').style.display = 'none';
   document.getElementById('f-pur').value = '';
+  document.getElementById('sw-species-tbody').innerHTML = '';
+  document.getElementById('p-vendor').value = '';
+  document.getElementById('p-invno').value = '';
+  document.getElementById('p-notes').value = '';
+  swSpeciesRowId = 0;
 }
 function showPurForm() {
   document.getElementById('pur-form').style.display = 'block';
   document.getElementById('pur-manual-btn-wrap').style.display = 'none';
+  if (!document.getElementById('sw-species-tbody').children.length) addSWSpeciesRow();
 }
 
-function calcPurCBM() {
-  const cft = parseFloat(document.getElementById('p-cft').value) || 0;
-  document.getElementById('p-cbm').value = (cft / 35.3147).toFixed(4);
-  calcPurRate();
+let swSpeciesRowId = 0;
+
+function addSWSpeciesRow(data) {
+  const id = ++swSpeciesRowId;
+  const spOpts = ['White Oak','White Ash','Rosewood','Uttarakhand Teak','CP Teak','Siris','Agar','Eucalyptus','Cedar']
+    .map(s => `<option ${data&&data.species===s?'selected':''}>${s}</option>`).join('');
+  const tr = document.createElement('tr');
+  tr.id = 'swsr' + id;
+  tr.style.borderBottom = '1px solid rgba(255,255,255,.06)';
+  tr.innerHTML = `
+    <td style="padding:4px 6px"><select id="swsr${id}sp" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink);padding:6px 8px;border-radius:4px;font-size:12px;width:110px">${spOpts}</select></td>
+    <td style="padding:4px 6px"><input type="number" id="swsr${id}cft" value="${data&&data.totalCFT||''}" step="0.01" placeholder="0.00" style="width:72px;background:var(--bg3);border:1px solid var(--rule);color:var(--ink);padding:6px 8px;border-radius:4px;font-size:12px" oninput="calcSWRate(${id})"></td>
+    <td style="padding:4px 6px"><input type="number" id="swsr${id}pcs" value="${data&&data.slabCount||''}" placeholder="—" style="width:50px;background:var(--bg3);border:1px solid var(--rule);color:var(--ink);padding:6px 8px;border-radius:4px;font-size:12px"></td>
+    <td style="padding:4px 6px"><input type="number" id="swsr${id}thick" value="${data&&data.thicknessMM||''}" placeholder="52" style="width:50px;background:var(--bg3);border:1px solid var(--rule);color:var(--ink);padding:6px 8px;border-radius:4px;font-size:12px"></td>
+    <td style="padding:4px 6px"><input type="number" id="swsr${id}wood" value="${data&&data.woodValue?Math.round(data.woodValue):''}" placeholder="0" style="width:80px;background:var(--bg3);border:1px solid var(--rule);color:var(--ink);padding:6px 8px;border-radius:4px;font-size:12px" oninput="calcSWRate(${id})"></td>
+    <td style="padding:4px 6px"><input type="number" id="swsr${id}frt" value="${data&&data.freight?Math.round(data.freight):''}" placeholder="0" style="width:70px;background:var(--bg3);border:1px solid var(--rule);color:var(--ink);padding:6px 8px;border-radius:4px;font-size:12px" oninput="calcSWRate(${id})"></td>
+    <td style="padding:4px 6px"><input type="number" id="swsr${id}rate" value="${data&&data.rateCFT?Math.round(data.rateCFT):''}" style="width:70px;background:rgba(74,154,106,.1);border:1px solid rgba(74,154,106,.2);color:var(--seasoned);padding:6px 8px;border-radius:4px;font-size:12px;font-weight:600" readonly></td>
+    <td style="padding:4px 6px"><button onclick="document.getElementById('swsr${id}').remove()" style="background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer;padding:4px">✕</button></td>`;
+  document.getElementById('sw-species-tbody').appendChild(tr);
+  calcSWRate(id);
 }
-function calcPurRate() {
-  const cft = parseFloat(document.getElementById('p-cft').value) || 0;
-  const woodval = parseFloat(document.getElementById('p-woodval').value) || 0;
-  if (cft > 0 && woodval > 0) document.getElementById('p-ratecft').value = Math.round(woodval / cft);
+
+function calcSWRate(id) {
+  const cft  = parseFloat(document.getElementById('swsr'+id+'cft')?.value) || 0;
+  const wood = parseFloat(document.getElementById('swsr'+id+'wood')?.value) || 0;
+  const frt  = parseFloat(document.getElementById('swsr'+id+'frt')?.value) || 0;
+  const el   = document.getElementById('swsr'+id+'rate');
+  if (el && cft > 0 && wood > 0) el.value = Math.round(wood / cft);
 }
 
 async function procPurFile(event) {
@@ -1139,20 +1162,32 @@ async function procPurFile(event) {
   try {
     const b64 = await toB64(file);
     const mt = file.type === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
-    const prompt = `Read this timber/wood purchase invoice. Extract:
+    const prompt = `Read this timber/wood purchase invoice carefully.
+
+Extract header:
 - vendor: supplier name
-- invoiceNo: document number
+- invoiceNo: document number  
 - date: YYYY-MM-DD
-- species: map to "White Oak", "White Ash", "Rosewood", "Uttarakhand Teak", "CP Teak", "Siris", "Agar", "Eucalyptus", "Cedar"
-- totalCFT: total quantity in CFT (convert from CBM if needed: CBM × 35.3147)
-- slabCount: number of slabs if mentioned
-- thicknessMM: thickness in mm
-- woodValue: quantity × rate per CFT — pure wood cost, no freight or labour
-- freight: freight/cartage charges shown separately on bill (₹ total)
-- labour: labour charges shown separately on bill (₹ total)
-- totalTaxable: full taxable amount including freight/labour
-- rateCFT: woodValue ÷ totalCFT (wood rate only)
-Return ONLY JSON: {"vendor":"","invoiceNo":"","date":"","species":"","totalCFT":0,"slabCount":0,"thicknessMM":0,"woodValue":0,"freight":0,"labour":0,"totalTaxable":0,"rateCFT":0}`;
+
+Extract ALL wood species line items (there may be one or more):
+For each species line item extract:
+- species: map to exactly one of: "White Oak", "White Ash", "Rosewood", "Uttarakhand Teak", "CP Teak", "Siris", "Agar", "Eucalyptus", "Cedar"
+  Mapping hints: Siris Wood→"Siris", Sangwan/Sangwan Wood→"Uttarakhand Teak", Sirus→"Siris"
+- totalCFT: quantity in CFT for this species only
+- slabCount: number of pieces if shown
+- thicknessMM: thickness in mm if shown
+- woodValue: quantity × rate for this species (pure wood, no freight)
+- rateCFT: woodValue ÷ totalCFT
+
+Shared costs (cartage/freight/labour shown as single line for all species):
+- Split proportionally by CFT across species
+- freight per species = (totalCartage × speciesCFT / totalAllCFT)
+
+Return ONLY JSON:
+{"vendor":"Woodangle","invoiceNo":"2/2026-27","date":"2026-04-09","lineItems":[
+  {"species":"Siris","totalCFT":49.10,"slabCount":null,"thicknessMM":null,"woodValue":56514,"freight":3311,"rateCFT":1151},
+  {"species":"Uttarakhand Teak","totalCFT":39.87,"slabCount":null,"thicknessMM":null,"woodValue":79780,"freight":2689,"rateCFT":2001}
+]}`;
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
@@ -1165,15 +1200,17 @@ Return ONLY JSON: {"vendor":"","invoiceNo":"","date":"","species":"","totalCFT":
     if (d.vendor) document.getElementById('p-vendor').value = d.vendor;
     if (d.invoiceNo) document.getElementById('p-invno').value = d.invoiceNo;
     if (d.date) document.getElementById('p-date').value = d.date;
-    if (d.species) document.getElementById('p-species').value = d.species;
-    if (d.totalCFT) { document.getElementById('p-cft').value = d.totalCFT.toFixed(2); calcPurCBM(); }
-    if (d.slabCount) document.getElementById('p-slabs').value = d.slabCount;
-    if (d.thicknessMM) document.getElementById('p-thick').value = d.thicknessMM;
-    if (d.woodValue) document.getElementById('p-woodval').value = Math.round(d.woodValue);
-    if (d.freight)   document.getElementById('p-freight').value = Math.round(d.freight);
-    if (d.labour)    document.getElementById('p-labour').value  = Math.round(d.labour);
-    if (d.totalTaxable) document.getElementById('p-taxable').value = Math.round(d.totalTaxable);
-    calcPurRate();
+
+    // Populate species rows
+    document.getElementById('sw-species-tbody').innerHTML = '';
+    swSpeciesRowId = 0;
+    const items = d.lineItems || [];
+    if (items.length === 0) {
+      addSWSpeciesRow({ species: d.species, totalCFT: d.totalCFT, slabCount: d.slabCount, thicknessMM: d.thicknessMM, woodValue: d.woodValue, freight: d.freight, rateCFT: d.rateCFT });
+    } else {
+      items.forEach(item => addSWSpeciesRow(item));
+      if (items.length > 1) toast(`${items.length} species found — saved as separate batches`, 'ok');
+    }
     showPurForm();
     toast('Bill read ✓', 'ok');
   } catch(e) { document.getElementById('ai-pur').classList.remove('show'); showPurForm(); toast('AI read failed — enter manually', 'err'); }
@@ -1181,41 +1218,59 @@ Return ONLY JSON: {"vendor":"","invoiceNo":"","date":"","species":"","totalCFT":
 
 async function savePurchase() {
   const btn = document.getElementById('pur-save-btn');
-  const data = {
-    vendor: document.getElementById('p-vendor').value.trim(),
-    invoiceNo: document.getElementById('p-invno').value.trim(),
-    date: document.getElementById('p-date').value,
-    species: document.getElementById('p-species').value,
-    totalCFT: parseFloat(document.getElementById('p-cft').value) || 0,
-    totalCBM: parseFloat(document.getElementById('p-cbm').value) || 0,
-    slabCount: parseInt(document.getElementById('p-slabs').value) || 0,
-    thicknessMM: parseInt(document.getElementById('p-thick').value) || 0,
-    woodValue: parseFloat(document.getElementById('p-woodval').value) || 0,
-    freight:   parseFloat(document.getElementById('p-freight').value) || 0,
-    labour:    parseFloat(document.getElementById('p-labour').value) || 0,
-    taxableValue: parseFloat(document.getElementById('p-taxable').value) || 0,
-    rateCFT: parseFloat(document.getElementById('p-ratecft').value) || 0,
-    seasoningStatus: document.getElementById('p-status').value,
-    notes: document.getElementById('p-notes').value.trim()
-  };
-  if (!data.vendor || !data.invoiceNo || !data.totalCFT) { toast('Fill vendor, invoice no and CFT', 'err'); return; }
-  btn.disabled = true; btn.textContent = 'Saving…';
-  try {
-    const r = await apiPost({ action: 'saveSWBatch', data });
-    if (r.success) {
-      toast('Batch saved ✓', 'ok'); closePurModal(); await loadBatches(); loadDash();
-    } else if (r.duplicate) {
-      btn.disabled = false; btn.innerHTML = '💾 Save Batch';
-      if (confirm(`Invoice ${data.invoiceNo} already exists. Replace it?`)) {
-        btn.disabled = true; btn.textContent = 'Replacing…';
-        const r2 = await apiPost({ action: 'saveSWBatch', data: { ...data, replace: true } });
-        if (r2.success) { toast('Batch replaced ✓', 'ok'); closePurModal(); await loadBatches(); loadDash(); }
-        else toast('Error: ' + (r2.error||'Failed'), 'err');
-        btn.disabled = false; btn.innerHTML = '💾 Save Batch';
-      }
-    } else toast('Error: ' + (r.error || 'Failed'), 'err');
-  } catch(e) { toast('Network error', 'err'); }
-  btn.disabled = false; btn.innerHTML = '💾 Save Batch';
+  const vendor   = document.getElementById('p-vendor').value.trim();
+  const invoiceNo= document.getElementById('p-invno').value.trim();
+  const date     = document.getElementById('p-date').value;
+  const status   = document.getElementById('p-status').value;
+  const notes    = document.getElementById('p-notes').value.trim();
+
+  if (!vendor || !invoiceNo) { toast('Fill vendor and invoice no', 'err'); return; }
+
+  // Collect species rows
+  const speciesRows = [];
+  document.querySelectorAll('#sw-species-tbody tr').forEach(tr => {
+    const id = tr.id.replace('swsr','');
+    if (!id) return;
+    const sp    = document.getElementById('swsr'+id+'sp')?.value || '';
+    const cft   = parseFloat(document.getElementById('swsr'+id+'cft')?.value) || 0;
+    const pcs   = parseInt(document.getElementById('swsr'+id+'pcs')?.value) || 0;
+    const thick = parseInt(document.getElementById('swsr'+id+'thick')?.value) || 0;
+    const wood  = parseFloat(document.getElementById('swsr'+id+'wood')?.value) || 0;
+    const frt   = parseFloat(document.getElementById('swsr'+id+'frt')?.value) || 0;
+    const rate  = parseFloat(document.getElementById('swsr'+id+'rate')?.value) || 0;
+    if (sp && cft > 0) speciesRows.push({ species:sp, totalCFT:cft, slabCount:pcs, thicknessMM:thick, woodValue:wood, freight:frt, labour:0, taxableValue:wood+frt, rateCFT:rate });
+  });
+
+  if (!speciesRows.length) { toast('Add at least one species row', 'err'); return; }
+
+  btn.disabled = true; btn.innerHTML = `<span style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .6s linear infinite"></span> Saving…`;
+
+  let saved = 0, errors = [];
+  for (const row of speciesRows) {
+    const suffix = speciesRows.length > 1 ? '-' + row.species.split(' ').map(w=>w[0]).join('') : '';
+    const batchId = invoiceNo + suffix;
+    const data = { vendor, invoiceNo: batchId, date, species: row.species,
+      totalCFT: row.totalCFT, totalCBM: row.totalCFT/35.3147,
+      slabCount: row.slabCount, thicknessMM: row.thicknessMM,
+      woodValue: row.woodValue, freight: row.freight, labour: row.labour,
+      taxableValue: row.taxableValue, rateCFT: row.rateCFT,
+      seasoningStatus: status, notes };
+    try {
+      const r = await apiPost({ action: 'saveSWBatch', data });
+      if (r.success) { saved++; }
+      else if (r.duplicate) {
+        if (confirm(`${batchId} already exists. Replace?`)) {
+          const r2 = await apiPost({ action: 'saveSWBatch', data: { ...data, replace: true } });
+          if (r2.success) saved++; else errors.push(batchId);
+        }
+      } else errors.push(batchId + ': ' + (r.error||'Failed'));
+    } catch(e) { errors.push(batchId + ': network error'); }
+  }
+
+  if (errors.length) toast('Errors: ' + errors.join(', '), 'err');
+  else toast(`${saved} batch(es) saved ✓`, 'ok');
+  if (saved > 0) { closePurModal(); await loadBatches(); loadDash(); }
+  btn.disabled = false; btn.innerHTML = '💾 Save Batch(es)';
 }
 
 // ── DISPATCH ──
