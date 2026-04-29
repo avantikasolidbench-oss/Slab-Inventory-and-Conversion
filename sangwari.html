@@ -233,10 +233,10 @@ select option{background:var(--bg3);color:var(--ink)}
     <!-- DASHBOARD -->
     <div class="screen active" id="screen-dash">
       <div class="kpi-grid">
-        <div class="kpi"><div class="kpi-lbl">Total Stock</div><div class="kpi-val" id="k-stock">—</div><div class="kpi-sub">CFT in yard</div></div>
-        <div class="kpi"><div class="kpi-lbl">Seasoned</div><div class="kpi-val" id="k-seasoned" style="color:var(--seasoned)">—</div><div class="kpi-sub">ready to dispatch</div></div>
-        <div class="kpi"><div class="kpi-lbl">In Chamber</div><div class="kpi-val" id="k-chamber" style="color:var(--amber)">—</div><div class="kpi-sub">gas + solar</div></div>
-        <div class="kpi"><div class="kpi-lbl">Unseasoned</div><div class="kpi-val" id="k-raw" style="color:var(--ink3)">—</div><div class="kpi-sub">not yet started</div></div>
+        <div class="kpi"><div class="kpi-lbl">Total Stock</div><div class="kpi-val" id="k-stock">—</div><div class="kpi-sub" id="k-stock-val" style="color:var(--wood);font-weight:600;font-size:13px;margin-top:2px">—</div><div class="kpi-sub">CFT · value</div></div>
+        <div class="kpi"><div class="kpi-lbl">Seasoned</div><div class="kpi-val" id="k-seasoned" style="color:var(--seasoned)">—</div><div class="kpi-sub" id="k-seasoned-val" style="color:var(--seasoned);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">ready to dispatch</div></div>
+        <div class="kpi"><div class="kpi-lbl">In Chamber</div><div class="kpi-val" id="k-chamber" style="color:var(--amber)">—</div><div class="kpi-sub" id="k-chamber-val" style="color:var(--amber);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">gas + solar + hyd</div></div>
+        <div class="kpi"><div class="kpi-lbl">Unseasoned</div><div class="kpi-val" id="k-raw" style="color:var(--ink3)">—</div><div class="kpi-sub" id="k-raw-val" style="color:var(--ink3);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">not yet started</div></div>
       </div>
 
       <div class="card">
@@ -499,6 +499,102 @@ select option{background:var(--bg3);color:var(--ink)}
       <button class="btn btn-sec btn-full" onclick="showPurForm()">Enter Manually</button>
     </div>
     <button class="btn btn-sec btn-full" onclick="closePurModal()" style="margin-top:8px">Close</button>
+  </div>
+</div>
+
+<!-- EDIT BATCH MODAL -->
+<div class="modal" id="edit-batch-modal">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">✏️ Edit Batch</div>
+    <div class="modal-sub" id="eb-invno-label"></div>
+    <div class="field"><label>Batch Name</label><input type="text" id="eb-batchname"></div>
+    <div class="field"><label>Vendor</label><input type="text" id="eb-vendor"></div>
+    <div class="field"><label>Date</label><input type="date" id="eb-date"></div>
+    <div class="field"><label>Species</label>
+      <select id="eb-species">
+        <option>White Oak</option><option>White Ash</option><option>Rosewood</option>
+        <option>Uttarakhand Teak</option><option>CP Teak</option><option>Siris</option>
+        <option>Agar</option><option>Eucalyptus</option><option>Cedar</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field"><label>Total CFT</label><input type="number" id="eb-cft" step="0.01"></div>
+      <div class="field"><label>Slabs</label><input type="number" id="eb-slabs"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field"><label>Wood Value ₹</label><input type="number" id="eb-woodval"></div>
+      <div class="field"><label>Total Taxable ₹</label><input type="number" id="eb-taxable"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field"><label>Freight ₹</label><input type="number" id="eb-freight"></div>
+      <div class="field"><label>Labour ₹</label><input type="number" id="eb-labour"></div>
+    </div>
+    <div class="field"><label>Seasoning Status</label>
+      <select id="eb-status">
+        <option value="Unseasoned">🪵 Unseasoned</option>
+        <option value="Gas Chamber">⚗️ Gas Chamber</option>
+        <option value="Solar Chamber">☀️ Solar Chamber</option>
+        <option value="Sent to Hyderabad">🚛 Sent to Hyderabad</option>
+        <option value="Seasoned">✅ Seasoned</option>
+      </select>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="eb-notes" style="min-height:60px"></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-sec" onclick="closeEditBatch()" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditBatch()" style="flex:2" id="eb-save-btn">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT BATCH MODAL -->
+<div class="modal" id="edit-batch-modal">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">✏️ Edit Batch</div>
+    <div class="modal-sub" id="eb-invno-label"></div>
+    <input type="hidden" id="eb-invno">
+    <div class="field"><label>Batch Name</label><input type="text" id="eb-batchname"></div>
+    <div class="field"><label>Vendor</label><input type="text" id="eb-vendor"></div>
+    <div class="field"><label>Date</label><input type="date" id="eb-date"></div>
+    <div class="field"><label>Species</label>
+      <select id="eb-species">
+        <option>White Oak</option><option>White Ash</option><option>Rosewood</option>
+        <option>Uttarakhand Teak</option><option>CP Teak</option><option>Siris</option>
+        <option>Agar</option><option>Eucalyptus</option><option>Cedar</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field"><label>Total CFT</label><input type="number" id="eb-cft" step="0.01"></div>
+      <div class="field"><label>Slabs</label><input type="number" id="eb-slabs"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field"><label>Thickness mm</label><input type="number" id="eb-thick"></div>
+      <div class="field"><label>Rate/CFT ₹</label><input type="number" id="eb-ratecft"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field"><label>Wood Value ₹</label><input type="number" id="eb-woodval"></div>
+      <div class="field"><label>Total Taxable ₹</label><input type="number" id="eb-taxable"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field"><label>Freight ₹</label><input type="number" id="eb-freight"></div>
+      <div class="field"><label>Labour ₹</label><input type="number" id="eb-labour"></div>
+    </div>
+    <div class="field"><label>Seasoning Status</label>
+      <select id="eb-status">
+        <option value="Unseasoned">🪵 Unseasoned</option>
+        <option value="Gas Chamber">⚗️ Gas Chamber</option>
+        <option value="Solar Chamber">☀️ Solar Chamber</option>
+        <option value="Sent to Hyderabad">🚛 Sent to Hyderabad</option>
+        <option value="Returned from Hyderabad">↩️ Returned from Hyderabad</option>
+        <option value="Seasoned">✅ Seasoned</option>
+      </select>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="eb-notes" style="min-height:60px"></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-sec" onclick="closeEditBatch()" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditBatch()" style="flex:2" id="eb-save-btn">💾 Save Changes</button>
+    </div>
   </div>
 </div>
 
@@ -776,7 +872,13 @@ function renderBatches(batches) {
           <div class="bi-val">of ${cft} CFT</div>
           <div class="bi-val">₹${parseInt(b.woodValue||b.taxableValue||0).toLocaleString('en-IN')}</div>
         </div>
-        <button onclick="deleteBatch('${b.invoiceNo}')" style="background:rgba(192,74,58,.15);border:1px solid rgba(192,74,58,.3);color:var(--red);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">🗑 Delete</button>
+        <div style="display:flex;gap:6px">
+          <button onclick="editBatch('${b.invoiceNo}')" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink2);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">✏️ Edit</button>
+          <div style="display:flex;gap:6px">
+          <button onclick="editBatch('${b.invoiceNo}')" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink2);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">✏️ Edit</button>
+          <button onclick="deleteBatch('${b.invoiceNo}')" style="background:rgba(192,74,58,.15);border:1px solid rgba(192,74,58,.3);color:var(--red);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">🗑 Delete</button>
+        </div>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -1041,14 +1143,45 @@ function renderDispatches(dispatches) {
 // ── DASHBOARD ──
 function loadDash() {
   const totalCFT = ST.batches.reduce((s, b) => s + parseFloat(b.remainingCFT || b.totalCFT || 0), 0);
-  const seasonedCFT = ST.slabs.filter(s => s.status === 'Seasoned').reduce((s, x) => s + parseFloat(x.cft || 0), 0);
-  const chamberCFT = ST.slabs.filter(s => s.status === 'Gas Chamber' || s.status === 'Solar Chamber').reduce((s, x) => s + parseFloat(x.cft || 0), 0);
-  const rawCFT = ST.slabs.filter(s => s.status === 'Unseasoned').reduce((s, x) => s + parseFloat(x.cft || 0), 0);
+  const totalValue = ST.batches.reduce((s, b) => s + parseFloat(b.woodValue || b.taxableValue || 0), 0);
 
-  document.getElementById('k-stock').textContent = totalCFT.toFixed(1);
-  document.getElementById('k-seasoned').textContent = seasonedCFT.toFixed(1);
-  document.getElementById('k-chamber').textContent = chamberCFT.toFixed(1);
-  document.getElementById('k-raw').textContent = rawCFT.toFixed(1);
+  // Calculate CFT and value by status from slabs
+  const statusMap = {};
+  ST.slabs.forEach(s => {
+    const st = s.status || 'Unseasoned';
+    if (!statusMap[st]) statusMap[st] = { cft: 0 };
+    statusMap[st].cft += parseFloat(s.cft || 0);
+  });
+
+  // Calculate value by status — apportion batch value by CFT ratio
+  const totalSlabCFT = ST.slabs.reduce((s, x) => s + parseFloat(x.cft||0), 0);
+  ST.slabs.forEach(s => {
+    const batch = ST.batches.find(b => b.invoiceNo === s.invoiceNo);
+    if (!batch) return;
+    const batchValue = parseFloat(batch.woodValue || batch.taxableValue || 0);
+    const batchCFT = parseFloat(batch.totalCFT || 1);
+    const slabValue = batchValue / batchCFT * parseFloat(s.cft || 0);
+    const st = s.status || 'Unseasoned';
+    if (!statusMap[st]) statusMap[st] = { cft: 0 };
+    if (!statusMap[st].value) statusMap[st].value = 0;
+    statusMap[st].value += slabValue;
+  });
+
+  const seasonedCFT  = (statusMap['Seasoned']?.cft || 0);
+  const seasonedVal  = (statusMap['Seasoned']?.value || 0);
+  const chamberCFT   = (statusMap['Gas Chamber']?.cft || 0) + (statusMap['Solar Chamber']?.cft || 0) + (statusMap['Sent to Hyderabad']?.cft || 0);
+  const chamberVal   = (statusMap['Gas Chamber']?.value || 0) + (statusMap['Solar Chamber']?.value || 0) + (statusMap['Sent to Hyderabad']?.value || 0);
+  const rawCFT       = (statusMap['Unseasoned']?.cft || 0);
+  const rawVal       = (statusMap['Unseasoned']?.value || 0);
+
+  document.getElementById('k-stock').textContent    = totalCFT.toFixed(1);
+  document.getElementById('k-stock-val').textContent = '₹' + Math.round(totalValue).toLocaleString('en-IN');
+  document.getElementById('k-seasoned').textContent  = seasonedCFT.toFixed(1);
+  document.getElementById('k-seasoned-val').textContent = seasonedVal > 0 ? '₹' + Math.round(seasonedVal).toLocaleString('en-IN') : '';
+  document.getElementById('k-chamber').textContent   = chamberCFT.toFixed(1);
+  document.getElementById('k-chamber-val').textContent = chamberVal > 0 ? '₹' + Math.round(chamberVal).toLocaleString('en-IN') : '';
+  document.getElementById('k-raw').textContent       = rawCFT.toFixed(1);
+  document.getElementById('k-raw-val').textContent   = rawVal > 0 ? '₹' + Math.round(rawVal).toLocaleString('en-IN') : '';
 
   // Species breakdown
   const speciesMap = {};
@@ -1481,6 +1614,122 @@ async function saveDispatch() {
 }
 
 // ── BATCH DETAIL (for seasoning status update) ──
+function editBatch(invoiceNo) {
+  const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
+  if (!b) return;
+  document.getElementById('eb-invno-label').textContent = invoiceNo;
+  document.getElementById('eb-batchname').value  = b.batchName || '';
+  document.getElementById('eb-vendor').value     = b.vendor || '';
+  document.getElementById('eb-date').value       = b.date || '';
+  document.getElementById('eb-species').value    = b.species || '';
+  document.getElementById('eb-cft').value        = b.totalCFT || '';
+  document.getElementById('eb-slabs').value      = b.slabCount || '';
+  document.getElementById('eb-woodval').value    = b.woodValue || '';
+  document.getElementById('eb-taxable').value    = b.taxableValue || '';
+  document.getElementById('eb-freight').value    = b.freight || '';
+  document.getElementById('eb-labour').value     = b.labour || '';
+  document.getElementById('eb-status').value     = b.seasoningStatus || 'Unseasoned';
+  document.getElementById('eb-notes').value      = b.notes || '';
+  document.getElementById('edit-batch-modal').classList.add('show');
+}
+
+function closeEditBatch() { document.getElementById('edit-batch-modal').classList.remove('show'); }
+
+async function saveEditBatch() {
+  const btn = document.getElementById('eb-save-btn');
+  const invoiceNo = document.getElementById('eb-invno-label').textContent;
+  const totalCFT = parseFloat(document.getElementById('eb-cft').value) || 0;
+  const woodValue = parseFloat(document.getElementById('eb-woodval').value) || 0;
+  const data = {
+    invoiceNo,
+    batchName:       document.getElementById('eb-batchname').value.trim(),
+    vendor:          document.getElementById('eb-vendor').value.trim(),
+    date:            document.getElementById('eb-date').value,
+    species:         document.getElementById('eb-species').value,
+    totalCFT,
+    totalCBM:        totalCFT / 35.3147,
+    slabCount:       parseInt(document.getElementById('eb-slabs').value) || 0,
+    woodValue,
+    taxableValue:    parseFloat(document.getElementById('eb-taxable').value) || 0,
+    freight:         parseFloat(document.getElementById('eb-freight').value) || 0,
+    labour:          parseFloat(document.getElementById('eb-labour').value) || 0,
+    rateCFT:         totalCFT > 0 ? Math.round(woodValue / totalCFT) : 0,
+    seasoningStatus: document.getElementById('eb-status').value,
+    notes:           document.getElementById('eb-notes').value.trim(),
+    replace:         true
+  };
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const r = await apiPost({ action: 'saveSWBatch', data });
+    if (r.success) {
+      toast('Batch updated ✓', 'ok');
+      closeEditBatch();
+      await loadBatches(); loadDash();
+    } else toast('Error: ' + (r.error||'Failed'), 'err');
+  } catch(e) { toast('Network error', 'err'); }
+  btn.disabled = false; btn.innerHTML = '💾 Save Changes';
+}
+
+function editBatch(invoiceNo) {
+  const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
+  if (!b) return;
+  document.getElementById('eb-invno').value         = invoiceNo;
+  document.getElementById('eb-invno-label').textContent = invoiceNo;
+  document.getElementById('eb-batchname').value     = b.batchName || '';
+  document.getElementById('eb-vendor').value        = b.vendor || '';
+  document.getElementById('eb-date').value          = b.date || '';
+  document.getElementById('eb-species').value       = b.species || '';
+  document.getElementById('eb-cft').value           = b.totalCFT || '';
+  document.getElementById('eb-slabs').value         = b.slabCount || '';
+  document.getElementById('eb-thick').value         = b.thicknessMM || '';
+  document.getElementById('eb-ratecft').value       = b.rateCFT || '';
+  document.getElementById('eb-woodval').value       = b.woodValue || '';
+  document.getElementById('eb-taxable').value       = b.taxableValue || '';
+  document.getElementById('eb-freight').value       = b.freight || '';
+  document.getElementById('eb-labour').value        = b.labour || '';
+  document.getElementById('eb-status').value        = b.seasoningStatus || 'Unseasoned';
+  document.getElementById('eb-notes').value         = b.notes || '';
+  document.getElementById('edit-batch-modal').classList.add('show');
+}
+
+function closeEditBatch() { document.getElementById('edit-batch-modal').classList.remove('show'); }
+
+async function saveEditBatch() {
+  const btn = document.getElementById('eb-save-btn');
+  const invoiceNo = document.getElementById('eb-invno').value;
+  const cft = parseFloat(document.getElementById('eb-cft').value) || 0;
+  const data = {
+    invoiceNo,
+    batchName:       document.getElementById('eb-batchname').value.trim(),
+    vendor:          document.getElementById('eb-vendor').value.trim(),
+    date:            document.getElementById('eb-date').value,
+    species:         document.getElementById('eb-species').value,
+    totalCFT:        cft,
+    totalCBM:        cft / 35.3147,
+    slabCount:       parseInt(document.getElementById('eb-slabs').value) || 0,
+    thicknessMM:     parseInt(document.getElementById('eb-thick').value) || 0,
+    rateCFT:         parseFloat(document.getElementById('eb-ratecft').value) || 0,
+    woodValue:       parseFloat(document.getElementById('eb-woodval').value) || 0,
+    taxableValue:    parseFloat(document.getElementById('eb-taxable').value) || 0,
+    freight:         parseFloat(document.getElementById('eb-freight').value) || 0,
+    labour:          parseFloat(document.getElementById('eb-labour').value) || 0,
+    seasoningStatus: document.getElementById('eb-status').value,
+    notes:           document.getElementById('eb-notes').value.trim(),
+    replace:         true
+  };
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const r = await apiPost({ action: 'saveSWBatch', data });
+    if (r.success) {
+      toast('Batch updated ✓', 'ok');
+      closeEditBatch();
+      await loadBatches();
+      loadDash();
+    } else toast('Error: ' + (r.error||'Failed'), 'err');
+  } catch(e) { toast('Network error', 'err'); }
+  btn.disabled = false; btn.innerHTML = '💾 Save Changes';
+}
+
 async function deleteBatch(invoiceNo) {
   if (!confirm(`Delete batch ${invoiceNo}? This cannot be undone.`)) return;
   try {
