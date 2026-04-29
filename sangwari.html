@@ -1199,8 +1199,18 @@ async function savePurchase() {
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
     const r = await apiPost({ action: 'saveSWBatch', data });
-    if (r.success) { toast('Batch saved ✓', 'ok'); closePurModal(); await loadBatches(); loadDash(); }
-    else toast('Error: ' + (r.error || 'Failed'), 'err');
+    if (r.success) {
+      toast('Batch saved ✓', 'ok'); closePurModal(); await loadBatches(); loadDash();
+    } else if (r.duplicate) {
+      btn.disabled = false; btn.innerHTML = '💾 Save Batch';
+      if (confirm(`Invoice ${data.invoiceNo} already exists. Replace it?`)) {
+        btn.disabled = true; btn.textContent = 'Replacing…';
+        const r2 = await apiPost({ action: 'saveSWBatch', data: { ...data, replace: true } });
+        if (r2.success) { toast('Batch replaced ✓', 'ok'); closePurModal(); await loadBatches(); loadDash(); }
+        else toast('Error: ' + (r2.error||'Failed'), 'err');
+        btn.disabled = false; btn.innerHTML = '💾 Save Batch';
+      }
+    } else toast('Error: ' + (r.error || 'Failed'), 'err');
   } catch(e) { toast('Network error', 'err'); }
   btn.disabled = false; btn.innerHTML = '💾 Save Batch';
 }
