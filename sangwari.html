@@ -763,16 +763,19 @@ function renderBatches(batches) {
     const badge = statusBadge(b.seasoningStatus);
     const cft = parseFloat(b.totalCFT || 0).toFixed(2);
     const remCFT = parseFloat(b.remainingCFT || cft).toFixed(2);
-    return `<div class="batch-item" onclick="openBatchDetail('${b.invoiceNo}')">
-      <div class="bi-main">
+    return `<div class="batch-item">
+      <div class="bi-main" onclick="openBatchDetail('${b.invoiceNo}')" style="flex:1">
         <div class="bi-inv">${b.invoiceNo}</div>
         <div class="bi-meta">${b.vendor} · <span class="sp-tag">${b.species}</span> · ${b.date}</div>
         <div style="margin-top:6px">${badge}</div>
       </div>
-      <div class="bi-nums">
-        <div class="bi-cft">${remCFT} CFT</div>
-        <div class="bi-val">of ${cft} CFT</div>
-        <div class="bi-val" style="margin-top:2px">₹${parseInt(b.woodValue||b.taxableValue||0).toLocaleString('en-IN')}</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
+        <div class="bi-nums" style="text-align:right">
+          <div class="bi-cft">${remCFT} CFT</div>
+          <div class="bi-val">of ${cft} CFT</div>
+          <div class="bi-val">₹${parseInt(b.woodValue||b.taxableValue||0).toLocaleString('en-IN')}</div>
+        </div>
+        <button onclick="deleteBatch('${b.invoiceNo}')" style="background:rgba(192,74,58,.15);border:1px solid rgba(192,74,58,.3);color:var(--red);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">🗑 Delete</button>
       </div>
     </div>`;
   }).join('');
@@ -1400,6 +1403,15 @@ async function saveDispatch() {
 }
 
 // ── BATCH DETAIL (for seasoning status update) ──
+async function deleteBatch(invoiceNo) {
+  if (!confirm(`Delete batch ${invoiceNo}? This cannot be undone.`)) return;
+  try {
+    const r = await apiPost({ action: 'deleteSWBatch', data: { invoiceNo } });
+    if (r.success) { toast('Batch deleted ✓', 'ok'); await loadBatches(); loadDash(); }
+    else toast('Error: ' + (r.error||'Failed'), 'err');
+  } catch(e) { toast('Network error', 'err'); }
+}
+
 function openBatchDetail(invoiceNo) {
   const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
   if (!b) return;
