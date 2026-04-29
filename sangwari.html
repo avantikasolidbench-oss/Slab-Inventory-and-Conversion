@@ -508,51 +508,6 @@ select option{background:var(--bg3);color:var(--ink)}
     <div class="modal-handle"></div>
     <div class="modal-title">✏️ Edit Batch</div>
     <div class="modal-sub" id="eb-invno-label"></div>
-    <div class="field"><label>Batch Name</label><input type="text" id="eb-batchname"></div>
-    <div class="field"><label>Vendor</label><input type="text" id="eb-vendor"></div>
-    <div class="field"><label>Date</label><input type="date" id="eb-date"></div>
-    <div class="field"><label>Species</label>
-      <select id="eb-species">
-        <option>White Oak</option><option>White Ash</option><option>Rosewood</option>
-        <option>Uttarakhand Teak</option><option>CP Teak</option><option>Siris</option>
-        <option>Agar</option><option>Eucalyptus</option><option>Cedar</option>
-      </select>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div class="field"><label>Total CFT</label><input type="number" id="eb-cft" step="0.01"></div>
-      <div class="field"><label>Slabs</label><input type="number" id="eb-slabs"></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div class="field"><label>Wood Value ₹</label><input type="number" id="eb-woodval"></div>
-      <div class="field"><label>Total Taxable ₹</label><input type="number" id="eb-taxable"></div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div class="field"><label>Freight ₹</label><input type="number" id="eb-freight"></div>
-      <div class="field"><label>Labour ₹</label><input type="number" id="eb-labour"></div>
-    </div>
-    <div class="field"><label>Seasoning Status</label>
-      <select id="eb-status">
-        <option value="Unseasoned">🪵 Unseasoned</option>
-        <option value="Gas Chamber">⚗️ Gas Chamber</option>
-        <option value="Solar Chamber">☀️ Solar Chamber</option>
-        <option value="Sent to Hyderabad">🚛 Sent to Hyderabad</option>
-        <option value="Seasoned">✅ Seasoned</option>
-      </select>
-    </div>
-    <div class="field"><label>Notes</label><textarea id="eb-notes" style="min-height:60px"></textarea></div>
-    <div style="display:flex;gap:8px;margin-top:4px">
-      <button class="btn btn-sec" onclick="closeEditBatch()" style="flex:1">Cancel</button>
-      <button class="btn btn-primary" onclick="saveEditBatch()" style="flex:2" id="eb-save-btn">💾 Save Changes</button>
-    </div>
-  </div>
-</div>
-
-<!-- EDIT BATCH MODAL -->
-<div class="modal" id="edit-batch-modal">
-  <div class="modal-box">
-    <div class="modal-handle"></div>
-    <div class="modal-title">✏️ Edit Batch</div>
-    <div class="modal-sub" id="eb-invno-label"></div>
     <input type="hidden" id="eb-invno">
     <div class="field"><label>Batch Name</label><input type="text" id="eb-batchname"></div>
     <div class="field"><label>Vendor</label><input type="text" id="eb-vendor"></div>
@@ -860,11 +815,15 @@ function renderBatches(batches) {
     const badge = statusBadge(b.seasoningStatus);
     const cft = parseFloat(b.totalCFT || 0).toFixed(2);
     const remCFT = parseFloat(b.remainingCFT || cft).toFixed(2);
+    const rateCFT = b.rateCFT ? Math.round(b.rateCFT) : (b.woodValue && b.totalCFT ? Math.round(b.woodValue/b.totalCFT) : 0);
     return `<div class="batch-item">
       <div class="bi-main" onclick="openBatchDetail('${b.invoiceNo}')" style="flex:1">
         <div class="bi-inv">${b.batchName || b.invoiceNo}</div>
         <div class="bi-meta">${b.invoiceNo} · ${b.vendor} · <span class="sp-tag">${b.species}</span> · ${b.date}</div>
-        <div style="margin-top:6px">${badge}</div>
+        <div style="margin-top:4px;display:flex;align-items:center;gap:8px">
+          ${badge}
+          ${rateCFT ? `<span style="font-family:var(--mono);font-size:11px;color:var(--amber)">₹${rateCFT.toLocaleString('en-IN')}/CFT</span>` : ''}
+        </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
         <div class="bi-nums" style="text-align:right">
@@ -874,10 +833,7 @@ function renderBatches(batches) {
         </div>
         <div style="display:flex;gap:6px">
           <button onclick="editBatch('${b.invoiceNo}')" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink2);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">✏️ Edit</button>
-          <div style="display:flex;gap:6px">
-          <button onclick="editBatch('${b.invoiceNo}')" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink2);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">✏️ Edit</button>
           <button onclick="deleteBatch('${b.invoiceNo}')" style="background:rgba(192,74,58,.15);border:1px solid rgba(192,74,58,.3);color:var(--red);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">🗑 Delete</button>
-        </div>
         </div>
       </div>
     </div>`;
