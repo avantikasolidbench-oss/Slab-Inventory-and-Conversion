@@ -279,9 +279,14 @@ select option{background:var(--bg3);color:var(--ink)}
 
     <!-- PURCHASES (Bills) -->
     <div class="screen" id="screen-pur">
-      <div style="display:flex;gap:8px;margin-bottom:16px">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="showPurModal()">+ New Bill</button>
-        <button class="btn btn-sec btn-sm" onclick="switchPurTab('batches')">All Batches</button>
+        <div style="display:flex;gap:6px;margin-left:auto">
+          <span style="font-size:11px;color:var(--ink3);align-self:center">Sort:</span>
+          <button class="btn btn-sm btn-sec" id="sort-date" onclick="sortBatches('date')" style="font-size:11px">📅 Date</button>
+          <button class="btn btn-sm btn-sec" id="sort-vendor" onclick="sortBatches('vendor')" style="font-size:11px">🏭 Vendor</button>
+          <button class="btn btn-sm btn-sec" id="sort-species" onclick="sortBatches('species')" style="font-size:11px">🌿 Species</button>
+        </div>
       </div>
 
       <div class="card" id="pur-batches">
@@ -1181,14 +1186,32 @@ function loadDash() {
   const needsAttention = ST.batches.filter(b => b.seasoningStatus === 'Unseasoned' && parseFloat(b.remainingCFT||b.totalCFT||0) > 0);
   document.getElementById('attention-list').innerHTML = needsAttention.map(b => `
     <div style="padding:14px 16px;border-bottom:1px solid var(--rule)">
-      <div style="display:flex;justify-content:space-between">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
-          <div class="mono" style="color:var(--wood);font-size:13px">${b.invoiceNo}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--wood)">${b.batchName || b.invoiceNo}</div>
+          <div class="mono" style="font-size:11px;color:var(--ink3);margin-top:1px">${b.invoiceNo}</div>
           <div style="font-size:11px;color:var(--ink3);margin-top:2px">${b.species} · ${parseFloat(b.remainingCFT||b.totalCFT||0).toFixed(1)} CFT</div>
         </div>
         <span class="badge b-raw">Unseasoned</span>
       </div>
     </div>`).join('') || '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">✓ All stock in seasoning or ready</div>';
+}
+
+let currentSort = 'date';
+function sortBatches(by) {
+  currentSort = by;
+  ['date','vendor','species'].forEach(x => {
+    const el = document.getElementById('sort-'+x);
+    if (el) el.style.background = x === by ? 'var(--wood)' : '';
+    if (el) el.style.color = x === by ? 'white' : '';
+  });
+  const sorted = [...ST.batches].sort((a, b) => {
+    if (by === 'date')    return (b.date||'').localeCompare(a.date||'');
+    if (by === 'vendor')  return (a.batchName||a.vendor||'').localeCompare(b.batchName||b.vendor||'');
+    if (by === 'species') return (a.species||'').localeCompare(b.species||'');
+    return 0;
+  });
+  renderBatches(sorted);
 }
 
 // ── PURCHASE FORM ──
