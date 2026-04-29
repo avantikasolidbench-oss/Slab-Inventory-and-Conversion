@@ -453,7 +453,10 @@ select option{background:var(--bg3);color:var(--ink)}
 
     <div id="pur-form" style="display:none;margin-top:16px">
       <div class="field"><label>Vendor</label><input type="text" id="p-vendor"></div>
-      <div class="field"><label>Invoice No.</label><input type="text" id="p-invno"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>Invoice No.</label><input type="text" id="p-invno"></div>
+        <div class="field"><label>Batch Name <span style="font-weight:400;color:var(--ink3)">(optional)</span></label><input type="text" id="p-batchname" placeholder="e.g. Woodangle Apr Siris"></div>
+      </div>
       <div class="field"><label>Date</label><input type="date" id="p-date"></div>
 
       <!-- Species rows table -->
@@ -763,8 +766,8 @@ function renderBatches(batches) {
     const remCFT = parseFloat(b.remainingCFT || cft).toFixed(2);
     return `<div class="batch-item">
       <div class="bi-main" onclick="openBatchDetail('${b.invoiceNo}')" style="flex:1">
-        <div class="bi-inv">${b.invoiceNo}</div>
-        <div class="bi-meta">${b.vendor} · <span class="sp-tag">${b.species}</span> · ${b.date}</div>
+        <div class="bi-inv">${b.batchName || b.invoiceNo}</div>
+        <div class="bi-meta">${b.invoiceNo} · ${b.vendor} · <span class="sp-tag">${b.species}</span> · ${b.date}</div>
         <div style="margin-top:6px">${badge}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
@@ -870,7 +873,7 @@ function openHydModal() {
   const sel = document.getElementById('hyd-batch');
   sel.innerHTML = '<option value="">— select batch —</option>' +
     ST.batches.filter(b => parseFloat(b.remainingCFT||b.totalCFT||0) > 0)
-    .map(b => `<option value="${b.invoiceNo}">${b.invoiceNo} · ${b.species} · ${parseFloat(b.remainingCFT||b.totalCFT||0).toFixed(1)} CFT</option>`).join('');
+    .map(b => `<option value="${b.invoiceNo}">${b.batchName||b.invoiceNo} · ${b.species} · ${parseFloat(b.remainingCFT||b.totalCFT||0).toFixed(1)} CFT</option>`).join('');
   addHydRow();
   document.getElementById('hyd-modal').classList.add('show');
 }
@@ -1110,7 +1113,7 @@ function closePurModal() {
   document.getElementById('pur-manual-btn-wrap').style.display = 'flex';
   document.getElementById('ai-pur').classList.remove('show');
   document.getElementById('prev-pur').style.display = 'none';
-  document.getElementById('f-pur').value = '';
+  document.getElementById('p-batchname').value = '';
   document.getElementById('sw-species-tbody').innerHTML = '';
   document.getElementById('p-vendor').value = '';
   document.getElementById('p-invno').value = '';
@@ -1199,7 +1202,16 @@ Return ONLY JSON:
     document.getElementById('ai-pur').classList.remove('show');
     if (d.vendor) document.getElementById('p-vendor').value = d.vendor;
     if (d.invoiceNo) document.getElementById('p-invno').value = d.invoiceNo;
-    if (d.date) document.getElementById('p-date').value = d.date;
+    if (d.date) {
+      document.getElementById('p-date').value = d.date;
+      const mon = new Date(d.date).toLocaleString('en-IN',{month:'short',year:'2-digit'});
+      const shortVendor = (d.vendor||'').split(' ')[0];
+      document.getElementById('p-batchname').placeholder = `e.g. ${shortVendor} ${mon}`;
+    }
+    // Auto-generate batch name for single species; multi-species gets suffix added at save time
+    const firstSpecies = (d.lineItems?.[0]?.species || d.species || '');
+    const autoName = autoGenBatchName(d.vendor, d.date, d.lineItems?.length > 1 ? '' : firstSpecies);
+    if (autoName) document.getElementById('p-batchname').value = autoName;
 
     // Populate species rows
     document.getElementById('sw-species-tbody').innerHTML = '';
@@ -1220,6 +1232,7 @@ async function savePurchase() {
   const btn = document.getElementById('pur-save-btn');
   const vendor   = document.getElementById('p-vendor').value.trim();
   const invoiceNo= document.getElementById('p-invno').value.trim();
+  const batchName= document.getElementById('p-batchname').value.trim();
   const date     = document.getElementById('p-date').value;
   const status   = document.getElementById('p-status').value;
   const notes    = document.getElementById('p-notes').value.trim();
@@ -1246,10 +1259,20 @@ async function savePurchase() {
   btn.disabled = true; btn.innerHTML = `<span style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .6s linear infinite"></span> Saving…`;
 
   let saved = 0, errors = [];
+  // Calculate batch sequence per species for this vendor+month
+  const mon = date ? new Date(date).toLocaleString('en-IN', { month: 'short', year: '2-digit' }) : '';
+  const nick = getVendorNickname(vendor);
+
   for (const row of speciesRows) {
     const suffix = speciesRows.length > 1 ? '-' + row.species.split(' ').map(w=>w[0]).join('') : '';
     const batchId = invoiceNo + suffix;
+    // Count existing batches with same nickname+month+species to get sequence
+    const prefix = [nick, mon, row.species].join(' ');
+    const existing = ST.batches.filter(b => (b.batchName||'').startsWith(prefix)).length;
+    const seqNum = existing + 1;
+    const autoName = autoGenBatchName(vendor, date, row.species, seqNum > 1 ? seqNum : null);
     const data = { vendor, invoiceNo: batchId, date, species: row.species,
+      batchName: batchName || autoName,
       totalCFT: row.totalCFT, totalCBM: row.totalCFT/35.3147,
       slabCount: row.slabCount, thicknessMM: row.thicknessMM,
       woodValue: row.woodValue, freight: row.freight, labour: row.labour,
@@ -1279,7 +1302,7 @@ function populateDispatchBatchDrop() {
   if (!sel) return;
   sel.innerHTML = '<option value="">— select batch —</option>' +
     ST.batches.filter(b => parseFloat(b.remainingCFT || b.totalCFT || 0) > 0 && b.seasoningStatus === 'Seasoned')
-    .map(b => `<option value="${b.invoiceNo}">${b.invoiceNo} · ${b.species} · ${parseFloat(b.remainingCFT||b.totalCFT||0).toFixed(1)} CFT</option>`).join('');
+    .map(b => `<option value="${b.invoiceNo}">${b.batchName||b.invoiceNo} · ${b.species} · ${parseFloat(b.remainingCFT||b.totalCFT||0).toFixed(1)} CFT</option>`).join('');
 }
 
 function updateDispatchRate() {
@@ -1527,7 +1550,36 @@ Return ONLY JSON: {"billType":"hyd_seasoning","amount":50000,"date":"2026-04-01"
   document.getElementById('f-cost-bill').value = '';
 }
 
-// ── COSTS & APPORTIONMENT ────────────────────────────────
+// ── VENDOR NICKNAMES ─────────────────────────────────────
+const VENDOR_NICKNAMES = {
+  'woodangle':  'Chaurasia',
+  'chaurasia':  'Chaurasia',
+  'ss enterprise': 'Nawab',
+  'ss enterprises': 'Nawab',
+  'nawab':      'Nawab',
+  'jyoti timber': 'Jyoti',
+  'jyoti':      'Jyoti',
+  'pyramid':    'Pyramid Suraj Ji',
+  'pcpl':       'Pyramid Suraj Ji',
+  'collection': 'Pyramid Suraj Ji',
+};
+
+function getVendorNickname(vendorName) {
+  if (!vendorName) return '';
+  const lower = vendorName.toLowerCase();
+  for (const [key, nick] of Object.entries(VENDOR_NICKNAMES)) {
+    if (lower.includes(key)) return nick;
+  }
+  // Fallback: first word of vendor name
+  return vendorName.split(' ')[0];
+}
+
+function autoGenBatchName(vendor, date, species, batchSeq) {
+  const nick = getVendorNickname(vendor);
+  const mon  = date ? new Date(date).toLocaleString('en-IN', { month: 'short', year: '2-digit' }) : '';
+  const seq  = batchSeq ? 'Batch ' + batchSeq : '';
+  return [nick, mon, species, seq].filter(Boolean).join(' ');
+}
 async function loadCosts() {
   if (!CFG.url) return;
   try {
