@@ -742,23 +742,20 @@ async function doLogin() {
   if (!pin) { document.getElementById('lg-err').textContent = 'Enter PIN'; return; }
   const btn = document.querySelector('.lg-btn');
   btn.disabled = true; btn.textContent = 'Checking…';
-  try {
-    if (CFG.url) {
-      try {
-        const r = await apiGet({ action: 'verifyPIN', pin });
-        if (r.success) { enterApp(r.role || 'manager'); return; }
-        // API returned but PIN wrong — check local fallback
-      } catch(e) {
-        // API failed — fall through to local check
-      }
-    }
-    // Local PIN fallback
-    if (pin === '1111') { enterApp('manager'); return; }
-    if (pin === '2222') { enterApp('viewer'); return; }
-    document.getElementById('lg-err').textContent = 'Incorrect PIN';
-  } catch(e) {
-    document.getElementById('lg-err').textContent = 'Error — try again';
+
+  // Always try local PIN first — fast and reliable
+  if (pin === '1111') { enterApp('manager'); return; }
+  if (pin === '2222') { enterApp('viewer'); return; }
+
+  // If not local PIN, try API
+  if (CFG.url) {
+    try {
+      const r = await apiGet({ action: 'verifyPIN', pin });
+      if (r.success) { enterApp(r.role || 'manager'); return; }
+    } catch(e) { /* API failed, fall through */ }
   }
+
+  document.getElementById('lg-err').textContent = 'Incorrect PIN';
   btn.disabled = false; btn.textContent = 'Enter →';
 }
 
