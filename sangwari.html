@@ -1051,7 +1051,7 @@ async function readHydSheet(event) {
       const data = await resp.json();
       const txt = data.content?.[0]?.text || '[]';
       let rows;
-      try { rows = JSON.parse(txt.replace(/```json|```/g,'').trim()); }
+      try { rows = JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim()); }
       catch(e) { const lc = txt.lastIndexOf('}'); rows = lc > 0 ? JSON.parse(txt.substring(0,lc+1)+']') : []; }
       rows.forEach(r => {
         const id = ++hydRowCount;
@@ -1366,7 +1366,7 @@ Return ONLY JSON:
     });
     const data = await resp.json();
     const txt = data.content?.[0]?.text || '{}';
-    const d = JSON.parse(txt.replace(/```json|```/g, '').trim());
+    const d = JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g, '').trim());
     document.getElementById('ai-pur').classList.remove('show');
     if (d.vendor) document.getElementById('p-vendor').value = d.vendor;
     if (d.invoiceNo) document.getElementById('p-invno').value = d.invoiceNo;
@@ -1577,7 +1577,7 @@ No other text.`;
       const data = await resp.json();
       const txt = data.content?.[0]?.text || '[]';
       let rows;
-      try { rows = JSON.parse(txt.replace(/```json|```/g,'').trim()); }
+      try { rows = JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim()); }
       catch(e) { const lc = txt.lastIndexOf('}'); rows = lc > 0 ? JSON.parse(txt.substring(0,lc+1)+']') : []; }
       rows.forEach(r => {
         const id = ++disRowCount;
@@ -1645,61 +1645,6 @@ async function saveDispatch() {
 }
 
 // ── BATCH DETAIL (for seasoning status update) ──
-function editBatch(invoiceNo) {
-  const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
-  if (!b) return;
-  document.getElementById('eb-invno-label').textContent = invoiceNo;
-  document.getElementById('eb-batchname').value  = b.batchName || '';
-  document.getElementById('eb-vendor').value     = b.vendor || '';
-  document.getElementById('eb-date').value       = b.date || '';
-  document.getElementById('eb-species').value    = b.species || '';
-  document.getElementById('eb-cft').value        = b.totalCFT || '';
-  document.getElementById('eb-slabs').value      = b.slabCount || '';
-  document.getElementById('eb-woodval').value    = b.woodValue || '';
-  document.getElementById('eb-taxable').value    = b.taxableValue || '';
-  document.getElementById('eb-freight').value    = b.freight || '';
-  document.getElementById('eb-labour').value     = b.labour || '';
-  document.getElementById('eb-status').value     = b.seasoningStatus || 'Unseasoned';
-  document.getElementById('eb-notes').value      = b.notes || '';
-  document.getElementById('edit-batch-modal').classList.add('show');
-}
-
-function closeEditBatch() { document.getElementById('edit-batch-modal').classList.remove('show'); }
-
-async function saveEditBatch() {
-  const btn = document.getElementById('eb-save-btn');
-  const invoiceNo = document.getElementById('eb-invno-label').textContent;
-  const totalCFT = parseFloat(document.getElementById('eb-cft').value) || 0;
-  const woodValue = parseFloat(document.getElementById('eb-woodval').value) || 0;
-  const data = {
-    invoiceNo,
-    batchName:       document.getElementById('eb-batchname').value.trim(),
-    vendor:          document.getElementById('eb-vendor').value.trim(),
-    date:            document.getElementById('eb-date').value,
-    species:         document.getElementById('eb-species').value,
-    totalCFT,
-    totalCBM:        totalCFT / 35.3147,
-    slabCount:       parseInt(document.getElementById('eb-slabs').value) || 0,
-    woodValue,
-    taxableValue:    parseFloat(document.getElementById('eb-taxable').value) || 0,
-    freight:         parseFloat(document.getElementById('eb-freight').value) || 0,
-    labour:          parseFloat(document.getElementById('eb-labour').value) || 0,
-    rateCFT:         totalCFT > 0 ? Math.round(woodValue / totalCFT) : 0,
-    seasoningStatus: document.getElementById('eb-status').value,
-    notes:           document.getElementById('eb-notes').value.trim(),
-    replace:         true
-  };
-  btn.disabled = true; btn.textContent = 'Saving…';
-  try {
-    const r = await apiPost({ action: 'saveSWBatch', data });
-    if (r.success) {
-      toast('Batch updated ✓', 'ok');
-      closeEditBatch();
-      await loadBatches(); loadDash();
-    } else toast('Error: ' + (r.error||'Failed'), 'err');
-  } catch(e) { toast('Network error', 'err'); }
-  btn.disabled = false; btn.innerHTML = '💾 Save Changes';
-}
 
 function editBatch(invoiceNo) {
   const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
@@ -1805,7 +1750,7 @@ Extract:
 - amount: the PRE-GST taxable amount (NOT the total including GST). Look for "Taxable Amount", "Sub Total", "Basic Freight", or "Total Freight Value" — whichever is the base before tax. For reverse charge transport bills the basic freight is the taxable amount.
 - date: bill date in YYYY-MM-DD
 - billNo: invoice or reference number
-Return ONLY JSON: {"billType":"hyd_seasoning","amount":50850,"date":"2026-03-12","billNo":"1"};
+Return ONLY JSON: {"billType":"hyd_seasoning","amount":50850,"date":"2026-03-12","billNo":"1"}`;
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
@@ -1816,7 +1761,7 @@ Return ONLY JSON: {"billType":"hyd_seasoning","amount":50850,"date":"2026-03-12"
     });
     const data = await resp.json();
     const txt = data.content?.[0]?.text || '{}';
-    const d = JSON.parse(txt.replace(/```json|```/g,'').trim());
+    const d = JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim());
     document.getElementById('ai-cost').classList.remove('show');
     if (d.billType) document.getElementById('cost-type').value = d.billType;
     if (d.amount)   document.getElementById('cost-amount').value = Math.round(d.amount);
@@ -1872,17 +1817,19 @@ async function loadCosts() {
 function renderCostHistory(costs) {
   const el = document.getElementById('cost-history');
   if (!costs.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No cost bills yet</div>'; return; }
-  el.innerHTML = costs.slice(0,20).map(c => `
-    <div style="padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center">
-      <div>
-        <div class="mono" style="font-size:13px;color:var(--hyd)">${c.billNo||'—'}</div>
-        <div style="font-size:11px;color:var(--ink3);margin-top:2px">${c.type==='hyd_seasoning'?'🏭 Hyd Seasoning':'🚛 Hyd Transit'} · ${c.date} · ${c.batchCount||0} batches</div>
-      </div>
-      <div style="text-align:right">
-        <div class="mono" style="color:var(--wood)">₹${parseInt(c.amount).toLocaleString('en-IN')}</div>
-        <div style="font-size:11px;color:var(--ink3)">₹${parseFloat(c.perCFT||0).toFixed(0)}/CFT</div>
-      </div>
-    </div>`).join('');
+  el.innerHTML = costs.slice(0,20).map(c => {
+    const typeLabel = c.type === 'hyd_seasoning' ? '🏭 Hyd Seasoning' : '🚛 Hyd Transit';
+    return '<div style="padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center">' +
+      '<div>' +
+        '<div class="mono" style="font-size:13px;color:var(--hyd)">' + (c.billNo||'—') + '</div>' +
+        '<div style="font-size:11px;color:var(--ink3);margin-top:2px">' + typeLabel + ' · ' + c.date + ' · ' + (c.batchCount||0) + ' batches</div>' +
+      '</div>' +
+      '<div style="text-align:right">' +
+        '<div class="mono" style="color:var(--wood)">₹' + parseInt(c.amount).toLocaleString('en-IN') + '</div>' +
+        '<div style="font-size:11px;color:var(--ink3)">₹' + parseFloat(c.perCFT||0).toFixed(0) + '/CFT</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
 }
 
 function previewCostApportionment() {
