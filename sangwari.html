@@ -257,7 +257,7 @@ select option{background:var(--bg3);color:var(--ink)}
 
     <!-- INVENTORY (Slab level with seasoning) -->
     <div class="screen" id="screen-inv">
-      <div style="display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px">
+      <div style="display:flex;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px">
         <button class="btn btn-sm" id="flt-all" onclick="filterSlabs('all')" style="background:var(--wood);color:white;white-space:nowrap">All</button>
         <button class="btn btn-sm btn-sec" id="flt-raw" onclick="filterSlabs('Unseasoned')" style="white-space:nowrap">🪵 Unseasoned</button>
         <button class="btn btn-sm btn-sec" id="flt-gas" onclick="filterSlabs('Gas Chamber')" style="white-space:nowrap">⚗️ Gas</button>
@@ -266,10 +266,17 @@ select option{background:var(--bg3);color:var(--ink)}
         <button class="btn btn-sm btn-sec" id="flt-seasoned" onclick="filterSlabs('Seasoned')" style="white-space:nowrap">✅ Seasoned</button>
       </div>
 
-      <div style="display:flex;gap:8px;margin-bottom:12px">
+      <!-- Summary bar -->
+      <div id="inv-summary" style="background:var(--bg2);border:1px solid var(--rule);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap">
+        <div><span style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px">Showing</span> <span class="mono" id="inv-sum-count" style="color:var(--ink);font-size:13px">—</span></div>
+        <div><span style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px">CFT</span> <span class="mono" id="inv-sum-cft" style="color:var(--wood);font-size:13px">—</span></div>
+        <div id="inv-sum-hyd-wrap" style="display:none"><span style="font-size:10px;color:var(--hyd);text-transform:uppercase;letter-spacing:1px">In Hyd</span> <span class="mono" id="inv-sum-hyd" style="color:var(--hyd);font-size:13px">—</span></div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
         <button class="btn btn-primary btn-sm" onclick="openHydModal()">🚛 Send to Hyd</button>
-        <button class="btn btn-sec btn-sm" onclick="selectAllSlabs()" id="sel-all-btn">Select All</button>
-        <span style="font-size:12px;color:var(--ink3);align-self:center" id="slab-count-lbl">— slabs</span>
+        <button class="btn btn-sec btn-sm" id="bulk-mode-btn" onclick="toggleBulkMode()">☑ Bulk Update</button>
+        <span style="font-size:12px;color:var(--ink3)" id="slab-count-lbl"></span>
       </div>
 
       <div class="card" id="slab-list">
@@ -417,7 +424,7 @@ select option{background:var(--bg3);color:var(--ink)}
 <div class="bulk-bar" id="bulk-bar">
   <span class="bulk-count" id="bulk-count">0 selected</span>
   <div class="bulk-actions">
-    <button class="bulk-btn" onclick="showSendToHyd()">🚛 Send to Hyd</button>
+    <button class="bulk-btn" onclick="selectAllSlabs()">Select All</button>
     <button class="bulk-btn" onclick="showBulkStatus()">↕ Status</button>
     <button class="bulk-btn" onclick="clearSelection()" style="background:rgba(255,255,255,.1)">✕</button>
   </div>
@@ -855,11 +862,33 @@ async function loadSlabs() {
   } catch(e) { renderSlabs([]); }
 }
 
+let bulkMode = false;
+
+function toggleBulkMode() {
+  bulkMode = !bulkMode;
+  const btn = document.getElementById('bulk-mode-btn');
+  btn.style.background = bulkMode ? 'var(--wood)' : '';
+  btn.style.color = bulkMode ? 'white' : '';
+  if (!bulkMode) { selectedSlabs.clear(); updateBulkBar(); }
+  renderSlabs(ST.slabs);
+}
+
 function renderSlabs(slabs) {
   const filtered = slabFilter === 'all' ? slabs : slabs.filter(s => s.status === slabFilter);
-  const el = document.getElementById('slab-list');
-  document.getElementById('slab-count-lbl').textContent = filtered.length + ' slabs';
 
+  // Update summary bar
+  const totalCFT = filtered.reduce((s, x) => s + parseFloat(x.cft||0), 0);
+  const hydCFT   = slabs.filter(s => s.status === 'Sent to Hyderabad').reduce((s, x) => s + parseFloat(x.cft||0), 0);
+  document.getElementById('inv-sum-count').textContent = filtered.length + ' slabs';
+  document.getElementById('inv-sum-cft').textContent   = totalCFT.toFixed(2) + ' CFT';
+  document.getElementById('slab-count-lbl').textContent = bulkMode ? (selectedSlabs.size + ' selected') : '';
+  const hydWrap = document.getElementById('inv-sum-hyd-wrap');
+  if (slabFilter !== 'Sent to Hyderabad' && hydCFT > 0) {
+    hydWrap.style.display = 'block';
+    document.getElementById('inv-sum-hyd').textContent = hydCFT.toFixed(2) + ' CFT';
+  } else { hydWrap.style.display = 'none'; }
+
+  const el = document.getElementById('slab-list');
   if (!filtered.length) {
     el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No slabs found</div>';
     return;
@@ -867,16 +896,22 @@ function renderSlabs(slabs) {
 
   el.innerHTML = filtered.map(s => {
     const checked = selectedSlabs.has(s.slabId);
-    const badge = statusBadge(s.status);
-    const cft = parseFloat(s.cft || 0).toFixed(3);
+    const badge   = statusBadge(s.status);
+    const cft     = parseFloat(s.cft || 0).toFixed(3);
+    const cbHtml  = bulkMode
+      ? `<div class="slab-cb ${checked ? 'checked' : ''}" onclick="toggleSlab('${s.slabId}')"></div>`
+      : '';
     return `<div class="slab-item" id="si-${s.slabId}">
-      <div class="slab-cb ${checked ? 'checked' : ''}" onclick="toggleSlab('${s.slabId}')"></div>
+      ${cbHtml}
       <div class="slab-main">
         <div class="slab-dims">${s.lengthMM}×${s.widthMM}×${s.thickMM} mm</div>
         <div class="slab-meta">${s.invoiceNo} · <span class="sp-tag">${s.species}</span> · ${s.dateIn||s.date}</div>
         <div style="margin-top:4px">${badge}</div>
       </div>
-      <div class="slab-cft">${cft} CFT</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        <span class="slab-cft">${cft} CFT</span>
+        <button onclick="editSlab('${s.slabId}')" style="background:none;border:none;color:var(--ink3);font-size:11px;cursor:pointer;padding:2px 6px;border-radius:3px;border:1px solid var(--rule)" title="Edit slab">✏️</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -903,11 +938,31 @@ function toggleSlab(id) {
 }
 
 function selectAllSlabs() {
+  if (!bulkMode) return;
   const filtered = slabFilter === 'all' ? ST.slabs : ST.slabs.filter(s => s.status === slabFilter);
   const allSelected = filtered.every(s => selectedSlabs.has(s.slabId));
   filtered.forEach(s => allSelected ? selectedSlabs.delete(s.slabId) : selectedSlabs.add(s.slabId));
   renderSlabs(ST.slabs);
   updateBulkBar();
+}
+
+function editSlab(slabId) {
+  const s = ST.slabs.find(x => x.slabId === slabId);
+  if (!s) return;
+  const newL = prompt('Length mm:', s.lengthMM);
+  if (newL === null) return;
+  const newW = prompt('Width mm:', s.widthMM);
+  if (newW === null) return;
+  const newT = prompt('Thickness mm:', s.thickMM);
+  if (newT === null) return;
+  const newStatus = prompt('Status (Unseasoned/Gas Chamber/Solar Chamber/Sent to Hyderabad/Seasoned):', s.status);
+  if (newStatus === null) return;
+  apiPost({ action: 'updateSlab', data: {
+    slabId, lengthMM: parseFloat(newL), widthMM: parseFloat(newW), thickMM: parseFloat(newT), status: newStatus
+  }}).then(r => {
+    if (r.success) { toast('Slab updated ✓', 'ok'); loadSlabs(); }
+    else toast('Error: ' + (r.error||'Failed'), 'err');
+  });
 }
 
 function clearSelection() {
@@ -1745,11 +1800,11 @@ async function procCostBill(event) {
     const mt = file.type === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
     const prompt = `Read this invoice/bill. It is either a seasoning bill or a freight/transport bill.
 Extract:
-- billType: "hyd_seasoning" if seasoning/treatment bill, "hyd_transit" if freight/transport bill
-- amount: total bill amount in INR (numbers only)
+- billType: "hyd_seasoning" if seasoning/treatment/job work bill, "hyd_transit" if freight/transport/logistics bill
+- amount: the PRE-GST taxable amount (NOT the total including GST). Look for "Taxable Amount", "Sub Total", "Basic Freight", or "Total Freight Value" — whichever is the base before tax. For reverse charge transport bills the basic freight is the taxable amount.
 - date: bill date in YYYY-MM-DD
 - billNo: invoice or reference number
-Return ONLY JSON: {"billType":"hyd_seasoning","amount":50000,"date":"2026-04-01","billNo":"HYD/001/2026"}`;
+Return ONLY JSON: {"billType":"hyd_seasoning","amount":50850,"date":"2026-03-12","billNo":"1"};
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
