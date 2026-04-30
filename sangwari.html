@@ -744,16 +744,20 @@ async function doLogin() {
   btn.disabled = true; btn.textContent = 'Checking…';
   try {
     if (CFG.url) {
-      const r = await apiGet({ action: 'verifyPIN', pin });
-      if (r.success) { enterApp(r.role || 'manager'); return; }
-      else { document.getElementById('lg-err').textContent = 'Incorrect PIN'; }
-    } else {
-      // Fallback local PIN check
-      if (pin === CFG.pin || pin === '2222') enterApp(pin === '2222' ? 'viewer' : 'manager');
-      else document.getElementById('lg-err').textContent = 'Incorrect PIN';
+      try {
+        const r = await apiGet({ action: 'verifyPIN', pin });
+        if (r.success) { enterApp(r.role || 'manager'); return; }
+        // API returned but PIN wrong — check local fallback
+      } catch(e) {
+        // API failed — fall through to local check
+      }
     }
+    // Local PIN fallback
+    if (pin === '1111') { enterApp('manager'); return; }
+    if (pin === '2222') { enterApp('viewer'); return; }
+    document.getElementById('lg-err').textContent = 'Incorrect PIN';
   } catch(e) {
-    document.getElementById('lg-err').textContent = 'Connection error';
+    document.getElementById('lg-err').textContent = 'Error — try again';
   }
   btn.disabled = false; btn.textContent = 'Enter →';
 }
