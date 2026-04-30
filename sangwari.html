@@ -340,14 +340,18 @@ select option{background:var(--bg3);color:var(--ink)}
           <div id="cost-form">
             <div class="field">
               <label>Bill Type</label>
-              <select id="cost-type">
+              <select id="cost-type" onchange="toggleCostFreight()">
                 <option value="hyd_seasoning">🏭 Hyderabad Seasoning</option>
                 <option value="hyd_transit">🚛 Hyderabad Transit (Freight)</option>
               </select>
             </div>
             <div class="field">
-              <label>Bill Amount ₹</label>
-              <input type="number" id="cost-amount" placeholder="50000">
+              <label>Amount ₹ <span style="color:var(--ink3);font-size:10px">(pre-GST taxable)</span></label>
+              <input type="number" id="cost-amount" placeholder="50850">
+            </div>
+            <div class="field" id="cost-freight-wrap" style="display:none">
+              <label>Shipping on Seasoning Bill ₹ <span style="color:var(--ink3);font-size:10px">(separate line on bill)</span></label>
+              <input type="number" id="cost-freight-amt" placeholder="0">
             </div>
             <div class="field">
               <label>Bill Date</label>
@@ -1747,10 +1751,11 @@ async function procCostBill(event) {
     const prompt = `Read this invoice/bill. It is either a seasoning bill or a freight/transport bill.
 Extract:
 - billType: "hyd_seasoning" if seasoning/treatment/job work bill, "hyd_transit" if freight/transport/logistics bill
-- amount: the PRE-GST taxable amount (NOT the total including GST). Look for "Taxable Amount", "Sub Total", "Basic Freight", or "Total Freight Value" — whichever is the base before tax. For reverse charge transport bills the basic freight is the taxable amount.
+- amount: the PRE-GST taxable seasoning/freight amount (NOT total including GST). Look for "Taxable Amount", "Sub Total", "Basic Freight", or "Total Freight Value"
+- shipping: separate shipping/delivery charge if shown as a distinct line item (e.g. "Shipping: 8000") — 0 if not present
 - date: bill date in YYYY-MM-DD
 - billNo: invoice or reference number
-Return ONLY JSON: {"billType":"hyd_seasoning","amount":50850,"date":"2026-03-12","billNo":"1"}`;
+Return ONLY JSON: {"billType":"hyd_seasoning","amount":50850,"shipping":8000,"date":"2026-03-12","billNo":"1"}`;
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
@@ -1767,7 +1772,9 @@ Return ONLY JSON: {"billType":"hyd_seasoning","amount":50850,"date":"2026-03-12"
     if (d.amount)   document.getElementById('cost-amount').value = Math.round(d.amount);
     if (d.date)     document.getElementById('cost-date').value = d.date;
     if (d.billNo)   document.getElementById('cost-billno').value = d.billNo;
-    toast('Bill read ✓ — now set date range and preview', 'ok');
+    if (d.shipping && document.getElementById('cost-freight-amt')) document.getElementById('cost-freight-amt').value = Math.round(d.shipping);
+    toggleCostFreight();
+    toast('Bill read ✓ — set date range and preview', 'ok');
   } catch(e) {
     document.getElementById('ai-cost').classList.remove('show');
     toast('Read failed — enter manually', 'err');
@@ -1832,55 +1839,69 @@ function renderCostHistory(costs) {
   }).join('');
 }
 
+function toggleCostFreight() {
+  const type = document.getElementById('cost-type').value;
+  const wrap = document.getElementById('cost-freight-wrap');
+  if (wrap) wrap.style.display = type === 'hyd_seasoning' ? 'block' : 'none';
+}
+
 function previewCostApportionment() {
   const from   = document.getElementById('cost-from').value;
   const to     = document.getElementById('cost-to').value;
   const amount = parseFloat(document.getElementById('cost-amount').value) || 0;
-  if (!from || !to || !amount) { toast('Fill amount and date range', 'err'); return; }
+  const freight = parseFloat(document.getElementById('cost-freight-amt')?.value) || 0;
+  const totalAmount = amount + freight;
+  if (!from || !to || !totalAmount) { toast('Fill amount and date range', 'err'); return; }
 
-  // Find all batches with slabs sent to Hyderabad in date range
   const hydSlabs = ST.slabs.filter(s =>
     (s.status === 'Sent to Hyderabad' || s.status === 'Returned from Hyderabad' || s.status === 'Seasoned') &&
     s.statusDate >= from && s.statusDate <= to
   );
 
-  // Group by invoiceNo and sum CFT
   const batchMap = {};
   hydSlabs.forEach(s => {
-    if (!batchMap[s.invoiceNo]) batchMap[s.invoiceNo] = { invoiceNo: s.invoiceNo, species: s.species, cft: 0 };
+    if (!batchMap[s.invoiceNo]) {
+      const b = ST.batches.find(x => x.invoiceNo === s.invoiceNo);
+      batchMap[s.invoiceNo] = { invoiceNo: s.invoiceNo, species: s.species, batchName: b?.batchName||s.invoiceNo, cft: 0 };
+    }
     batchMap[s.invoiceNo].cft += parseFloat(s.cft || 0);
   });
 
   const batches = Object.values(batchMap).filter(b => b.cft > 0);
-
-  if (!batches.length) {
-    toast('No Hyderabad slabs found in that date range', 'err');
-    return;
-  }
+  if (!batches.length) { toast('No Hyderabad slabs found in that date range', 'err'); return; }
 
   const totalCFT = batches.reduce((s, b) => s + b.cft, 0);
-  const perCFT   = amount / totalCFT;
+  const perCFT   = totalAmount / totalCFT;
 
   document.getElementById('cost-preview-rows').innerHTML = batches.map(b => {
     const batchCost = b.cft * perCFT;
-    return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)">
-      <div>
-        <span class="mono" style="font-size:12px;color:var(--wood)">${b.invoiceNo}</span>
-        <span class="sp-tag" style="margin-left:6px;font-size:10px">${b.species}</span>
-      </div>
-      <div style="text-align:right">
-        <span class="mono" style="font-size:12px">${b.cft.toFixed(2)} CFT</span>
-        <span class="mono" style="color:var(--amber);margin-left:8px">₹${Math.round(batchCost).toLocaleString('en-IN')}</span>
-      </div>
-    </div>`;
+    // Show existing costs already saved for this batch
+    let existingTotal = 0;
+    (ST.costs || []).forEach(c => {
+      try {
+        const ap = JSON.parse(c.apportionment || '[]');
+        const a = ap.find(x => x.invoiceNo === b.invoiceNo);
+        if (a) existingTotal += parseInt(a.cost) || 0;
+      } catch(e) {}
+    });
+    return '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)">' +
+      '<div style="display:flex;justify-content:space-between">' +
+        '<div><span style="font-size:12px;color:var(--wood);font-weight:600">' + b.batchName + '</span>' +
+        (b.batchName !== b.invoiceNo ? ' <span style="font-size:10px;color:var(--ink3)">· ' + b.invoiceNo + '</span>' : '') + '</div>' +
+        '<span style="font-family:var(--mono);font-size:12px;color:var(--amber)">+₹' + Math.round(batchCost).toLocaleString('en-IN') + '</span>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;margin-top:2px">' +
+        '<span style="font-size:11px;color:var(--ink3)">' + b.cft.toFixed(2) + ' CFT</span>' +
+        (existingTotal > 0 ? '<span style="font-size:11px;color:var(--ink3)">Previously saved: ₹' + Math.round(existingTotal).toLocaleString('en-IN') + '</span>' : '<span style="font-size:11px;color:var(--ink3)">No prior costs</span>') +
+      '</div>' +
+    '</div>';
   }).join('');
 
   document.getElementById('cost-total-cft').textContent = totalCFT.toFixed(2) + ' CFT';
-  document.getElementById('cost-per-cft').textContent = '₹' + Math.round(perCFT) + '/CFT';
+  document.getElementById('cost-per-cft').textContent = '₹' + Math.round(perCFT) + '/CFT' +
+    (freight > 0 ? ' (seasoning ₹' + amount.toLocaleString('en-IN') + ' + shipping ₹' + freight.toLocaleString('en-IN') + ')' : '');
   document.getElementById('cost-preview').style.display = 'block';
-
-  // Store for saving
-  window._costPreview = { batches, totalCFT, perCFT, amount };
+  window._costPreview = { batches, totalCFT, perCFT, totalAmount, freight };
 }
 
 async function saveCostBill() {
@@ -1889,7 +1910,8 @@ async function saveCostBill() {
   btn.disabled = true; btn.textContent = 'Saving…';
   const data = {
     type:       document.getElementById('cost-type').value,
-    amount:     parseFloat(document.getElementById('cost-amount').value),
+    amount:     window._costPreview.totalAmount,
+    freight:    window._costPreview.freight || 0,
     date:       document.getElementById('cost-date').value,
     dateFrom:   document.getElementById('cost-from').value,
     dateTo:     document.getElementById('cost-to').value,
@@ -1911,6 +1933,7 @@ async function saveCostBill() {
       document.getElementById('cost-preview').style.display = 'none';
       document.getElementById('cost-amount').value = '';
       document.getElementById('cost-billno').value = '';
+      if (document.getElementById('cost-freight-amt')) document.getElementById('cost-freight-amt').value = '';
       window._costPreview = null;
       await loadCosts();
       await loadBatches();
