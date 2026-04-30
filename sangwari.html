@@ -577,9 +577,9 @@ select option{background:var(--bg3);color:var(--ink)}
 
     <!-- Slab entry -->
     <div style="display:flex;gap:8px;margin-bottom:10px">
-      <button class="btn btn-sec btn-sm" onclick="document.getElementById('f-hyd-sheet').click()">📷 Upload Register</button>
+      <button class="btn btn-sec btn-sm" onclick="document.getElementById('f-hyd-sheet').click()">📷 Upload Register (multiple ok)</button>
       <button class="btn btn-sec btn-sm" onclick="addHydRow()">+ Add Row</button>
-      <input type="file" id="f-hyd-sheet" accept="image/*" onchange="readHydSheet(event)" style="display:none">
+      <input type="file" id="f-hyd-sheet" accept="image/*" multiple onchange="readHydSheet(event)" style="display:none">
     </div>
     <div class="ai-spin-wrap" id="ai-hyd" style="margin-bottom:8px"><div class="ai-spin"></div> Reading register…</div>
 
@@ -668,9 +668,9 @@ select option{background:var(--bg3);color:var(--ink)}
 
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:8px">Slabs Being Dispatched</div>
     <div style="display:flex;gap:8px;margin-bottom:10px">
-      <button class="btn btn-sec btn-sm" onclick="document.getElementById('f-dis-sheet').click()">📷 Upload Register</button>
+      <button class="btn btn-sec btn-sm" onclick="document.getElementById('f-dis-sheet').click()">📷 Upload Register (multiple ok)</button>
       <button class="btn btn-sec btn-sm" onclick="addDisRow()">+ Add Row</button>
-      <input type="file" id="f-dis-sheet" accept="image/*" onchange="readDisSheet(event)" style="display:none">
+      <input type="file" id="f-dis-sheet" accept="image/*" multiple onchange="readDisSheet(event)" style="display:none">
     </div>
     <div class="ai-spin-wrap" id="ai-dis"><div class="ai-spin"></div> Reading register…</div>
     <div style="overflow-x:auto;margin-bottom:12px">
@@ -936,7 +936,7 @@ function openHydModal() {
   const sel = document.getElementById('hyd-batch');
   sel.innerHTML = '<option value="">— select batch —</option>' +
     ST.batches.filter(b => parseFloat(b.remainingCFT||b.totalCFT||0) > 0)
-    .map(b => `<option value="${b.invoiceNo}">${b.batchName||b.invoiceNo} · ${b.species} · ${parseFloat(b.remainingCFT||b.totalCFT||0).toFixed(1)} CFT</option>`).join('');
+    .map(b => `<option value="${b.invoiceNo}">${b.batchName||b.invoiceNo} · ${b.invoiceNo} · ${b.species} · ${parseFloat(b.remainingCFT||b.totalCFT||0).toFixed(1)} CFT</option>`).join('');
   addHydRow();
   document.getElementById('hyd-modal').classList.add('show');
 }
@@ -974,48 +974,48 @@ function calcHydTotals() {
 }
 
 async function readHydSheet(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
   if (!CFG.key) { toast('Claude API key not set', 'err'); return; }
   document.getElementById('ai-hyd').classList.add('show');
-  try {
-    const b64 = await toB64(file);
-    const prompt = `Read this handwritten slab list. Each row has L (length mm), W (width mm), T (thickness mm). Return ONLY JSON array:
+  let totalRows = 0;
+  for (const file of files) {
+    try {
+      const b64 = await toB64(file);
+      const prompt = `Read this handwritten slab list. Each row has L (length mm), W (width mm), T (thickness mm). Return ONLY JSON array:
 [{"lengthMM":3000,"widthMM":280,"thickMM":55},...]`;
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64.split(',')[1] } },
-        { type: 'text', text: prompt }
-      ]}]})
-    });
-    const data = await resp.json();
-    const txt = data.content?.[0]?.text || '[]';
-    let rows;
-    try { rows = JSON.parse(txt.replace(/```json|```/g,'').trim()); }
-    catch(e) { const lc = txt.lastIndexOf('}'); rows = lc > 0 ? JSON.parse(txt.substring(0,lc+1)+']') : []; }
-    document.getElementById('ai-hyd').classList.remove('show');
-    if (!rows.length) { toast('Could not read — enter manually', 'err'); return; }
-    rows.forEach(r => {
-      const id = ++hydRowCount;
-      const tr = document.createElement('tr');
-      tr.id = 'hdr' + id;
-      const cft = r.lengthMM && r.widthMM && r.thickMM ? ((r.lengthMM*r.widthMM*r.thickMM)/1e9*35.3147).toFixed(3) : '—';
-      tr.innerHTML = `
-        <td><input type="number" id="hdr${id}l" value="${r.lengthMM||''}" oninput="calcHydTotals()" style="width:70px"></td>
-        <td><input type="number" id="hdr${id}w" value="${r.widthMM||''}" oninput="calcHydTotals()" style="width:65px"></td>
-        <td><input type="number" id="hdr${id}t" value="${r.thickMM||''}" oninput="calcHydTotals()" style="width:55px"></td>
-        <td class="mono" id="hdr${id}cft" style="color:var(--wood);padding:8px">${cft}</td>
-        <td><button onclick="document.getElementById('hdr${id}').remove();calcHydTotals()" style="background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer;padding:4px 8px">✕</button></td>`;
-      document.getElementById('hyd-rows').appendChild(tr);
-    });
-    calcHydTotals();
-    toast(rows.length + ' rows read ✓', 'ok');
-  } catch(e) {
-    document.getElementById('ai-hyd').classList.remove('show');
-    toast('Read failed: ' + e.message, 'err');
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64.split(',')[1] } },
+          { type: 'text', text: prompt }
+        ]}]})
+      });
+      const data = await resp.json();
+      const txt = data.content?.[0]?.text || '[]';
+      let rows;
+      try { rows = JSON.parse(txt.replace(/```json|```/g,'').trim()); }
+      catch(e) { const lc = txt.lastIndexOf('}'); rows = lc > 0 ? JSON.parse(txt.substring(0,lc+1)+']') : []; }
+      rows.forEach(r => {
+        const id = ++hydRowCount;
+        const tr = document.createElement('tr');
+        tr.id = 'hdr' + id;
+        const cft = r.lengthMM && r.widthMM && r.thickMM ? ((r.lengthMM*r.widthMM*r.thickMM)/1e9*35.3147).toFixed(3) : '—';
+        tr.innerHTML = `
+          <td><input type="number" id="hdr${id}l" value="${r.lengthMM||''}" oninput="calcHydTotals()" style="width:70px"></td>
+          <td><input type="number" id="hdr${id}w" value="${r.widthMM||''}" oninput="calcHydTotals()" style="width:65px"></td>
+          <td><input type="number" id="hdr${id}t" value="${r.thickMM||''}" oninput="calcHydTotals()" style="width:55px"></td>
+          <td class="mono" id="hdr${id}cft" style="color:var(--wood);padding:8px">${cft}</td>
+          <td><button onclick="document.getElementById('hdr${id}').remove();calcHydTotals()" style="background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer;padding:4px 8px">✕</button></td>`;
+        document.getElementById('hyd-rows').appendChild(tr);
+        totalRows++;
+      });
+    } catch(e) { toast('Failed reading one photo — skipped', 'err'); }
   }
+  document.getElementById('ai-hyd').classList.remove('show');
+  calcHydTotals();
+  toast(`${totalRows} rows read from ${files.length} photo(s) ✓`, 'ok');
   document.getElementById('f-hyd-sheet').value = '';
 }
 
@@ -1414,7 +1414,7 @@ function populateDispatchBatchDrop() {
   if (!sel) return;
   sel.innerHTML = '<option value="">— select batch —</option>' +
     ST.batches.filter(b => parseFloat(b.remainingCFT || b.totalCFT || 0) > 0 && b.seasoningStatus === 'Seasoned')
-    .map(b => `<option value="${b.invoiceNo}">${b.batchName||b.invoiceNo} · ${b.species} · ${parseFloat(b.remainingCFT||b.totalCFT||0).toFixed(1)} CFT</option>`).join('');
+    .map(b => `<option value="${b.invoiceNo}">${b.batchName||b.invoiceNo} · ${b.invoiceNo} · ${b.species} · ${parseFloat(b.remainingCFT||b.totalCFT||0).toFixed(1)} CFT</option>`).join('');
 }
 
 function updateDispatchRate() {
@@ -1497,55 +1497,51 @@ function calcDispatchTotals() {
 }
 
 async function readDisSheet(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
   if (!CFG.key) { toast('Claude API key not set — enter rows manually', 'err'); return; }
   document.getElementById('ai-dis').classList.add('show');
-  try {
-    const b64 = await toB64(file);
-    const prompt = `This is a handwritten slab dispatch register from a wood yard. Read every row.
+  let totalRows = 0;
+  for (const file of files) {
+    try {
+      const b64 = await toB64(file);
+      const prompt = `This is a handwritten slab dispatch register from a wood yard. Read every row.
 Each row has: Sr No, L (length mm), W (width mm), T/H (thickness mm).
 Read all numeric dimensions carefully. Return ONLY a JSON array:
 [{"lengthMM":3000,"widthMM":280,"thickMM":55},...]
 No other text.`;
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64.split(',')[1] } },
-        { type: 'text', text: prompt }
-      ]}]})
-    });
-    const data = await resp.json();
-    const txt = data.content?.[0]?.text || '[]';
-    let rows;
-    try { rows = JSON.parse(txt.replace(/```json|```/g,'').trim()); }
-    catch(e) {
-      const lastClose = txt.lastIndexOf('}');
-      if (lastClose > 0) rows = JSON.parse(txt.substring(0, lastClose+1) + ']');
-      else throw e;
-    }
-    document.getElementById('ai-dis').classList.remove('show');
-    if (!rows.length) { toast('Could not read rows — try manual entry', 'err'); return; }
-    rows.forEach(r => {
-      const id = ++disRowCount;
-      const tr = document.createElement('tr');
-      tr.id = 'dr' + id;
-      tr.innerHTML = `
-        <td><input type="number" id="dr${id}l" value="${r.lengthMM||''}" placeholder="3000" oninput="calcDisRow(${id})" style="width:70px"></td>
-        <td><input type="number" id="dr${id}w" value="${r.widthMM||''}" placeholder="280" oninput="calcDisRow(${id})" style="width:65px"></td>
-        <td><input type="number" id="dr${id}t" value="${r.thickMM||''}" placeholder="55" oninput="calcDisRow(${id})" style="width:55px"></td>
-        <td class="mono" id="dr${id}cft" style="color:var(--wood);padding:8px">—</td>
-        <td class="mono" id="dr${id}cost" style="color:var(--ink3);padding:8px">—</td>
-        <td><button onclick="document.getElementById('dr${id}').remove();calcDispatchTotals()" style="background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer;padding:4px 8px">✕</button></td>`;
-      document.getElementById('dis-rows').appendChild(tr);
-      calcDisRow(id);
-    });
-    toast(rows.length + ' rows read ✓', 'ok');
-  } catch(e) {
-    document.getElementById('ai-dis').classList.remove('show');
-    toast('Read failed: ' + e.message, 'err');
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64.split(',')[1] } },
+          { type: 'text', text: prompt }
+        ]}]})
+      });
+      const data = await resp.json();
+      const txt = data.content?.[0]?.text || '[]';
+      let rows;
+      try { rows = JSON.parse(txt.replace(/```json|```/g,'').trim()); }
+      catch(e) { const lc = txt.lastIndexOf('}'); rows = lc > 0 ? JSON.parse(txt.substring(0,lc+1)+']') : []; }
+      rows.forEach(r => {
+        const id = ++disRowCount;
+        const tr = document.createElement('tr');
+        tr.id = 'dr' + id;
+        tr.innerHTML = `
+          <td><input type="number" id="dr${id}l" value="${r.lengthMM||''}" placeholder="3000" oninput="calcDisRow(${id})" style="width:70px"></td>
+          <td><input type="number" id="dr${id}w" value="${r.widthMM||''}" placeholder="280" oninput="calcDisRow(${id})" style="width:65px"></td>
+          <td><input type="number" id="dr${id}t" value="${r.thickMM||''}" placeholder="55" oninput="calcDisRow(${id})" style="width:55px"></td>
+          <td class="mono" id="dr${id}cft" style="color:var(--wood);padding:8px">—</td>
+          <td class="mono" id="dr${id}cost" style="color:var(--ink3);padding:8px">—</td>
+          <td><button onclick="document.getElementById('dr${id}').remove();calcDispatchTotals()" style="background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer;padding:4px 8px">✕</button></td>`;
+        document.getElementById('dis-rows').appendChild(tr);
+        calcDisRow(id);
+        totalRows++;
+      });
+    } catch(e) { toast('Failed reading one photo — skipped', 'err'); }
   }
+  document.getElementById('ai-dis').classList.remove('show');
+  toast(`${totalRows} rows read from ${files.length} photo(s) ✓`, 'ok');
   document.getElementById('f-dis-sheet').value = '';
 }
 
