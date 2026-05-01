@@ -2322,6 +2322,8 @@ async function saveSESlabs() {
   }catch(e){toast('Network error','err');}
   btn.disabled=false; btn.innerHTML='💾 Save Slabs';
 }
+
+function toggleCostFreight() {
   const type = document.getElementById('cost-type').value;
   const wrap = document.getElementById('cost-freight-wrap');
   if (wrap) wrap.style.display = type === 'hyd_seasoning' ? 'block' : 'none';
