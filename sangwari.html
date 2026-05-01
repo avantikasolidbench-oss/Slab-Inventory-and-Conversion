@@ -1231,6 +1231,18 @@ function renderDispatches(dispatches) {
     const slabs = d.slabs || [];
     const hasSlabs = slabs.length > 0;
 
+    // Check if purchase batch exists for this dispatch's species
+    const hasBatch = ST.batches.some(b => b.invoiceNo === d.invoiceNo);
+    const missingBillBanner = !hasBatch
+      ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;background:rgba(192,150,58,.15);border-top:1px solid rgba(192,150,58,.3)">' +
+          '<span style="font-size:11px;color:var(--amber)">⚠ No purchase bill for ' + (d.species||'this species') + '</span>' +
+          '<div style="display:flex;gap:6px;flex-shrink:0">' +
+            '<button onclick="event.stopPropagation();showPurModal(\''+d.species+'\')" style="font-size:11px;padding:4px 8px;background:rgba(192,150,58,.2);border:1px solid rgba(192,150,58,.4);color:var(--amber);border-radius:4px;cursor:pointer">📋 Upload Bill</button>' +
+            '<button onclick="event.stopPropagation();markAsOpeningStock(\''+d.invoiceNo+'\',\''+d.species+'\')" style="font-size:11px;padding:4px 8px;background:rgba(74,154,106,.15);border:1px solid rgba(74,154,106,.3);color:var(--seasoned);border-radius:4px;cursor:pointer">✓ Opening Stock</button>' +
+          '</div>' +
+        '</div>'
+      : '';
+
     // Slab detail rows
     const slabRows = hasSlabs
       ? '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">' +
@@ -1256,13 +1268,13 @@ function renderDispatches(dispatches) {
         '</tr></tbody></table>'
       : '<div style="padding:12px 0 4px;font-size:12px;color:var(--ink3)">No slab-level detail stored</div>';
 
-    return '<div class="batch-item" style="padding:0">' +
-      // Header — always visible, clickable to expand
+    return '<div class="batch-item" style="padding:0;overflow:hidden">' +
       '<div onclick="toggleDispatchExpand(\'dis-'+idx+'\')" style="padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start">' +
         '<div style="flex:1">' +
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
             '<span class="bi-inv" style="font-size:13px">' + (d.billNo||'—') + '</span>' +
             tag +
+            (!hasBatch ? '<span style="font-size:10px;color:var(--amber)">⚠ no bill</span>' : '') +
           '</div>' +
           '<div class="bi-meta" style="font-size:11px">' + d.date + ' · ' + d.invoiceNo + ' · <span class="sp-tag">' + (d.species||'—') + '</span></div>' +
         '</div>' +
@@ -1272,7 +1284,7 @@ function renderDispatches(dispatches) {
           '<div style="font-size:10px;color:var(--ink3);margin-top:3px" id="dis-'+idx+'-arrow">▾ details</div>' +
         '</div>' +
       '</div>' +
-      // Expandable slab detail
+      missingBillBanner +
       '<div id="dis-'+idx+'" style="display:none;padding:0 16px 14px;border-top:1px solid var(--rule)">' +
         slabRows +
       '</div>' +
@@ -1286,6 +1298,33 @@ function toggleDispatchExpand(id) {
   const open = el.style.display !== 'none';
   el.style.display = open ? 'none' : 'block';
   if (arrow) arrow.textContent = open ? '▾ details' : '▴ hide';
+}
+
+async function markAsOpeningStock(invoiceNo, species) {
+  if (!confirm('Mark this dispatch as Opening Stock? This creates a synthetic purchase batch for ' + species + ' with unknown rate. You can edit it later.')) return;
+  const cft = ST.dispatches.find(d => d.invoiceNo === invoiceNo)?.totalCFT || 0;
+  try {
+    const r = await apiPost({ action: 'saveSWBatch', data: {
+      invoiceNo,
+      batchName: 'Opening Stock · ' + species,
+      vendor: 'Opening Stock',
+      date: '2026-01-01',
+      species,
+      totalCFT: parseFloat(cft),
+      totalCBM: parseFloat(cft) / 35.31466560103903,
+      slabCount: 0,
+      woodValue: 0,
+      taxableValue: 0,
+      rateCFT: 0,
+      seasoningStatus: 'Seasoned',
+      notes: 'Opening stock — purchase bill pending',
+      replace: false
+    }});
+    if (r.success) {
+      toast('Marked as opening stock ✓ — edit rate when bill is found', 'ok');
+      await loadAll();
+    } else toast('Error: ' + (r.error||'Failed'), 'err');
+  } catch(e) { toast('Network error', 'err'); }
 }
 
 // ── DASHBOARD ──
@@ -1341,8 +1380,10 @@ function loadDash() {
   const bySpeciesThis = {};
   thisMonDispatches.forEach(d => {
     const sp = d.species || 'Unknown';
-    if (!bySpeciesThis[sp]) bySpeciesThis[sp] = 0;
-    bySpeciesThis[sp] += parseFloat(d.totalCFT || 0);
+    const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
+    if (!bySpeciesThis[sp]) bySpeciesThis[sp] = { cft: 0, isHyd };
+    bySpeciesThis[sp].cft += parseFloat(d.totalCFT || 0);
+    if (isHyd) bySpeciesThis[sp].isHyd = true;
   });
 
   const monthEl = document.getElementById('dispatch-this-month');
@@ -1350,32 +1391,49 @@ function loadDash() {
     monthEl.innerHTML = '<div style="padding:20px 16px;text-align:center;color:var(--ink3);font-size:13px">No dispatches this month</div>';
   } else {
     monthEl.innerHTML = Object.entries(bySpeciesThis)
-      .sort((a,b) => b[1]-a[1])
-      .map(([sp, cft]) =>
-        '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--rule)">' +
-          '<span style="font-weight:600;font-size:14px">' + sp + '</span>' +
-          '<span class="mono" style="color:var(--wood);font-size:15px;font-weight:700">' + cft.toFixed(3) + ' CFT</span>' +
+      .sort((a,b) => b[1].cft - a[1].cft)
+      .map(([sp, d]) =>
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--rule)">' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span style="font-weight:600;font-size:14px">' + sp + '</span>' +
+            (d.isHyd ? '<span class="badge b-hyd" style="font-size:10px">via Hyd</span>' : '<span class="badge b-wood" style="font-size:10px">direct</span>') +
+          '</div>' +
+          '<span class="mono" style="color:var(--wood);font-size:15px;font-weight:700">' + d.cft.toFixed(3) + ' CFT</span>' +
         '</div>'
       ).join('') +
       '<div style="padding:8px 16px;display:flex;justify-content:space-between;font-size:12px;color:var(--ink3)">' +
-        '<span>Total dispatched</span>' +
+        '<span>' + thisMonLabel + ' total</span>' +
         '<span class="mono" style="color:var(--wood);font-weight:600">' + thisMonDispatches.reduce((s,d)=>s+parseFloat(d.totalCFT||0),0).toFixed(3) + ' CFT</span>' +
       '</div>';
   }
 
-  // History button
+  // History button — older months
   const histBtn = document.getElementById('dispatch-history-btn');
-  if (ST.dispatches.length > thisMonDispatches.length) {
+  const older = ST.dispatches.filter(d => (d.date||'').slice(0,7) !== thisMonth);
+  if (older.length) {
     histBtn.style.display = 'block';
-    // Pre-render history
-    const older = ST.dispatches.filter(d => (d.date||'').slice(0,7) !== thisMonth);
-    document.getElementById('dispatch-history-list').innerHTML = older.map(d =>
-      '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--rule)">' +
-        '<div><div style="font-size:12px;font-weight:600">' + (d.species||'—') + '</div>' +
-        '<div style="font-size:11px;color:var(--ink3)">' + d.date + ' · Bill ' + (d.billNo||'—') + '</div></div>' +
-        '<span class="mono" style="font-size:13px;color:var(--ink2)">' + parseFloat(d.totalCFT||0).toFixed(3) + ' CFT</span>' +
-      '</div>'
-    ).join('');
+    // Group older by month+species
+    const byMonth = {};
+    older.forEach(d => {
+      const mo = (d.date||'').slice(0,7);
+      const sp = d.species||'Unknown';
+      const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
+      const key = mo + '|' + sp;
+      if (!byMonth[key]) byMonth[key] = { mo, sp, cft: 0, isHyd };
+      byMonth[key].cft += parseFloat(d.totalCFT||0);
+      if (isHyd) byMonth[key].isHyd = true;
+    });
+    document.getElementById('dispatch-history-list').innerHTML = Object.values(byMonth)
+      .sort((a,b) => b.mo.localeCompare(a.mo))
+      .map(d =>
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--rule)">' +
+          '<div>' +
+            '<div style="font-size:12px;font-weight:600">' + d.sp + (d.isHyd ? ' <span class="badge b-hyd" style="font-size:9px">via Hyd</span>' : '') + '</div>' +
+            '<div style="font-size:11px;color:var(--ink3)">' + d.mo + '</div>' +
+          '</div>' +
+          '<span class="mono" style="font-size:13px;color:var(--ink2)">' + d.cft.toFixed(3) + ' CFT</span>' +
+        '</div>'
+      ).join('');
   } else { histBtn.style.display = 'none'; }
 
   // Species breakdown
