@@ -239,6 +239,24 @@ select option{background:var(--bg3);color:var(--ink)}
         <div class="kpi"><div class="kpi-lbl">Unseasoned</div><div class="kpi-val" id="k-raw" style="color:var(--ink3)">—</div><div class="kpi-sub" id="k-raw-val" style="color:var(--ink3);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">not yet started</div></div>
       </div>
 
+      <!-- Closing Inventory tile -->
+      <div class="card" style="background:linear-gradient(135deg,rgba(58,122,176,.15),rgba(58,122,176,.05));border:1px solid rgba(58,122,176,.3)">
+        <div style="padding:14px 16px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gas);font-weight:600;margin-bottom:6px">📚 Closing Inventory — 31 Mar 2026</div>
+              <div style="font-family:var(--mono);font-size:26px;font-weight:700;color:var(--ink)" id="k-closing-cft">—</div>
+              <div style="font-size:11px;color:var(--ink3);margin-top:2px">CFT at cost</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--wood)" id="k-closing-val">—</div>
+              <div style="font-size:11px;color:var(--ink3);margin-top:2px">wood value ₹</div>
+              <div style="font-size:10px;color:var(--ink3);margin-top:6px" id="k-closing-sub"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-head">
           <span class="card-title">Dispatches to Solid Bench</span>
@@ -1430,6 +1448,36 @@ function loadDash() {
   const rawCFT2 = Math.max(0, activeCFT - chamberCFT - netSeasonedCFT);
   document.getElementById('k-raw').textContent       = rawCFT2.toFixed(1);
   document.getElementById('k-raw-val').textContent   = rawVal > 0 ? '₹' + Math.round(rawVal).toLocaleString('en-IN') : '';
+
+  // ── Closing Inventory 31-Mar-2026 ──
+  // Purchased on or before 31-Mar-2026 minus dispatched on or before 31-Mar-2026
+  const CLOSING_DATE = '2026-03-31';
+  let closingCFT = 0, closingVal = 0, closingBatches = 0;
+  ST.batches.forEach(b => {
+    if (!b.isCreditNote && (b.date||'') <= CLOSING_DATE) {
+      closingCFT += parseFloat(b.totalCFT || 0);
+      closingVal  += parseFloat(b.woodValue || b.taxableValue || 0);
+      closingBatches++;
+    }
+  });
+  // Subtract dispatches on or before closing date
+  let dispatchedByClose = 0, dispatchedValByClose = 0;
+  ST.dispatches.forEach(d => {
+    if ((d.date||'') <= CLOSING_DATE) {
+      dispatchedByClose += parseFloat(d.totalCFT || 0);
+      // Apportion value by CFT ratio from batch
+      const b = ST.batches.find(x => x.invoiceNo === d.invoiceNo);
+      if (b && parseFloat(b.totalCFT||0) > 0) {
+        dispatchedValByClose += parseFloat(d.totalCFT||0) / parseFloat(b.totalCFT) * parseFloat(b.woodValue||b.taxableValue||0);
+      }
+    }
+  });
+  const netClosingCFT = Math.max(0, closingCFT - dispatchedByClose);
+  const netClosingVal = Math.max(0, closingVal - dispatchedValByClose);
+
+  document.getElementById('k-closing-cft').textContent = netClosingCFT.toFixed(2);
+  document.getElementById('k-closing-val').textContent = '₹' + Math.round(netClosingVal).toLocaleString('en-IN');
+  document.getElementById('k-closing-sub').textContent = closingBatches + ' batches purchased · ' + dispatchedByClose.toFixed(2) + ' CFT dispatched';
 
   // ── Dispatch tile ──
   const now = new Date();
