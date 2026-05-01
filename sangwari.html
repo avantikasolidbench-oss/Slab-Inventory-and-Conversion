@@ -1409,6 +1409,12 @@ function loadDash() {
 
   const seasonedCFT = statusMap['Seasoned']?.cft || 0;
   const seasonedVal = statusMap['Seasoned']?.value || 0;
+  // Direct dispatches (non-Hyd) take from seasoned pool — subtract them
+  const directDispatchedCFT = ST.dispatches
+    .filter(d => d.dispatchType !== 'hyd_to_sb' && !(d.notes||'').includes('[Hyd→SB]'))
+    .reduce((s, d) => s + parseFloat(d.totalCFT||0), 0);
+  const netSeasonedCFT = Math.max(0, seasonedCFT - directDispatchedCFT);
+  const netSeasonedVal = seasonedCFT > 0 ? seasonedVal * (netSeasonedCFT / seasonedCFT) : 0;
   const chamberCFT  = (statusMap['Gas Chamber']?.cft || 0) + (statusMap['Solar Chamber']?.cft || 0);
   const chamberVal  = (statusMap['Gas Chamber']?.value || 0) + (statusMap['Solar Chamber']?.value || 0);
   // Unseasoned = active stock minus what we know is in chamber/seasoned
@@ -1417,63 +1423,75 @@ function loadDash() {
 
   document.getElementById('k-stock').textContent    = activeCFT.toFixed(1);
   document.getElementById('k-stock-val').textContent = '₹' + Math.round(activeVal).toLocaleString('en-IN');
-  document.getElementById('k-seasoned').textContent  = seasonedCFT.toFixed(1);
-  document.getElementById('k-seasoned-val').textContent = seasonedVal > 0 ? '₹' + Math.round(seasonedVal).toLocaleString('en-IN') : '';
+  document.getElementById('k-seasoned').textContent  = netSeasonedCFT.toFixed(1);
+  document.getElementById('k-seasoned-val').textContent = netSeasonedVal > 0 ? '₹' + Math.round(netSeasonedVal).toLocaleString('en-IN') : '';
   document.getElementById('k-chamber').textContent   = chamberCFT.toFixed(1);
   document.getElementById('k-chamber-val').textContent = chamberVal > 0 ? '₹' + Math.round(chamberVal).toLocaleString('en-IN') : '';
-  document.getElementById('k-raw').textContent       = rawCFT.toFixed(1);
+  const rawCFT2 = Math.max(0, activeCFT - chamberCFT - netSeasonedCFT);
+  document.getElementById('k-raw').textContent       = rawCFT2.toFixed(1);
   document.getElementById('k-raw-val').textContent   = rawVal > 0 ? '₹' + Math.round(rawVal).toLocaleString('en-IN') : '';
 
   // ── Dispatch tile ──
   const now = new Date();
-  const thisMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
   const thisMonLabel = now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-  document.getElementById('dispatch-month-label').textContent = thisMonLabel;
 
-  const thisMonDispatches = ST.dispatches.filter(d => (d.date||'').slice(0,7) === thisMonth);
-  const lastMonth = new Date(now.getFullYear(), now.getMonth()-1, 1);
-  const lastMonthStr = lastMonth.getFullYear() + '-' + String(lastMonth.getMonth()+1).padStart(2,'0');
-  const lastMonLabel = lastMonth.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-  const lastMonDispatches = ST.dispatches.filter(d => (d.date||'').slice(0,7) === lastMonthStr);
-
-  function groupBySpecies(list) {
-    const map = {};
-    list.forEach(d => {
-      const sp = d.species || 'Unknown';
-      const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
-      if (!map[sp]) map[sp] = { cft: 0, isHyd };
-      map[sp].cft += parseFloat(d.totalCFT || 0);
-      if (isHyd) map[sp].isHyd = true;
-    });
-    return map;
+  function monthLabel(ym) {
+    const [y, m] = ym.split('-');
+    return new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
   }
 
-  function renderMonthBlock(label, list) {
-    const bySpecies = groupBySpecies(list);
-    if (!list.length) return '<div style="padding:10px 16px;color:var(--ink3);font-size:12px">No dispatches</div>';
-    return Object.entries(bySpecies).sort((a,b)=>b[1].cft-a[1].cft).map(([sp, d]) =>
-      '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--rule)">' +
-        '<div style="display:flex;align-items:center;gap:8px">' +
-          '<span style="font-weight:600;font-size:13px">' + sp + '</span>' +
-          (d.isHyd ? '<span class="badge b-hyd" style="font-size:9px">via Hyd</span>' : '<span class="badge b-wood" style="font-size:9px">direct</span>') +
-        '</div>' +
-        '<span class="mono" style="color:var(--wood);font-size:14px;font-weight:700">' + d.cft.toFixed(3) + ' CFT</span>' +
-      '</div>'
-    ).join('') +
-    '<div style="padding:7px 16px;display:flex;justify-content:space-between;font-size:11px;color:var(--ink3);background:var(--bg3)">' +
-      '<span>Total</span>' +
-      '<span class="mono" style="font-weight:600">' + list.reduce((s,d)=>s+parseFloat(d.totalCFT||0),0).toFixed(3) + ' CFT</span>' +
-    '</div>';
-  }
+  document.getElementById('dispatch-month-label').textContent = 'Jan 2026 – ' + thisMonLabel;
 
+  // Group all dispatches by month → species
+  const byMonth = {};
+  ST.dispatches.forEach(d => {
+    const mo = (d.date||'').slice(0,7);
+    if (!mo || mo < '2026-01') return;
+    const sp = d.species || 'Unknown';
+    const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
+    if (!byMonth[mo]) byMonth[mo] = {};
+    if (!byMonth[mo][sp]) byMonth[mo][sp] = { cft: 0, isHyd };
+    byMonth[mo][sp].cft += parseFloat(d.totalCFT || 0);
+    if (isHyd) byMonth[mo][sp].isHyd = true;
+  });
+
+  // Generate all months from Jan 2026 to current
+  const allMonths = [];
+  const cur = new Date();
+  let y = 2026, m = 1;
+  while (y < cur.getFullYear() || (y === cur.getFullYear() && m <= cur.getMonth()+1)) {
+    allMonths.push(y + '-' + String(m).padStart(2,'0'));
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  allMonths.reverse(); // most recent first
+
+  const grandTotal = ST.dispatches.reduce((s,d) => s + parseFloat(d.totalCFT||0), 0);
   const monthEl = document.getElementById('dispatch-this-month');
-  monthEl.innerHTML =
-    '<div style="padding:8px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--wood);font-weight:600">' + thisMonLabel + '</div>' +
-    renderMonthBlock(thisMonLabel, thisMonDispatches) +
-    '<div style="padding:8px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-top:4px">' + lastMonLabel + '</div>' +
-    renderMonthBlock(lastMonLabel, lastMonDispatches);
 
-  // Hide history button — 2 months is enough on dashboard
+  monthEl.innerHTML = allMonths.map(mo => {
+    const species = Object.entries(byMonth[mo] || {}).sort((a,b) => b[1].cft - a[1].cft);
+    const moTotal = species.reduce((s,[,d]) => s + d.cft, 0);
+    return '<div style="border-bottom:1px solid var(--rule)">' +
+      '<div style="padding:8px 16px 4px;display:flex;justify-content:space-between">' +
+        '<span style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600">' + monthLabel(mo) + '</span>' +
+        '<span class="mono" style="font-size:11px;color:' + (moTotal > 0 ? 'var(--wood)' : 'var(--ink3)') + '">' + (moTotal > 0 ? moTotal.toFixed(3) + ' CFT' : '—') + '</span>' +
+      '</div>' +
+      (species.length ? species.map(([sp, d]) =>
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 16px 6px 20px">' +
+          '<div style="display:flex;align-items:center;gap:6px">' +
+            '<span style="font-size:13px;font-weight:600">' + sp + '</span>' +
+            (d.isHyd ? '<span class="badge b-hyd" style="font-size:9px">via Hyd</span>' : '<span class="badge b-wood" style="font-size:9px">direct</span>') +
+          '</div>' +
+          '<span class="mono" style="color:var(--wood);font-size:13px;font-weight:700">' + d.cft.toFixed(3) + ' CFT</span>' +
+        '</div>'
+      ).join('') : '<div style="padding:4px 16px 8px 20px;font-size:12px;color:var(--ink3)">No dispatches</div>') +
+    '</div>';
+  }).join('') +
+  '<div style="padding:10px 16px;display:flex;justify-content:space-between;font-size:12px;background:var(--bg3)">' +
+    '<span style="color:var(--ink3);font-weight:600">Grand Total</span>' +
+    '<span class="mono" style="color:var(--wood);font-weight:700">' + grandTotal.toFixed(3) + ' CFT</span>' +
+  '</div>';
+
   document.getElementById('dispatch-history-btn').style.display = 'none';
 
   // Species breakdown
