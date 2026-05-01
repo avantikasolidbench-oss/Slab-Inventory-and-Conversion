@@ -269,8 +269,8 @@ select option{background:var(--bg3);color:var(--ink)}
         <button class="btn btn-sm btn-sec" id="flt-raw" onclick="filterSlabs('Unseasoned')" style="white-space:nowrap">🪵 Unseasoned</button>
         <button class="btn btn-sm btn-sec" id="flt-gas" onclick="filterSlabs('Gas Chamber')" style="white-space:nowrap">⚗️ Gas</button>
         <button class="btn btn-sm btn-sec" id="flt-solar" onclick="filterSlabs('Solar Chamber')" style="white-space:nowrap">☀️ Solar</button>
-        <button class="btn btn-sm btn-sec" id="flt-hyd" onclick="filterSlabs('Sent to Hyderabad')" style="white-space:nowrap">🚛 Hyd</button>
         <button class="btn btn-sm btn-sec" id="flt-seasoned" onclick="filterSlabs('Seasoned')" style="white-space:nowrap">✅ Seasoned</button>
+        <button class="btn btn-sm btn-sec" id="flt-hyd" onclick="filterSlabs('Sent to Hyderabad')" style="white-space:nowrap;opacity:.6">🚛 Hyd (dispatched)</button>
       </div>
 
       <!-- Summary bar -->
@@ -729,55 +729,51 @@ select option{background:var(--bg3);color:var(--ink)}
 <div class="modal" id="dis-modal">
   <div class="modal-box">
     <div class="modal-handle"></div>
-    <div class="modal-title">Dispatch to Solid Bench</div>
-    <div class="modal-sub">Enter dispatch bill details and slab dimensions</div>
+    <div class="modal-title">🚚 Dispatch to Solid Bench</div>
 
-    <div class="field"><label>Xpertpack Bill No.</label><input type="text" id="d-billno" placeholder="XP/001/2026-27"></div>
-    <div class="field"><label>Dispatch Date</label><input type="date" id="d-date"></div>
-    <div class="field"><label>Source Batch</label>
-      <select id="d-batch" onchange="updateDispatchRate()">
-        <option value="">— select batch —</option>
-      </select>
-    </div>
-    <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:14px;display:flex;gap:16px;flex-wrap:wrap" id="d-rate-info" style="display:none">
-      <div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px">Vendor Rate/CFT</div><div style="font-family:var(--mono);color:var(--ink);margin-top:2px" id="d-vendor-rate">—</div></div>
-      <div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px">Markup</div><div style="font-family:var(--mono);color:var(--amber);margin-top:2px">+₹300</div></div>
-      <div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px">Bill Rate/CFT</div><div style="font-family:var(--mono);color:var(--wood);font-weight:700;margin-top:2px" id="d-bill-rate">—</div></div>
-    </div>
-
-    <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:8px">Slabs Being Dispatched</div>
-    <div style="display:flex;gap:8px;margin-bottom:10px">
-      <button class="btn btn-sec btn-sm" onclick="document.getElementById('f-dis-sheet').click()">📷 Upload Register (multiple ok)</button>
-      <button class="btn btn-sec btn-sm" onclick="addDisRow()">+ Add Row</button>
-      <input type="file" id="f-dis-sheet" accept="image/*" multiple onchange="readDisSheet(event)" style="display:none">
-    </div>
-    <div class="ai-spin-wrap" id="ai-dis"><div class="ai-spin"></div> Reading register…</div>
-    <div style="overflow-x:auto;margin-bottom:12px">
-      <table class="dtbl">
-        <thead><tr>
-          <th>L mm</th><th>W mm</th><th>T mm</th><th>CFT</th><th>Cost ₹</th><th></th>
-        </tr></thead>
-        <tbody id="dis-rows"></tbody>
-      </table>
-    </div>
-
-    <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:12px;color:var(--ink3)">Total Slabs</span>
-        <span class="mono" id="d-total-slabs" style="color:var(--ink)">—</span>
+    <!-- Step 1: Cover page -->
+    <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:12px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:8px">Step 1 — Bill / Challan Cover</div>
+      <button class="btn btn-primary btn-sm btn-full" onclick="document.getElementById('f-dis-cover').click()" style="margin-bottom:8px">📄 Upload Cover Page</button>
+      <input type="file" id="f-dis-cover" accept="image/*,.pdf" onchange="readDisCover(event)" style="display:none">
+      <div class="ai-spin-wrap" id="ai-dis-cover"><div class="ai-spin"></div> Reading cover…</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="field" style="margin-bottom:0"><label>Bill / Challan No.</label><input type="text" id="d-billno" placeholder="XP/001/2026-27"></div>
+        <div class="field" style="margin-bottom:0"><label>Date</label><input type="date" id="d-date"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:12px;color:var(--ink3)">Total CFT</span>
-        <span class="mono" id="d-total-cft" style="color:var(--ink)">—</span>
+      <div id="d-cover-summary" style="display:none;margin-top:8px;padding:8px;background:var(--bg4);border-radius:4px;font-size:12px;color:var(--ink3)"></div>
+    </div>
+
+    <!-- Step 2: Slab register pages -->
+    <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:12px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:8px">Step 2 — Slab Register (multiple pages ok)</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('f-dis-sheet').click()" style="flex:1">📷 Upload Register Photo(s)</button>
+        <button class="btn btn-sec btn-sm" onclick="addDisRow()">+ Manual</button>
+        <input type="file" id="f-dis-sheet" accept="image/*" multiple onchange="readDisSheet(event)" style="display:none">
       </div>
-      <div style="display:flex;justify-content:space-between">
-        <span style="font-size:12px;color:var(--ink3)">Total Bill Value</span>
-        <span class="mono" id="d-total-val" style="color:var(--wood);font-weight:700">—</span>
+      <div class="ai-spin-wrap" id="ai-dis"><div class="ai-spin"></div> Reading register…</div>
+      <div id="dis-species-sections"></div>
+      <div id="dis-manual-wrap" style="display:none">
+        <div style="overflow-x:auto;margin-bottom:8px">
+          <table class="dtbl"><thead><tr><th>L mm</th><th>W mm</th><th>T mm</th><th>CFT</th><th>Cost ₹</th><th></th></tr></thead>
+          <tbody id="dis-rows"></tbody></table>
+        </div>
+        <div class="field" style="margin-bottom:6px"><label>Batch</label>
+          <select id="d-batch" onchange="updateDispatchRate()" style="background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;width:100%;font-size:13px">
+            <option value="">— select batch —</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:12px;font-size:12px;color:var(--ink3);flex-wrap:wrap">
+          <span>Rate: <span class="mono" id="d-vendor-rate">—</span> +₹300 = <span class="mono" style="color:var(--wood)" id="d-bill-rate">—</span></span>
+          <span>CFT: <span class="mono" id="d-total-cft">—</span></span>
+          <span>Value: <span class="mono" style="color:var(--wood)" id="d-total-val">—</span></span>
+          <span id="d-total-slabs" style="display:none"></span>
+        </div>
       </div>
     </div>
 
-    <div class="field"><label>Notes</label><textarea id="d-notes" placeholder="Any notes…" style="min-height:60px"></textarea></div>
-
+    <div class="field"><label>Notes (optional)</label><textarea id="d-notes" placeholder="Any notes…" style="min-height:40px"></textarea></div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-sec" onclick="closeDisModal()" style="flex:1">Cancel</button>
       <button class="btn btn-primary" onclick="saveDispatch()" style="flex:2" id="dis-save-btn">🚚 Save Dispatch</button>
@@ -1012,7 +1008,9 @@ function toggleSlab(id) {
 
 function selectAllSlabs() {
   if (!bulkMode) return;
-  const filtered = slabFilter === 'all' ? ST.slabs : ST.slabs.filter(s => s.status === slabFilter);
+  const filtered = slabFilter === 'all'
+    ? ST.slabs.filter(s => s.status !== 'Dispatched to SB')
+    : ST.slabs.filter(s => s.status === slabFilter);
   const allSelected = filtered.every(s => selectedSlabs.has(s.slabId));
   filtered.forEach(s => allSelected ? selectedSlabs.delete(s.slabId) : selectedSlabs.add(s.slabId));
   renderSlabs(ST.slabs);
@@ -1306,18 +1304,27 @@ async function markAsOpeningStock(invoiceNo, species) {
 
 // ── DASHBOARD ──
 function loadDash() {
+  // Total stock from batches (source of truth — always populated)
   const totalCFT = ST.batches.reduce((s, b) => s + parseFloat(b.remainingCFT || b.totalCFT || 0), 0);
   const totalValue = ST.batches.reduce((s, b) => s + parseFloat(b.woodValue || b.taxableValue || 0), 0);
 
+  // Dispatched CFT (from dispatches sheet — these left Sangwari)
+  const dispatchedCFT = ST.dispatches.reduce((s, d) => s + parseFloat(d.totalCFT || 0), 0);
+
+  // Active stock = total purchased minus dispatched
+  const activeCFT = Math.max(0, totalCFT - dispatchedCFT);
+  const activeVal = activeCFT > 0 && totalCFT > 0 ? totalValue * (activeCFT / totalCFT) : totalValue;
+
+  // Slab-level breakdown (only for batches with slab data)
   const statusMap = {};
-  ST.slabs.forEach(s => {
+  ST.slabs.filter(s => s.status !== 'Dispatched to SB').forEach(s => {
     const st = s.status || 'Unseasoned';
     if (!statusMap[st]) statusMap[st] = { cft: 0, value: 0 };
     statusMap[st].cft += parseFloat(s.cft || 0);
   });
 
   // Apportion value by CFT ratio
-  ST.slabs.forEach(s => {
+  ST.slabs.filter(s => s.status !== 'Dispatched to SB').forEach(s => {
     const batch = ST.batches.find(b => b.invoiceNo === s.invoiceNo);
     if (!batch) return;
     const batchValue = parseFloat(batch.woodValue || batch.taxableValue || 0);
@@ -1327,16 +1334,13 @@ function loadDash() {
     if (statusMap[st]) statusMap[st].value = (statusMap[st].value || 0) + slabValue;
   });
 
-  const seasonedCFT  = statusMap['Seasoned']?.cft || 0;
-  const seasonedVal  = statusMap['Seasoned']?.value || 0;
-  // In Process = Gas + Solar only (Hyd = dispatched, not in Sangwari stock)
-  const chamberCFT   = (statusMap['Gas Chamber']?.cft || 0) + (statusMap['Solar Chamber']?.cft || 0);
-  const chamberVal   = (statusMap['Gas Chamber']?.value || 0) + (statusMap['Solar Chamber']?.value || 0);
-  const rawCFT       = statusMap['Unseasoned']?.cft || 0;
-  const rawVal       = statusMap['Unseasoned']?.value || 0;
-  // Total excludes Hyd (dispatched) and already Dispatched to SB
-  const activeCFT    = rawCFT + chamberCFT + seasonedCFT;
-  const activeVal    = rawVal + chamberVal + seasonedVal;
+  const seasonedCFT = statusMap['Seasoned']?.cft || 0;
+  const seasonedVal = statusMap['Seasoned']?.value || 0;
+  const chamberCFT  = (statusMap['Gas Chamber']?.cft || 0) + (statusMap['Solar Chamber']?.cft || 0);
+  const chamberVal  = (statusMap['Gas Chamber']?.value || 0) + (statusMap['Solar Chamber']?.value || 0);
+  // Unseasoned = active stock minus what we know is in chamber/seasoned
+  const rawCFT = Math.max(0, activeCFT - chamberCFT - seasonedCFT);
+  const rawVal = Math.max(0, activeVal - chamberVal - seasonedVal);
 
   document.getElementById('k-stock').textContent    = activeCFT.toFixed(1);
   document.getElementById('k-stock-val').textContent = '₹' + Math.round(activeVal).toLocaleString('en-IN');
@@ -1741,8 +1745,8 @@ function calcDispatchTotals() {
   document.getElementById('d-total-val').textContent = totalVal > 0 ? '₹' + Math.round(totalVal).toLocaleString('en-IN') : '—';
 }
 
-// ── DISPATCH — multi-species register read ────────────────
-let disSpeciesGroups = {}; // { species: [ {lengthMM,widthMM,thickMM,cft} ] }
+// ── DISPATCH — two-level read ────────────────────────────
+let disSpeciesGroups = {};
 
 function showDispatchModal() {
   disSpeciesGroups = {};
@@ -1754,9 +1758,56 @@ function showDispatchModal() {
   document.getElementById('dis-species-sections').innerHTML = '';
   document.getElementById('dis-manual-wrap').style.display = 'none';
   document.getElementById('dis-rows').innerHTML = '';
+  document.getElementById('d-cover-summary').style.display = 'none';
   document.getElementById('ai-dis').classList.remove('show');
+  document.getElementById('ai-dis-cover').classList.remove('show');
 }
 function closeDisModal() { document.getElementById('dis-modal').classList.remove('show'); }
+
+async function readDisCover(event) {
+  const file = event.target.files[0]; if (!file) return;
+  if (!CFG.key) { toast('API key not set', 'err'); return; }
+  document.getElementById('ai-dis-cover').classList.add('show');
+  try {
+    const b64 = await toB64(file);
+    const mt = file.type === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
+    const prompt = `This is a dispatch bill or challan cover page from a wood yard. Extract:
+- billNo: bill or challan number
+- date: date in YYYY-MM-DD
+- species: array of wood species mentioned (e.g. ["Rosewood","CP Teak","White Ash"])
+- totalCFT: total CFT on the bill (if shown)
+- vendor: supplier/party name
+Return ONLY JSON: {"billNo":"XP/001","date":"2026-05-02","species":["Rosewood","CP Teak"],"totalCFT":85.4,"vendor":"SS Enterprises"}`;
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, messages: [{ role: 'user', content: [
+        { type: mt === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: mt, data: b64.split(',')[1] } },
+        { type: 'text', text: prompt }
+      ]}]})
+    });
+    const data = await resp.json();
+    const txt = data.content?.[0]?.text || '{}';
+    const d = JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim());
+    document.getElementById('ai-dis-cover').classList.remove('show');
+    if (d.billNo) document.getElementById('d-billno').value = d.billNo;
+    if (d.date)   document.getElementById('d-date').value = d.date;
+    // Show summary
+    const sumEl = document.getElementById('d-cover-summary');
+    const speciesList = (d.species||[]).join(', ') || 'Not detected';
+    sumEl.innerHTML =
+      '✓ Read: <strong>' + (d.billNo||'—') + '</strong> · ' + (d.date||'—') +
+      (d.totalCFT ? ' · <span style="color:var(--wood)"><strong>' + d.totalCFT + ' CFT</strong></span>' : '') +
+      ' · Species: <span style="color:var(--wood)">' + speciesList + '</span>' +
+      (d.vendor ? ' · ' + d.vendor : '');
+    sumEl.style.display = 'block';
+    toast('Cover read ✓ — now upload register photos', 'ok');
+  } catch(e) {
+    document.getElementById('ai-dis-cover').classList.remove('show');
+    toast('Cover read failed — fill manually', 'err');
+  }
+  document.getElementById('f-dis-cover').value = '';
+}
 
 async function readDisSheet(event) {
   const files = Array.from(event.target.files);
