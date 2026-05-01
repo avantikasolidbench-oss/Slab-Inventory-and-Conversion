@@ -229,6 +229,11 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
       <input type="password" id="cfg-key" placeholder="sk-ant-...">
       <span class="hint">From console.anthropic.com — only used in your browser</span>
     </div>
+    <div class="field mb24">
+      <label>Sangwari API URL (optional)</label>
+      <input type="text" id="cfg-swurl" placeholder="https://script.google.com/macros/s/.../exec">
+      <span class="hint">From SangwariTrack Apps Script deployment — enables Sangwari import</span>
+    </div>
     <div class="fsb">
       <span class="hint">Settings stored in localStorage — never sent to any server</span>
       <div style="display:flex;gap:8px">
@@ -292,71 +297,150 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
             <h1 style="font-family:var(--serif);font-size:28px;letter-spacing:-.3px">Issue Slabs</h1>
             <p style="color:var(--ink3);font-size:13px;margin-top:4px">Record slabs issued to clients — dimensions in mm · batch assigned per row</p>
           </div>
-          <button class="btn btn-p" onclick="saveIssuances()" id="save-btn">💾 Save All Entries</button>
+          <button class="btn btn-p" onclick="saveIssuancesActive()" id="save-btn">💾 Save All Entries</button>
         </div>
 
-        <div class="card" id="slab-entry-card">
-          <div class="ch">
-            <span class="ct">Slab Issuances</span>
-            <div style="display:flex;gap:6px">
-              <button class="btn btn-p btn-sm" id="mode-ai-btn" onclick="setMode('ai')">📷 Upload Handwritten Sheet</button>
-              <button class="btn btn-s btn-sm" id="mode-manual-btn" onclick="setMode('manual')">✏️ Enter Manually</button>
+        <!-- Mode selector -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <button class="btn btn-p btn-sm" id="issue-mode-stock" onclick="setIssueMode('stock')">📋 Issue from Stock</button>
+          <button class="btn btn-s btn-sm" id="issue-mode-manual" onclick="setIssueMode('manual')">✏️ Manual Entry</button>
+        </div>
+
+        <!-- STOCK PICKER MODE -->
+        <div id="issue-stock-panel" style="display:none">
+          <div class="card" style="margin-bottom:16px">
+            <div class="ch"><span class="ct">Select Batch with Stock</span></div>
+            <div class="cb">
+              <div class="field mb24">
+                <label>Batch</label>
+                <select id="stock-batch-sel" onchange="loadStockForIssue()" style="background:white;border:1.5px solid var(--rule);color:var(--ink);padding:9px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;width:100%">
+                  <option value="">— Select batch with slab stock —</option>
+                </select>
+              </div>
+              <div id="stock-batch-info" style="display:none;padding:10px 14px;background:var(--paper2);border-radius:4px;margin-bottom:14px;font-size:13px">
+                <span id="stock-info-text" style="color:var(--ink3)"></span>
+              </div>
             </div>
           </div>
-          <div class="cb">
-            <div id="leak-alert"></div>
 
-            <!-- AI upload mode -->
-            <div id="mode-ai" style="display:none">
-              <div class="uz" id="uz-store" style="padding:32px" ondragover="dov(event,'uz-store')" ondragleave="dlv('uz-store')" ondrop="dropStore(event)">
-                <input type="file" accept="image/*" onchange="storeFileChosen(event)" id="f-store">
-                <span class="uz-icon" style="font-size:32px">📋</span>
-                <div class="uz-title" style="font-size:14px">Drop photo of handwritten sheet here</div>
-                <div class="uz-sub">AI reads date, dimensions, client — leaves blanks for missing data</div>
-              </div>
-              <div class="ai-r" id="ai-store"><div class="ai-spin"></div> AI is reading your handwritten entries…</div>
-              <img id="prev-store" class="prev-img" style="display:none;max-height:300px">
-              <div id="ai-store-result" style="display:none">
-                <div class="alert a-ok" id="ai-store-msg"></div>
+          <!-- Slab picker -->
+          <div class="card" id="stock-slab-card" style="display:none">
+            <div class="ch">
+              <span class="ct" id="stock-slab-title">Available Slabs</span>
+              <div style="display:flex;gap:6px;align-items:center">
+                <button class="btn btn-s btn-sm" onclick="selectAllStockSlabs()">Select All</button>
+                <span class="mono" id="stock-sel-count" style="font-size:12px;color:var(--ink3)">0 selected</span>
               </div>
             </div>
+            <div class="cb">
+              <div id="stock-slab-list" style="max-height:320px;overflow-y:auto;border:1px solid var(--rule);border-radius:4px;margin-bottom:16px">
+                <div style="padding:24px;text-align:center;color:var(--ink3)">Loading…</div>
+              </div>
 
-            <!-- Mass-assign bar -->
-            <div id="mass-assign-bar" style="background:var(--paper);border:1px solid var(--rule);border-radius:3px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-              <span style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;white-space:nowrap">Assign to All:</span>
-              <select id="mass-batch-sel" style="flex:1;min-width:220px;background:white;border:1.5px solid var(--rule);color:var(--ink);padding:7px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;cursor:pointer">
-                <option value="">— Batch —</option>
-              </select>
-              <select id="mass-cat-sel" style="flex:0 0 180px;background:white;border:1.5px solid var(--rule);color:var(--ink);padding:7px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;cursor:pointer">
-                <option value="">— Category —</option>
-              </select>
-              <button class="btn btn-s btn-sm" onclick="massAssignAll()">Apply to All</button>
-              <span style="font-size:11px;color:var(--ink3)">or set per row below</span>
-            </div>
+              <!-- Assign details -->
+              <div style="background:var(--paper2);border-radius:4px;padding:14px;margin-bottom:14px">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:12px">Assign Selected Slabs To:</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+                  <div class="field mb24">
+                    <label>Client</label>
+                    <input type="text" id="stock-client" list="clist-stock" placeholder="Client name" style="background:white;border:1.5px solid var(--rule);padding:8px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;width:100%">
+                    <datalist id="clist-stock"></datalist>
+                  </div>
+                  <div class="field mb24">
+                    <label>Category</label>
+                    <select id="stock-category" style="background:white;border:1.5px solid var(--rule);color:var(--ink);padding:9px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;width:100%">
+                      <option value="">— Category —</option>
+                      <option>Chair</option><option>Dining Table</option><option>Coffee Table</option>
+                      <option>Side Table</option><option>Study Table</option><option>Bar Stool</option>
+                      <option>Bench</option><option>Lounger/Sofa</option><option>Console/Cabinet</option><option>Other</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                  <div class="field mb24">
+                    <label>Carpenter</label>
+                    <input type="text" id="stock-carpenter" placeholder="Carpenter name" style="background:white;border:1.5px solid var(--rule);padding:8px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;width:100%">
+                  </div>
+                  <div class="field mb24">
+                    <label>Date of Issue</label>
+                    <input type="date" id="stock-date" style="background:white;border:1.5px solid var(--rule);padding:8px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;width:100%">
+                  </div>
+                </div>
+              </div>
 
-            <!-- Table -->
-            <div style="overflow-x:auto">
-              <table class="stbl">
-                <thead><tr>
-                  <th style="width:108px">Date</th>
-                  <th style="width:82px">Length mm</th>
-                  <th style="width:72px">Width mm</th>
-                  <th style="width:80px">Thick mm</th>
-                  <th style="width:90px">CBM</th>
-                  <th style="width:90px">Cost ₹</th>
-                  <th style="width:100px">Species</th>
-                  <th style="width:130px">Client</th>
-                  <th style="width:160px">Category</th>
-                  <th style="width:110px">Carpenter</th>
-                  <th style="width:190px">Batch / Invoice</th>
-                  <th style="width:36px"></th>
-                </tr></thead>
-                <tbody id="slab-tbody"></tbody>
-              </table>
+              <!-- Summary -->
+              <div id="stock-issue-summary" style="display:none;padding:10px 14px;background:#f0f8e8;border-radius:4px;margin-bottom:14px;font-size:13px">
+                <span id="stock-summary-text"></span>
+              </div>
+
+              <button class="btn btn-p" onclick="issueFromStock()" id="issue-stock-btn" style="width:100%">💾 Issue Selected Slabs</button>
             </div>
-            <button class="btn btn-g btn-sm" style="margin-top:10px" onclick="addRow()">+ Add Row</button>
           </div>
         </div>
+
+        <!-- MANUAL ENTRY MODE (existing) -->
+        <div id="issue-manual-panel">
+          <div class="card" id="slab-entry-card">
+            <div class="ch">
+              <span class="ct">Slab Issuances</span>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-p btn-sm" id="mode-ai-btn" onclick="setMode('ai')">📷 Upload Handwritten Sheet</button>
+                <button class="btn btn-s btn-sm" id="mode-manual-btn" onclick="setMode('manual')">✏️ Enter Manually</button>
+              </div>
+            </div>
+            <div class="cb">
+              <div id="leak-alert"></div>
+
+              <div id="mode-ai" style="display:none">
+                <div class="uz" id="uz-store" style="padding:32px" ondragover="dov(event,'uz-store')" ondragleave="dlv('uz-store')" ondrop="dropStore(event)">
+                  <input type="file" accept="image/*" onchange="storeFileChosen(event)" id="f-store">
+                  <span class="uz-icon" style="font-size:32px">📋</span>
+                  <div class="uz-title" style="font-size:14px">Drop photo of handwritten sheet here</div>
+                  <div class="uz-sub">AI reads date, dimensions, client — leaves blanks for missing data</div>
+                </div>
+                <div class="ai-r" id="ai-store"><div class="ai-spin"></div> AI is reading your handwritten entries…</div>
+                <img id="prev-store" class="prev-img" style="display:none;max-height:300px">
+                <div id="ai-store-result" style="display:none">
+                  <div class="alert a-ok" id="ai-store-msg"></div>
+                </div>
+              </div>
+
+              <div id="mass-assign-bar" style="background:var(--paper);border:1px solid var(--rule);border-radius:3px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <span style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;white-space:nowrap">Assign to All:</span>
+                <select id="mass-batch-sel" style="flex:1;min-width:220px;background:white;border:1.5px solid var(--rule);color:var(--ink);padding:7px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;cursor:pointer">
+                  <option value="">— Batch —</option>
+                </select>
+                <select id="mass-cat-sel" style="flex:0 0 180px;background:white;border:1.5px solid var(--rule);color:var(--ink);padding:7px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;cursor:pointer">
+                  <option value="">— Category —</option>
+                </select>
+                <button class="btn btn-s btn-sm" onclick="massAssignAll()">Apply to All</button>
+                <span style="font-size:11px;color:var(--ink3)">or set per row below</span>
+              </div>
+
+              <div style="overflow-x:auto">
+                <table class="stbl">
+                  <thead><tr>
+                    <th style="width:108px">Date</th>
+                    <th style="width:82px">Length mm</th>
+                    <th style="width:72px">Width mm</th>
+                    <th style="width:80px">Thick mm</th>
+                    <th style="width:90px">CFT</th>
+                    <th style="width:90px">Cost ₹</th>
+                    <th style="width:100px">Species</th>
+                    <th style="width:130px">Client</th>
+                    <th style="width:160px">Category</th>
+                    <th style="width:110px">Carpenter</th>
+                    <th style="width:190px">Batch / Invoice</th>
+                    <th style="width:36px"></th>
+                  </tr></thead>
+                  <tbody id="slab-tbody"></tbody>
+                </table>
+              </div>
+              <button class="btn btn-g btn-sm" style="margin-top:10px" onclick="addRow()">+ Add Row</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -371,6 +455,7 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
           <button class="tab active" id="tab-pur" onclick="switchTab('pur')">📦 Purchase Bills</button>
           <button class="tab" id="tab-cli" onclick="switchTab('cli')">🛒 Client Invoices</button>
           <button class="tab" id="tab-bat" onclick="switchTab('bat')">📋 All Batches</button>
+          <button class="tab" id="tab-sw" onclick="switchTab('sw')">🏭 From Sangwari</button>
         </div>
 
         <!-- Purchase -->
@@ -503,17 +588,27 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
               <table class="tbl">
                 <thead><tr>
                   <th>Invoice</th><th>Bill Date</th><th>Vendor</th><th>Species</th>
-                  <th>Slabs</th><th>Thick mm</th><th>CBM</th><th title="Wood value only — excl freight, GST">Wood Value ₹</th><th>Rate/CBM ₹</th><th>CBM Issued</th><th>CBM Left</th><th>Notes</th><th>Status</th>
+                  <th>Slabs</th><th>Thick mm</th><th>CFT</th><th title="Wood value only — excl freight, GST">Wood Value ₹</th><th>Rate/CFT ₹</th><th>CFT Issued</th><th>CFT Left</th><th>Notes</th><th>Status</th><th>Stock</th>
                 </tr></thead>
                 <tbody id="bat-tbody"><tr><td colspan="13" style="text-align:center;padding:32px;color:var(--ink3)">Loading…</td></tr></tbody>
               </table>
             </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- DASHBOARD -->
+        <!-- Sangwari Import -->
+        <div id="panel-sw" style="display:none">
+          <div class="card" style="margin:0">
+            <div class="ch">
+              <span class="ct">Pending Sangwari Dispatches</span>
+              <button class="btn btn-s btn-sm" onclick="loadSWDispatches()">↻ Refresh</button>
+            </div>
+            <div class="cb" id="sw-pending">
+              <div style="text-align:center;padding:24px;color:var(--ink3)">
+                Click Refresh to load pending dispatches from Sangwari
+              </div>
+            </div>
+          </div>
+        </div>
     <div class="screen" id="screen-dash">
       <div class="page">
         <div class="fsb mb24">
@@ -525,7 +620,7 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
         </div>
         <div class="g4 mb20">
           <div class="kpi"><div class="kpi-lbl">Inventory Value</div><div class="kpi-val" id="k-inv">—</div><div class="kpi-sub" id="k-inv-s">current batches</div></div>
-          <div class="kpi"><div class="kpi-lbl">CBM in Stock</div><div class="kpi-val" id="k-cbm">—</div><div class="kpi-sub" id="k-cbm-s">across all batches</div></div>
+          <div class="kpi"><div class="kpi-lbl">CFT in Stock</div><div class="kpi-val" id="k-cbm">—</div><div class="kpi-sub" id="k-cbm-s">across all batches</div></div>
           <div class="kpi"><div class="kpi-lbl">Gross Conversion</div><div class="kpi-val" id="k-conv">—</div><div class="kpi-sub">sale value ÷ raw material</div><div id="k-conv-s"></div></div>
           <div class="kpi"><div class="kpi-lbl">Unaccounted CBM</div><div class="kpi-val" id="k-leak">—</div><div class="kpi-sub">purchased but unissued</div><div id="k-leak-s"></div></div>
         </div>
@@ -718,7 +813,7 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
             <table class="tbl">
               <thead><tr>
                 <th style="width:24px"></th>
-                <th>Date</th><th>Dimensions mm</th><th>CBM</th><th>Cost ₹</th>
+                <th>Date</th><th>Dimensions mm</th><th>CFT</th><th>Cost ₹</th>
                 <th>Client</th><th>Species</th><th>Category</th><th>Carpenter</th><th>Batch</th>
                 <th style="width:56px"></th>
               </tr></thead>
@@ -739,6 +834,66 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
 
     <!-- EDIT PANEL -->
     <div id="edit-overlay" onclick="closeEditPanel()" style="display:none;position:fixed;inset:0;background:rgba(28,26,22,.3);z-index:49"></div>
+<!-- SLAB STOCK MODAL -->
+<div class="modal" id="ss-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:flex-start;justify-content:center;padding-top:60px;overflow-y:auto">
+  <div style="background:var(--paper);border-radius:8px;width:95%;max-width:760px;padding:24px;position:relative;margin-bottom:40px">
+    <button onclick="closeSSModal()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:20px;cursor:pointer;color:var(--ink3)">✕</button>
+    <div style="font-family:var(--mono);font-size:16px;font-weight:700;margin-bottom:4px" id="ss-title">Slab Stock</div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:16px" id="ss-sub"></div>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn btn-s btn-sm" onclick="document.getElementById('ss-xl-input').click()">📊 Upload Excel</button>
+      <button class="btn btn-s btn-sm" onclick="document.getElementById('ss-img-input').click()">📷 Upload Register</button>
+      <button class="btn btn-s btn-sm" onclick="showSSManualEntry()">+ Add Manually</button>
+      <input type="file" id="ss-xl-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="uploadSSExcel(event)">
+      <input type="file" id="ss-img-input" accept="image/*" multiple style="display:none" onchange="uploadSSRegister(event)">
+    </div>
+    <div id="ai-ss" style="display:none;align-items:center;gap:8px;padding:8px 12px;background:rgba(99,102,241,.1);border-radius:4px;margin-bottom:12px;font-size:13px;color:#6366f1"><span style="display:inline-block;width:14px;height:14px;border:2px solid rgba(99,102,241,.3);border-top-color:#6366f1;border-radius:50%;animation:spin .6s linear infinite"></span> Reading...</div>
+
+    <div id="ss-manual" style="display:none;background:var(--paper2);border-radius:6px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);display:block;margin-bottom:4px">L mm</label><input type="number" id="ss-ml" style="width:80px;padding:7px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);font-family:var(--mono);font-size:13px" placeholder="3000"></div>
+        <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);display:block;margin-bottom:4px">W mm</label><input type="number" id="ss-mw" style="width:75px;padding:7px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);font-family:var(--mono);font-size:13px" placeholder="280"></div>
+        <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);display:block;margin-bottom:4px">T mm</label><input type="number" id="ss-mt" style="width:70px;padding:7px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);font-family:var(--mono);font-size:13px" placeholder="50"></div>
+        <div><label style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);display:block;margin-bottom:4px">Date Received</label><input type="date" id="ss-mdate" style="padding:7px;border:1px solid var(--rule);border-radius:4px;background:var(--paper);font-size:13px"></div>
+        <button class="btn btn-p btn-sm" onclick="addSSManualRow()">Add Slab</button>
+      </div>
+    </div>
+
+    <div id="ss-staged-wrap" style="display:none;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:600;color:var(--ink2)">Staged (not yet saved)</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="mono" id="ss-staged-count" style="font-size:12px;color:var(--ink3)"></span>
+          <button class="btn btn-p btn-sm" onclick="saveSSSlabs()" id="ss-save-btn">💾 Save to Batch</button>
+        </div>
+      </div>
+      <div style="max-height:200px;overflow-y:auto;border:1px solid var(--rule);border-radius:4px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:var(--paper2)">
+            <th style="padding:6px 10px;text-align:left;color:var(--ink3)">L mm</th>
+            <th style="padding:6px 10px;text-align:left;color:var(--ink3)">W mm</th>
+            <th style="padding:6px 10px;text-align:left;color:var(--ink3)">T mm</th>
+            <th style="padding:6px 10px;text-align:left;color:var(--ink3)">CFT</th>
+            <th style="width:28px"></th>
+          </tr></thead>
+          <tbody id="ss-staged-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="ss-existing-wrap">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:600;color:var(--ink2)">In Stock for this Batch</span>
+        <span class="mono" id="ss-existing-count" style="font-size:12px;color:var(--ink3)"></span>
+      </div>
+      <div id="ss-existing-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--rule);border-radius:4px">
+        <div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
     <div id="edit-panel" style="display:none;position:fixed;top:54px;right:0;bottom:0;width:380px;background:white;border-left:1px solid var(--rule);box-shadow:-4px 0 20px rgba(28,26,22,.12);z-index:50;overflow-y:auto">
       <div style="padding:20px;border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:white">
         <div>
@@ -777,7 +932,7 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
           </select>
         </div>
         <div style="background:var(--paper);border:1px solid var(--rule);border-radius:3px;padding:12px;margin-bottom:20px">
-          <div class="fsb" style="margin-bottom:6px"><span style="font-size:12px;color:var(--ink3)">CBM</span><span class="mono" id="ep-cbm" style="font-size:13px">—</span></div>
+          <div class="fsb" style="margin-bottom:6px"><span style="font-size:12px;color:var(--ink3)">CFT</span><span class="mono" id="ep-cbm" style="font-size:13px">—</span></div>
           <div class="fsb"><span style="font-size:12px;color:var(--ink3)">Cost ₹</span><span class="mono" id="ep-cost" style="font-size:13px;color:var(--wood);font-weight:600">—</span></div>
         </div>
         <div style="display:flex;gap:8px">
@@ -805,22 +960,30 @@ function closeConfirm(){
 }
 
 // ── CONFIG ──────────────────────────────────────────────
-let CFG={url:'',key:''};
+let CFG={url:'',key:'',swUrl:''};
 let ST={role:'',batches:[],clients:[]};
 
 function loadCfg(){
   CFG.url=localStorage.getItem('st_url')||'https://script.google.com/macros/s/AKfycbzFMpD4hAMGJnP3hxRpZUPnE4iHdq6KoWWbYkSCDXb9EzQVuBGrfnjUR_lEQyeL4P25aA/exec';
   CFG.key=localStorage.getItem('st_key')||'';
+  CFG.swUrl=localStorage.getItem('sw_url')||'';
 }
 function saveCfg(){
   CFG.url=document.getElementById('cfg-url').value.trim();
   CFG.key=document.getElementById('cfg-key').value.trim();
+  CFG.swUrl=document.getElementById('cfg-swurl').value.trim();
   if(!CFG.url){toast('Please enter Apps Script URL','err');return;}
   localStorage.setItem('st_url',CFG.url);
   localStorage.setItem('st_key',CFG.key);
+  localStorage.setItem('sw_url',CFG.swUrl);
   closeCfg(); toast('Settings saved ✓','ok');
 }
-function showCfg(){document.getElementById('cfg-url').value=CFG.url;document.getElementById('cfg-key').value=CFG.key;document.getElementById('cfg').classList.add('show')}
+function showCfg(){
+  document.getElementById('cfg-url').value=CFG.url;
+  document.getElementById('cfg-key').value=CFG.key;
+  document.getElementById('cfg-swurl').value=CFG.swUrl||'';
+  document.getElementById('cfg').classList.add('show');
+}
 function closeCfg(){document.getElementById('cfg').classList.remove('show')}
 
 // ── LOGIN ────────────────────────────────────────────────
@@ -879,7 +1042,13 @@ function goTo(s){
   if(nb) nb.classList.add('active');
   if(s==='dash') loadDash();
   if(s==='inv') loadInv();
-  if(s==='store') loadBatches().then(refreshRowBatchDropdowns);
+  if(s==='store'){
+    loadBatches().then(()=>{
+      refreshRowBatchDropdowns();
+      // Default to manual mode, initialise both panels
+      setIssueMode('manual');
+    });
+  }
   if(s==='log') loadLog();
 }
 
@@ -890,6 +1059,9 @@ async function apiGet(p){
   const r=await fetch(CFG.url+'?'+qs);
   return r.json();
 }
+
+function toCFT(cbm){ return parseFloat((parseFloat(cbm||0)*35.3147).toFixed(3)); }
+function fmtCFT(cbm){ return toCFT(cbm).toFixed(3)+' CFT'; }
 async function apiPost(d){
   if(!CFG.url) throw new Error('No URL configured');
   const r=await fetch(CFG.url,{method:'POST',body:JSON.stringify(d)});
@@ -1045,13 +1217,13 @@ function cr(id){
   const w=parseFloat(document.getElementById(id+'w').value)||0;
   const t=parseFloat(document.getElementById(id+'t').value)||0;
   const cbm=(l*w*t)/1e9;
-  // Use per-row batch dropdown
+  const cft=cbm*35.3147;
   const batchEl=document.getElementById(id+'b');
   const inv=batchEl?batchEl.value:'';
   const b=ST.batches.find(x=>x.invoiceNo===inv);
   const rate=b?parseFloat(b.rateCBM):0;
   const cost=cbm*rate;
-  document.getElementById(id+'cbm').textContent=cbm>0?cbm.toFixed(5):'—';
+  document.getElementById(id+'cbm').textContent=cft>0?cft.toFixed(4):'—';
   document.getElementById(id+'cost').textContent=(cost>0&&rate>0)?'₹'+Math.round(cost).toLocaleString('en-IN'):'—';
 }
 function delRow(id){const r=document.getElementById('row'+id);if(r)r.remove();}
@@ -1090,11 +1262,12 @@ async function saveIssuances(){
 
 // ── INVOICE TABS ─────────────────────────────────────────
 function switchTab(t){
-  ['pur','cli','bat'].forEach(x=>{
+  ['pur','cli','bat','sw'].forEach(x=>{
     document.getElementById('panel-'+x).style.display=x===t?'block':'none';
     document.getElementById('tab-'+x).classList.toggle('active',x===t);
   });
   if(t==='bat') loadBatTable();
+  if(t==='sw') loadSWDispatches();
 }
 
 // ── FILE UPLOAD + AI ─────────────────────────────────────
@@ -1436,6 +1609,12 @@ async function loadBatTable(){
       const woodDisplay=isCN
         ? `<span style="color:var(--red)">−₹${Math.abs(woodVal).toLocaleString('en-IN')}</span>`
         : `<span style="${woodStyle}">₹${Math.abs(woodVal).toLocaleString('en-IN')}</span>`;
+      const cftDisplay = isCN
+        ? `<span style="color:var(--red)">${parseFloat(b.totalCFT||0).toFixed(3)}</span>`
+        : parseFloat(b.totalCFT||toCFT(b.totalCBM)).toFixed(3);
+      const rateCFT = b.rateCBM ? Math.round(parseFloat(b.rateCBM)/35.3147) : 0;
+      const issuedCFT   = parseFloat(b.issuedCFT||toCFT(b.issuedCBM||0)).toFixed(3);
+      const remainCFT   = parseFloat(b.remainingCFT||toCFT(b.remainingCBM||0));
       return `<tr style="${rowStyle}">
         <td class="mono">${invoiceDisplay}</td>
         <td style="font-size:12px;color:var(--ink3)">${b.date}</td>
@@ -1443,13 +1622,14 @@ async function loadBatTable(){
         <td>${b.species}</td>
         <td class="mono">${b.slabCount||'—'}</td>
         <td class="mono">${b.thicknessMM||'—'}</td>
-        <td class="mono">${cbmDisplay}</td>
+        <td class="mono">${cftDisplay}</td>
         <td class="mono">${woodDisplay}</td>
-        <td class="mono">₹${parseInt(b.rateCBM).toLocaleString('en-IN')}</td>
-        <td class="mono">${parseFloat(b.issuedCBM||0).toFixed(4)}</td>
-        <td class="mono" style="${rem<0?'color:var(--red)':''}">${rem.toFixed(4)}</td>
+        <td class="mono">₹${rateCFT.toLocaleString('en-IN')}</td>
+        <td class="mono">${issuedCFT}</td>
+        <td class="mono" style="${remainCFT<0?'color:var(--red)':''}">${remainCFT.toFixed(3)}</td>
         <td style="font-size:11px;color:var(--ink3)">${b.notes||'—'}</td>
         <td>${st}</td>
+        <td><button class="btn btn-s" style="font-size:11px;padding:4px 8px;white-space:nowrap" onclick="openSlabStockModal('${b.invoiceNo}','${b.species}')">📋 Stock</button></td>
       </tr>`;
     }).join('');
   }catch(e){document.getElementById('bat-tbody').innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--ink3);padding:24px">Error loading</td></tr>';}
@@ -1470,7 +1650,7 @@ async function loadDash(){
     const d=r.dashboard||{};
     document.getElementById('k-inv').textContent=d.inventoryValue?'₹'+parseInt(d.inventoryValue).toLocaleString('en-IN'):'—';
     document.getElementById('k-inv-s').textContent=(d.activeBatches||0)+' active batch(es)';
-    document.getElementById('k-cbm').textContent=d.inventoryCBM?parseFloat(d.inventoryCBM).toFixed(3)+' CBM':'—';
+    document.getElementById('k-cbm').textContent=d.inventoryCBM?toCFT(d.inventoryCBM).toFixed(2)+' CFT':'—';
     document.getElementById('k-cbm-s').textContent=(d.totalBatches||0)+' total batch(es)';
     const conv=parseFloat(d.conversionRatio||0);
     document.getElementById('k-conv').textContent=conv>0?conv.toFixed(1)+'x':'—';
@@ -2062,9 +2242,9 @@ function renderLogTable(){
   document.getElementById('log-next').disabled=(logCurrentPage+1)*LOG_PAGE_SIZE>=logFiltered.length;
 
   const summary=document.getElementById('log-summary');
-  const totalCBM=logFiltered.reduce((s,r)=>s+(parseFloat(r.cbm)||0),0);
+  const totalCFT=logFiltered.reduce((s,r)=>s+(parseFloat(r.cbm)||0),0)*35.3147;
   const totalCost=logFiltered.reduce((s,r)=>s+(parseFloat(r.cost)||0),0);
-  summary.textContent=`Total: ${totalCBM.toFixed(4)} CBM · ₹${Math.round(totalCost).toLocaleString('en-IN')} cost`;
+  summary.textContent=`Total: ${totalCFT.toFixed(3)} CFT · ₹${Math.round(totalCost).toLocaleString('en-IN')} cost`;
 
   if(!page.length){
     document.getElementById('log-tbody').innerHTML='<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--ink3)">No results</td></tr>';
@@ -2080,7 +2260,7 @@ function renderLogTable(){
       <td style="color:var(--amber);font-size:12px;text-align:center">${warn}</td>
       <td class="mono" style="font-size:12px">${r.date||'—'}</td>
       <td class="mono" style="font-size:12px">${r.lengthMM||'?'}×${r.widthMM||'?'}×${r.thickMM||'?'}</td>
-      <td class="mono" style="font-size:12px">${parseFloat(r.cbm||0).toFixed(5)}</td>
+      <td class="mono" style="font-size:12px">${toCFT(r.cbm||0).toFixed(4)}</td>
       <td class="mono" style="font-size:12px;color:var(--wood)">${r.cost>0?'₹'+Math.round(r.cost).toLocaleString('en-IN'):'—'}</td>
       <td style="font-size:13px">${r.client||'<span style="color:var(--amber)">—</span>'}</td>
       <td style="font-size:13px">${r.species||'<span style="color:var(--amber)">—</span>'}</td>
@@ -2121,10 +2301,11 @@ function calcEpCost(){
   const w=parseFloat(document.getElementById('ep-w').value)||0;
   const t=parseFloat(document.getElementById('ep-t').value)||0;
   const cbm=(l*w*t)/1e9;
+  const cft=cbm*35.3147;
   const inv=document.getElementById('ep-batch').value;
   const b=ST.batches.find(x=>x.invoiceNo===inv);
   const cost=b?cbm*parseFloat(b.rateCBM):0;
-  document.getElementById('ep-cbm').textContent=cbm>0?cbm.toFixed(5):'—';
+  document.getElementById('ep-cbm').textContent=cft>0?cft.toFixed(4):'—';
   document.getElementById('ep-cost').textContent=cost>0?'₹'+Math.round(cost).toLocaleString('en-IN'):'—';
 }
 
@@ -2322,7 +2503,450 @@ async function loadInv(){
   }catch(e){console.error('Inventory',e);}
 }
 
-// ── TOAST ────────────────────────────────────────────────
+// ── SANGWARI IMPORT ──────────────────────────────────────
+async function loadSWDispatches(){
+  const el=document.getElementById('sw-pending');
+  if(!CFG.swUrl){
+    el.innerHTML=`<div style="text-align:center;padding:32px;color:var(--ink3)">
+      Sangwari API URL not set — go to ⚙ Settings and add the Sangwari Apps Script URL
+    </div>`;
+    return;
+  }
+  el.innerHTML='<div style="text-align:center;padding:24px;color:var(--ink3)">Loading from Sangwari…</div>';
+  try{
+    const r=await fetch(CFG.swUrl+'?action=getSWDispatches');
+    const data=await r.json();
+    const dispatches=data.dispatches||[];
+
+    // Get already-imported bill numbers from existing batches
+    const existingInvoices=new Set(ST.batches.map(b=>b.invoiceNo));
+    const pending=dispatches.filter(d=>!existingInvoices.has(d.billNo));
+    const imported=dispatches.filter(d=>existingInvoices.has(d.billNo));
+
+    if(!dispatches.length){
+      el.innerHTML='<div style="text-align:center;padding:32px;color:var(--ink3)">No dispatches in Sangwari yet</div>';
+      return;
+    }
+
+    el.innerHTML=`
+      ${pending.length?`
+        <div style="margin-bottom:8px;padding:10px 16px;background:#e8f5ee;border-radius:3px;font-size:13px;color:var(--green)">
+          ${pending.length} pending dispatch(es) not yet imported into SlabTrack
+        </div>
+        ${pending.map(d=>`
+          <div style="border:1px solid var(--rule);border-radius:4px;margin-bottom:12px;overflow:hidden">
+            <div style="padding:14px 16px;background:var(--paper);display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <div style="font-family:var(--mono);font-size:14px;color:var(--wood);font-weight:600">${d.billNo}</div>
+                <div style="font-size:12px;color:var(--ink3);margin-top:3px">${d.date} · ${d.invoiceNo} · <strong>${d.species}</strong></div>
+                <div style="font-size:12px;color:var(--ink3);margin-top:2px">${d.slabCount} slabs · ${parseFloat(d.totalCFT).toFixed(3)} CFT · ₹${parseInt(d.totalValue).toLocaleString('en-IN')}</div>
+              </div>
+              <button class="btn btn-p btn-sm" onclick='importSWDispatch(${JSON.stringify(d)})'>Import →</button>
+            </div>
+            <div style="overflow-x:auto;border-top:1px solid var(--rule)">
+              <table class="tbl" style="font-size:12px">
+                <thead><tr><th>L mm</th><th>W mm</th><th>T mm</th><th>CFT</th><th>Cost ₹</th></tr></thead>
+                <tbody>
+                  ${(d.slabs||[]).map(s=>`<tr>
+                    <td class="mono">${s.lengthMM}</td><td class="mono">${s.widthMM}</td>
+                    <td class="mono">${s.thickMM}</td>
+                    <td class="mono" style="color:var(--wood)">${parseFloat(s.cft||0).toFixed(4)}</td>
+                    <td class="mono">₹${Math.round(s.cost||0).toLocaleString('en-IN')}</td>
+                  </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>`).join('')}
+      `:''}
+      ${imported.length?`
+        <div style="margin-top:${pending.length?'20px':'0'};padding:10px 16px;background:var(--paper2);border-radius:3px;font-size:12px;color:var(--ink3);margin-bottom:10px">
+          Already imported (${imported.length})
+        </div>
+        ${imported.map(d=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--paper2);opacity:.6">
+            <div>
+              <span class="mono" style="font-size:13px">${d.billNo}</span>
+              <span style="font-size:12px;color:var(--ink3);margin-left:10px">${d.date} · ${d.slabCount} slabs · ${parseFloat(d.totalCFT).toFixed(2)} CFT</span>
+            </div>
+            <span class="badge bg">Imported ✓</span>
+          </div>`).join('')}
+      `:''}`;
+  }catch(e){
+    el.innerHTML=`<div style="text-align:center;padding:32px;color:var(--red)">Error loading from Sangwari: ${e.message}</div>`;
+  }
+}
+
+async function importSWDispatch(dispatch){
+  // 1. Auto-create the Xpertpack purchase batch
+  // Rate = totalValue / totalCFT (already includes ₹300 markup)
+  const totalCFT = parseFloat(dispatch.totalCFT) || 0;
+  const totalValue = parseFloat(dispatch.totalValue) || 0;
+  const rateCFT = totalCFT > 0 ? Math.round(totalValue / totalCFT) : 0;
+  const totalCBM = totalCFT / 35.3147;
+
+  const batchData = {
+    invoiceNo:    dispatch.billNo,
+    date:         dispatch.date,
+    vendor:       'Xpertpack Transport Packaging',
+    species:      dispatch.species,
+    totalCBM:     parseFloat(totalCBM.toFixed(4)),
+    totalCFT:     parseFloat(totalCFT.toFixed(3)),
+    slabCount:    dispatch.slabCount,
+    thicknessMM:  dispatch.slabs?.[0]?.thickMM || 0,
+    taxableValue: Math.round(totalValue),
+    woodValue:    Math.round(totalValue),
+    rateCBM:      Math.round(rateCFT * 35.3147),
+    rateCFT:      rateCFT,
+    notes:        'Imported from Sangwari · Ref: ' + dispatch.invoiceNo
+  };
+
+  try{
+    const r=await apiPost({action:'savePurchaseBatch',data:batchData});
+    if(r.success||r.duplicate){
+      if(r.duplicate){
+        toast(dispatch.billNo+' batch already exists — pre-filling slabs only','');
+      } else {
+        toast('Batch '+dispatch.billNo+' created ✓','ok');
+      }
+      // 2. Pre-fill Issue Slabs with slab dimensions
+      await loadBatches();
+      goTo('store');
+      setMode('manual');
+      document.getElementById('slab-tbody').innerHTML='';
+
+      const batchInv=dispatch.billNo;
+      (dispatch.slabs||[]).forEach(slab=>{
+        const id=++rid;
+        const copts=(ST.clients||[]).map(c=>`<option>${c}</option>`).join('');
+        const speciesOpts=['White Oak','White Ash','Rosewood','Uttarakhand Teak','CP Teak','Siris','Agar','Eucalyptus','Cedar']
+          .map(s=>`<option ${s===dispatch.species?'selected':''}>${s}</option>`).join('');
+        const tr=document.createElement('tr');
+        tr.id='row'+id;
+        tr.innerHTML=`
+          <td><input type="date" value="${dispatch.date}" id="${id}d" style="width:108px"></td>
+          <td><input type="number" value="${slab.lengthMM}" id="${id}l" oninput="cr(${id})" style="width:82px"></td>
+          <td><input type="number" value="${slab.widthMM}" id="${id}w" oninput="cr(${id})" style="width:72px"></td>
+          <td><input type="number" value="${slab.thickMM}" id="${id}t" oninput="cr(${id})" style="width:72px"></td>
+          <td class="cc" id="${id}cbm">—</td>
+          <td class="costc" id="${id}cost">—</td>
+          <td><select id="${id}sp" style="width:96px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px"><option value="">—</option>${speciesOpts}</select></td>
+          <td><input type="text" placeholder="Client" id="${id}c" list="clist" style="width:126px"><datalist id="clist">${copts}</datalist></td>
+          <td><select id="${id}cat" style="width:156px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;color:var(--ink3)">${catOpts('')}</select></td>
+          <td><input type="text" placeholder="Carpenter" id="${id}carp" style="width:106px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px"></td>
+          <td><select id="${id}b" onchange="onRowBatchChange(${id})" style="width:186px;background:var(--paper);border:1px solid var(--rule);padding:6px 8px;border-radius:3px;font-family:var(--sans);font-size:12px;color:var(--ink3)">${batchOpts(batchInv)}</select></td>
+          <td><button class="del-btn" onclick="delRow(${id})">✕</button></td>`;
+        document.getElementById('slab-tbody').appendChild(tr);
+        cr(id);
+      });
+
+      toast(`${dispatch.slabs?.length||0} slabs pre-filled in Issue Slabs ✓ — assign clients & save`,'ok');
+    } else {
+      toast('Error creating batch: '+(r.error||'Unknown'),'err');
+    }
+  }catch(e){ toast('Import failed: '+e.message,'err'); }
+}
+
+// ── ISSUE FROM STOCK ─────────────────────────────────────
+let issueMode = 'manual'; // 'stock' or 'manual'
+let stockSlabsAvailable = []; // loaded slabs for current batch
+let selectedStockSlabs = new Set();
+
+function setIssueMode(mode) {
+  issueMode = mode;
+  document.getElementById('issue-stock-panel').style.display = mode === 'stock' ? 'block' : 'none';
+  document.getElementById('issue-manual-panel').style.display = mode === 'manual' ? 'block' : 'none';
+  document.getElementById('issue-mode-stock').className = 'btn btn-sm ' + (mode === 'stock' ? 'btn-p' : 'btn-s');
+  document.getElementById('issue-mode-manual').className = 'btn btn-sm ' + (mode === 'manual' ? 'btn-p' : 'btn-s');
+  document.getElementById('save-btn').style.display = mode === 'manual' ? 'inline-flex' : 'none';
+  if (mode === 'stock') populateStockBatchDrop();
+}
+
+function saveIssuancesActive() {
+  if (issueMode === 'manual') saveIssuances();
+}
+
+function populateStockBatchDrop() {
+  const sel = document.getElementById('stock-batch-sel');
+  // Show all batches — highlight ones with stock
+  const opts = ST.batches.filter(b => !b.isCreditNote && parseFloat(b.remainingCFT || 0) > 0)
+    .map(b => '<option value="' + b.invoiceNo + '">' + b.invoiceNo + ' · ' + b.species + ' · ' + parseFloat(b.remainingCFT||0).toFixed(2) + ' CFT</option>')
+    .join('');
+  sel.innerHTML = '<option value="">— Select batch —</option>' + opts;
+  // Populate client datalist
+  if (ST.clients) {
+    document.getElementById('clist-stock').innerHTML = ST.clients.map(c => '<option>' + c + '</option>').join('');
+  }
+  document.getElementById('stock-date').value = new Date().toISOString().slice(0, 10);
+}
+
+async function loadStockForIssue() {
+  const batchId = document.getElementById('stock-batch-sel').value;
+  if (!batchId) { document.getElementById('stock-slab-card').style.display = 'none'; return; }
+
+  const infoEl = document.getElementById('stock-batch-info');
+  const card = document.getElementById('stock-slab-card');
+  selectedStockSlabs.clear();
+  updateStockSelCount();
+
+  // Check if stock exists
+  try {
+    const r = await apiGet({ action: 'getSlabStock', batchId });
+    const slabs = r.slabs || [];
+    stockSlabsAvailable = slabs.filter(s => s.status === 'Available');
+    const batch = ST.batches.find(b => b.invoiceNo === batchId);
+
+    infoEl.style.display = 'block';
+    if (!stockSlabsAvailable.length) {
+      infoEl.innerHTML = '<span style="color:var(--ink3)">No slab-level stock loaded for this batch — use Manual Entry or upload stock via All Batches → 📋 Stock</span>';
+      card.style.display = 'none';
+      return;
+    }
+
+    const totalAvailCFT = stockSlabsAvailable.reduce((s, x) => s + x.cft, 0);
+    infoEl.innerHTML = '<span style="color:#4a9a2a;font-weight:600">' + stockSlabsAvailable.length + ' slabs available · ' + totalAvailCFT.toFixed(3) + ' CFT</span>' +
+      (batch ? ' <span style="color:var(--ink3)">· ₹' + Math.round(parseFloat(batch.rateCBM || 0)).toLocaleString('en-IN') + '/CBM · ' + batch.species + '</span>' : '');
+
+    card.style.display = 'block';
+    document.getElementById('stock-slab-title').textContent = 'Available Slabs — ' + batchId;
+    renderStockSlabs();
+  } catch(e) {
+    infoEl.style.display = 'block';
+    infoEl.innerHTML = '<span style="color:var(--red)">Error loading stock</span>';
+    card.style.display = 'none';
+  }
+}
+
+function renderStockSlabs() {
+  const el = document.getElementById('stock-slab-list');
+  if (!stockSlabsAvailable.length) {
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3)">No slabs available</div>';
+    return;
+  }
+  el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+    '<thead><tr style="background:var(--paper2);position:sticky;top:0">' +
+    '<th style="width:32px;padding:8px 10px"></th>' +
+    '<th style="padding:8px 10px;text-align:left;color:var(--ink3);font-size:11px;text-transform:uppercase;letter-spacing:1px">L mm</th>' +
+    '<th style="padding:8px 10px;text-align:left;color:var(--ink3);font-size:11px;text-transform:uppercase;letter-spacing:1px">W mm</th>' +
+    '<th style="padding:8px 10px;text-align:left;color:var(--ink3);font-size:11px;text-transform:uppercase;letter-spacing:1px">T mm</th>' +
+    '<th style="padding:8px 10px;text-align:left;color:var(--ink3);font-size:11px;text-transform:uppercase;letter-spacing:1px">CFT</th>' +
+    '<th style="padding:8px 10px;text-align:left;color:var(--ink3);font-size:11px;text-transform:uppercase;letter-spacing:1px">Slab ID</th>' +
+    '</tr></thead><tbody>' +
+    stockSlabsAvailable.map(s => {
+      const checked = selectedStockSlabs.has(s.slabId);
+      return '<tr style="border-bottom:1px solid var(--rule);cursor:pointer;background:' + (checked ? '#f0f8e8' : 'white') + '" onclick="toggleStockSlab(\'' + s.slabId + '\')">' +
+        '<td style="padding:8px 10px;text-align:center"><input type="checkbox" ' + (checked ? 'checked' : '') + ' onclick="toggleStockSlab(\'' + s.slabId + '\');event.stopPropagation()" style="cursor:pointer;width:16px;height:16px"></td>' +
+        '<td style="padding:8px 10px;font-family:var(--mono)">' + s.lengthMM + '</td>' +
+        '<td style="padding:8px 10px;font-family:var(--mono)">' + s.widthMM + '</td>' +
+        '<td style="padding:8px 10px;font-family:var(--mono)">' + s.thickMM + '</td>' +
+        '<td style="padding:8px 10px;font-family:var(--mono);color:var(--wood);font-weight:600">' + s.cft.toFixed(3) + '</td>' +
+        '<td style="padding:8px 10px;font-family:var(--mono);font-size:11px;color:var(--ink3)">' + s.slabId + '</td>' +
+        '</tr>';
+    }).join('') + '</tbody></table>';
+  updateStockSelCount();
+}
+
+function toggleStockSlab(slabId) {
+  if (selectedStockSlabs.has(slabId)) selectedStockSlabs.delete(slabId);
+  else selectedStockSlabs.add(slabId);
+  renderStockSlabs();
+}
+
+function selectAllStockSlabs() {
+  if (selectedStockSlabs.size === stockSlabsAvailable.length) {
+    selectedStockSlabs.clear();
+  } else {
+    stockSlabsAvailable.forEach(s => selectedStockSlabs.add(s.slabId));
+  }
+  renderStockSlabs();
+}
+
+function updateStockSelCount() {
+  const sel = selectedStockSlabs.size;
+  const totalCFT = stockSlabsAvailable.filter(s => selectedStockSlabs.has(s.slabId)).reduce((sum, s) => sum + s.cft, 0);
+  document.getElementById('stock-sel-count').textContent = sel > 0 ? sel + ' selected · ' + totalCFT.toFixed(3) + ' CFT' : '0 selected';
+  const sumEl = document.getElementById('stock-issue-summary');
+  if (sel > 0) {
+    sumEl.style.display = 'block';
+    document.getElementById('stock-summary-text').innerHTML =
+      '<strong>' + sel + ' slabs</strong> · <strong>' + totalCFT.toFixed(3) + ' CFT</strong> will be issued';
+  } else { sumEl.style.display = 'none'; }
+}
+
+async function issueFromStock() {
+  const client = document.getElementById('stock-client').value.trim();
+  const category = document.getElementById('stock-category').value;
+  const carpenter = document.getElementById('stock-carpenter').value.trim();
+  const date = document.getElementById('stock-date').value;
+  const invoiceNo = document.getElementById('stock-batch-sel').value;
+
+  if (!selectedStockSlabs.size) { toast('Select at least one slab', 'err'); return; }
+  if (!client) { toast('Enter client name', 'err'); return; }
+  if (!category) { toast('Select category', 'err'); return; }
+
+  const btn = document.getElementById('issue-stock-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  try {
+    const r = await apiPost({ action: 'issueSlabsFromStock', data: {
+      slabIds: [...selectedStockSlabs],
+      date, client, category, carpenter, invoiceNo
+    }});
+    if (r.success) {
+      toast(r.issued + ' slabs issued to ' + client + ' ✓', 'ok');
+      selectedStockSlabs.clear();
+      await loadBatches();
+      await loadStockForIssue(); // refresh available slabs
+      // Clear form
+      document.getElementById('stock-client').value = '';
+      document.getElementById('stock-category').value = '';
+      document.getElementById('stock-carpenter').value = '';
+    } else toast('Error: ' + (r.error || 'Failed'), 'err');
+  } catch(e) { toast('Network error', 'err'); }
+  btn.disabled = false; btn.innerHTML = '💾 Issue Selected Slabs';
+}
+let SS = { batchId: '', species: '', staged: [] };
+
+async function openSlabStockModal(batchId, species) {
+  SS.batchId = batchId; SS.species = species; SS.staged = [];
+  document.getElementById('ss-title').textContent = 'Slab Stock — ' + batchId;
+  document.getElementById('ss-sub').textContent = species + ' · Add received slabs to track individual pieces';
+  document.getElementById('ss-modal').style.display = 'flex';
+  document.getElementById('ss-manual').style.display = 'none';
+  document.getElementById('ss-staged-wrap').style.display = 'none';
+  document.getElementById('ss-mdate').value = new Date().toISOString().slice(0,10);
+  renderSSStaged();
+  await loadSSExisting();
+}
+function closeSSModal() { document.getElementById('ss-modal').style.display = 'none'; }
+function showSSManualEntry() { const m=document.getElementById('ss-manual'); m.style.display=m.style.display==='none'?'block':'none'; }
+
+function addSSManualRow() {
+  const l=parseFloat(document.getElementById('ss-ml').value)||0;
+  const w=parseFloat(document.getElementById('ss-mw').value)||0;
+  const t=parseFloat(document.getElementById('ss-mt').value)||0;
+  if(!l||!w||!t){toast('Enter L, W and T','err');return;}
+  SS.staged.push({lengthMM:l,widthMM:w,thickMM:t,cft:(l*w*t)/1e9*35.3147});
+  document.getElementById('ss-ml').value=''; document.getElementById('ss-mw').value='';
+  renderSSStaged();
+}
+
+function renderSSStaged() {
+  const wrap=document.getElementById('ss-staged-wrap');
+  if(!SS.staged.length){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  const totalCFT=SS.staged.reduce((s,r)=>s+r.cft,0);
+  document.getElementById('ss-staged-count').textContent=SS.staged.length+' slabs · '+totalCFT.toFixed(3)+' CFT';
+  document.getElementById('ss-staged-tbody').innerHTML=SS.staged.map((r,i)=>
+    '<tr style="border-bottom:1px solid var(--rule)">' +
+    '<td style="padding:6px 10px;font-family:var(--mono);font-size:12px">'+r.lengthMM+'</td>' +
+    '<td style="padding:6px 10px;font-family:var(--mono);font-size:12px">'+r.widthMM+'</td>' +
+    '<td style="padding:6px 10px;font-family:var(--mono);font-size:12px">'+r.thickMM+'</td>' +
+    '<td style="padding:6px 10px;font-family:var(--mono);font-size:12px;color:var(--wood)">'+r.cft.toFixed(3)+'</td>' +
+    '<td style="padding:4px"><button onclick="SS.staged.splice('+i+',1);renderSSStaged()" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:14px">✕</button></td>' +
+    '</tr>'
+  ).join('');
+}
+
+async function loadSSExisting() {
+  const el=document.getElementById('ss-existing-list');
+  el.innerHTML='<div style="padding:16px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div>';
+  try {
+    const r=await apiGet({action:'getSlabStock',batchId:SS.batchId});
+    const slabs=r.slabs||[];
+    const avail=slabs.filter(s=>s.status==='Available');
+    const issued=slabs.filter(s=>s.status==='Issued');
+    const totalCFT=avail.reduce((s,x)=>s+x.cft,0);
+    document.getElementById('ss-existing-count').textContent=
+      avail.length+' available · '+totalCFT.toFixed(3)+' CFT'+(issued.length?' · '+issued.length+' issued':'');
+    if(!slabs.length){
+      el.innerHTML='<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No slabs loaded yet — upload Excel, register photo or add manually above</div>';
+      return;
+    }
+    const rows=slabs.map(s=>
+      '<tr style="border-bottom:1px solid var(--rule);'+(s.status==='Issued'?'opacity:.5':'')+'">' +
+      '<td style="padding:6px 10px;font-family:var(--mono);font-size:11px;color:var(--ink3)">'+s.slabId+'</td>' +
+      '<td style="padding:6px 10px;font-family:var(--mono)">'+s.lengthMM+'</td>' +
+      '<td style="padding:6px 10px;font-family:var(--mono)">'+s.widthMM+'</td>' +
+      '<td style="padding:6px 10px;font-family:var(--mono)">'+s.thickMM+'</td>' +
+      '<td style="padding:6px 10px;font-family:var(--mono);color:var(--wood)">'+s.cft.toFixed(3)+'</td>' +
+      '<td style="padding:6px 10px"><span style="font-size:10px;padding:2px 6px;border-radius:3px;background:'+(s.status==='Available'?'rgba(74,154,58,.15)':'rgba(120,120,120,.15)')+';color:'+(s.status==='Available'?'#4a9a2a':'var(--ink3)')+'">'+s.status+'</span></td>' +
+      '</tr>'
+    ).join('');
+    el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+      '<thead><tr style="background:var(--paper2)">' +
+      '<th style="padding:6px 10px;text-align:left;color:var(--ink3)">Slab ID</th>' +
+      '<th style="padding:6px 10px;text-align:left;color:var(--ink3)">L mm</th>' +
+      '<th style="padding:6px 10px;text-align:left;color:var(--ink3)">W mm</th>' +
+      '<th style="padding:6px 10px;text-align:left;color:var(--ink3)">T mm</th>' +
+      '<th style="padding:6px 10px;text-align:left;color:var(--ink3)">CFT</th>' +
+      '<th style="padding:6px 10px;text-align:left;color:var(--ink3)">Status</th>' +
+      '</tr></thead><tbody>'+rows+'</tbody></table>';
+  } catch(e) { el.innerHTML='<div style="padding:16px;text-align:center;color:var(--red);font-size:13px">Error loading</div>'; }
+}
+
+async function uploadSSExcel(event) {
+  const file=event.target.files[0]; if(!file) return;
+  document.getElementById('ai-ss').style.display='flex';
+  try {
+    if(!window.XLSX) await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+    const data=await file.arrayBuffer();
+    const wb=XLSX.read(data);
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+    const header=(rows[0]||[]).map(h=>String(h||'').toLowerCase());
+    const lIdx=header.findIndex(h=>/length|^l$/.test(h));
+    const wIdx=header.findIndex(h=>/width|^w$/.test(h));
+    const tIdx=header.findIndex(h=>/height|thick|^h$|^t$/.test(h));
+    const cIdx=header.findIndex(h=>/cft/.test(h));
+    if(lIdx<0||wIdx<0||tIdx<0){toast('Could not find L/W/T columns in Excel','err');document.getElementById('ai-ss').style.display='none';return;}
+    const slabs=rows.slice(1).filter(r=>r[lIdx]&&r[wIdx]&&r[tIdx]).map(r=>{
+      const l=parseFloat(r[lIdx])||0,w=parseFloat(r[wIdx])||0,t=parseFloat(r[tIdx])||0;
+      return {lengthMM:l,widthMM:w,thickMM:t,cft:cIdx>=0&&r[cIdx]?parseFloat(r[cIdx]):l*w*t/1e9*35.3147};
+    });
+    SS.staged.push(...slabs);
+    document.getElementById('ai-ss').style.display='none';
+    renderSSStaged(); toast(slabs.length+' slabs read from Excel ✓','ok');
+  } catch(e) { document.getElementById('ai-ss').style.display='none'; toast('Excel read failed — try register photo','err'); }
+  document.getElementById('ss-xl-input').value='';
+}
+
+async function uploadSSRegister(event) {
+  const files=Array.from(event.target.files); if(!files.length) return;
+  if(!CFG.key){toast('Claude API key not set','err');return;}
+  document.getElementById('ai-ss').style.display='flex';
+  let total=0;
+  for(const file of files){
+    try {
+      const b64=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result.split(',')[1]);fr.onerror=rej;fr.readAsDataURL(file);});
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':CFG.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
+          {type:'text',text:'Read this slab register. Each row has L (length mm), W (width mm), T/H (thickness mm). Return ONLY JSON array: [{"lengthMM":3000,"widthMM":280,"thickMM":50},...]'}
+        ]}]})});
+      const d=await resp.json();
+      const txt=d.content?.[0]?.text||'[]';
+      let rows; try{rows=JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim());}catch(e){const lc=txt.lastIndexOf('}');rows=lc>0?JSON.parse(txt.substring(0,lc+1)+']'):[];}
+      rows.forEach(r=>{SS.staged.push({lengthMM:r.lengthMM,widthMM:r.widthMM,thickMM:r.thickMM,cft:(r.lengthMM*r.widthMM*r.thickMM)/1e9*35.3147});total++;});
+    }catch(e){toast('Failed reading one photo','err');}
+  }
+  document.getElementById('ai-ss').style.display='none';
+  renderSSStaged(); toast(total+' slabs read from '+files.length+' photo(s) ✓','ok');
+  document.getElementById('ss-img-input').value='';
+}
+
+async function saveSSSlabs() {
+  if(!SS.staged.length) return;
+  const btn=document.getElementById('ss-save-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+  const dateReceived=document.getElementById('ss-mdate').value||new Date().toISOString().slice(0,10);
+  try {
+    const r=await apiPost({action:'saveSlabStock',data:{batchId:SS.batchId,species:SS.species,dateReceived,slabs:SS.staged}});
+    if(r.success){toast(r.added+' slabs saved to stock ✓','ok');SS.staged=[];renderSSStaged();await loadSSExisting();}
+    else toast('Error: '+(r.error||'Failed'),'err');
+  }catch(e){toast('Network error','err');}
+  btn.disabled=false; btn.innerHTML='💾 Save to Batch';
+}
+
 function toast(msg,type=''){
   const el=document.createElement('div');
   el.className='toast'+(type?' '+type:'');
