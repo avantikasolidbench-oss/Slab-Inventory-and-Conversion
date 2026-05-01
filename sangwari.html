@@ -875,9 +875,9 @@ function goTo(s) {
 // ── LOAD ALL ──
 async function loadAll() {
   await loadBatches();
+  await loadDispatches();
   loadDash();
   loadSlabs();
-  loadDispatches();
 }
 
 // ── LOAD BATCHES ──
@@ -1741,96 +1741,250 @@ function calcDispatchTotals() {
   document.getElementById('d-total-val').textContent = totalVal > 0 ? '₹' + Math.round(totalVal).toLocaleString('en-IN') : '—';
 }
 
+// ── DISPATCH — multi-species register read ────────────────
+let disSpeciesGroups = {}; // { species: [ {lengthMM,widthMM,thickMM,cft} ] }
+
+function showDispatchModal() {
+  disSpeciesGroups = {};
+  disRowCount = 0;
+  document.getElementById('dis-modal').classList.add('show');
+  document.getElementById('d-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('d-billno').value = '';
+  document.getElementById('d-notes').value = '';
+  document.getElementById('dis-species-sections').innerHTML = '';
+  document.getElementById('dis-manual-wrap').style.display = 'none';
+  document.getElementById('dis-rows').innerHTML = '';
+  document.getElementById('ai-dis').classList.remove('show');
+}
+function closeDisModal() { document.getElementById('dis-modal').classList.remove('show'); }
+
 async function readDisSheet(event) {
   const files = Array.from(event.target.files);
   if (!files.length) return;
-  if (!CFG.key) { toast('Claude API key not set — enter rows manually', 'err'); return; }
+  if (!CFG.key) { toast('API key not set', 'err'); return; }
   document.getElementById('ai-dis').classList.add('show');
-  let totalRows = 0;
+
   for (const file of files) {
     try {
       const b64 = await toB64(file);
-      const prompt = `This is a handwritten slab dispatch register from a wood yard. Read every row.
-Each row has: Sr No, L (length mm), W (width mm), T/H (thickness mm).
-Read all numeric dimensions carefully. Return ONLY a JSON array:
-[{"lengthMM":3000,"widthMM":280,"thickMM":55},...]
-No other text.`;
+      const prompt = `This is a handwritten slab dispatch register from a wood yard. It may contain multiple wood species sections (e.g. "Rosewood", "CP Teak", "White Ash", "Agar", "Siris" etc) as column headers or section headings.
+
+Read ALL slabs grouped by species. For each row: L (length mm), W (width mm), T/H (thickness mm).
+
+Return ONLY JSON in this format:
+{"species_groups":[{"species":"Rosewood","slabs":[{"lengthMM":3000,"widthMM":280,"thickMM":50},...]},...]}
+
+If you cannot detect species, use "Unknown". Never mix species across groups.`;
+
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: [
+        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 6000, messages: [{ role: 'user', content: [
           { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64.split(',')[1] } },
           { type: 'text', text: prompt }
         ]}]})
       });
       const data = await resp.json();
-      const txt = data.content?.[0]?.text || '[]';
-      let rows;
-      try { rows = JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim()); }
-      catch(e) { const lc = txt.lastIndexOf('}'); rows = lc > 0 ? JSON.parse(txt.substring(0,lc+1)+']') : []; }
-      rows.forEach(r => {
-        const id = ++disRowCount;
-        const tr = document.createElement('tr');
-        tr.id = 'dr' + id;
-        tr.innerHTML = `
-          <td><input type="number" id="dr${id}l" value="${r.lengthMM||''}" placeholder="3000" oninput="calcDisRow(${id})" style="width:70px"></td>
-          <td><input type="number" id="dr${id}w" value="${r.widthMM||''}" placeholder="280" oninput="calcDisRow(${id})" style="width:65px"></td>
-          <td><input type="number" id="dr${id}t" value="${r.thickMM||''}" placeholder="55" oninput="calcDisRow(${id})" style="width:55px"></td>
-          <td class="mono" id="dr${id}cft" style="color:var(--wood);padding:8px">—</td>
-          <td class="mono" id="dr${id}cost" style="color:var(--ink3);padding:8px">—</td>
-          <td><button onclick="document.getElementById('dr${id}').remove();calcDispatchTotals()" style="background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer;padding:4px 8px">✕</button></td>`;
-        document.getElementById('dis-rows').appendChild(tr);
-        calcDisRow(id);
-        totalRows++;
+      const txt = data.content?.[0]?.text || '{}';
+      let parsed;
+      try { parsed = JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim()); }
+      catch(e) { parsed = {}; }
+
+      const groups = parsed.species_groups || [];
+      if (!groups.length) {
+        // Fallback — try plain array
+        try {
+          const arr = JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim());
+          if (Array.isArray(arr) && arr.length) {
+            groups.push({ species: 'Unknown', slabs: arr });
+          }
+        } catch(e2) {}
+      }
+
+      groups.forEach(g => {
+        const sp = g.species || 'Unknown';
+        if (!disSpeciesGroups[sp]) disSpeciesGroups[sp] = [];
+        (g.slabs || []).forEach(s => {
+          const cft = Math.round((s.lengthMM*s.widthMM*s.thickMM)/1e9*35.31466560103903*1000)/1000;
+          disSpeciesGroups[sp].push({ lengthMM: s.lengthMM, widthMM: s.widthMM, thickMM: s.thickMM, cft });
+        });
       });
-    } catch(e) { toast('Failed reading one photo — skipped', 'err'); }
+
+    } catch(e) { toast('Failed reading one photo', 'err'); }
   }
+
   document.getElementById('ai-dis').classList.remove('show');
-  toast(`${totalRows} rows read from ${files.length} photo(s) ✓`, 'ok');
+  renderDisSpeciesSections();
   document.getElementById('f-dis-sheet').value = '';
 }
+
+function renderDisSpeciesSections() {
+  const container = document.getElementById('dis-species-sections');
+  const species = Object.keys(disSpeciesGroups);
+  if (!species.length) { container.innerHTML = ''; return; }
+
+  container.innerHTML = species.map(sp => {
+    const slabs = disSpeciesGroups[sp];
+    const totalCFT = slabs.reduce((s,r) => s+r.cft, 0);
+    // Find matching batch
+    const matchBatch = ST.batches.find(b => b.species === sp && !b.isCreditNote);
+    const batchOpts = ST.batches.filter(b => !b.isCreditNote)
+      .map(b => '<option value="'+b.invoiceNo+'"'+(b.invoiceNo===matchBatch?.invoiceNo?' selected':'')+'>'+(b.batchName||b.invoiceNo)+' · '+b.species+'</option>')
+      .join('');
+
+    return '<div style="background:var(--bg3);border-radius:var(--r);padding:14px;margin-bottom:12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+        '<div>' +
+          '<span class="sp-tag" style="font-size:13px;font-weight:700">' + sp + '</span>' +
+          '<span style="font-size:12px;color:var(--ink3);margin-left:8px">' + slabs.length + ' slabs · ' + totalCFT.toFixed(3) + ' CFT</span>' +
+        '</div>' +
+        '<button onclick="removeDisSpecies(\''+sp+'\')" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:16px">✕</button>' +
+      '</div>' +
+      '<div class="field" style="margin-bottom:0">' +
+        '<label style="font-size:10px">Batch for ' + sp + '</label>' +
+        '<select id="dis-batch-'+sp.replace(/\s/g,'_')+'" style="background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;width:100%;font-size:13px">' +
+          '<option value="">— select batch —</option>' +
+          batchOpts +
+        '</select>' +
+        (!matchBatch ? '<div style="font-size:11px;color:var(--amber);margin-top:4px">⚠ No batch found for ' + sp + ' — select manually or save without batch</div>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('') +
+  '<div style="background:var(--bg3);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--ink3)">' +
+    'Total: <span class="mono" style="color:var(--wood);font-weight:600">' +
+    Object.values(disSpeciesGroups).flat().reduce((s,r)=>s+r.cft,0).toFixed(3) + ' CFT</span> · ' +
+    Object.values(disSpeciesGroups).flat().length + ' slabs across ' + species.length + ' species' +
+  '</div>';
+}
+
+function removeDisSpecies(sp) {
+  delete disSpeciesGroups[sp];
+  renderDisSpeciesSections();
+}
+
+function addDisRow() {
+  document.getElementById('dis-manual-wrap').style.display = 'block';
+  const id = ++disRowCount;
+  const tr = document.createElement('tr');
+  tr.id = 'dr' + id;
+  tr.innerHTML =
+    '<td><input type="number" id="dr'+id+'l" placeholder="3000" oninput="calcDisRow('+id+')" style="width:70px"></td>' +
+    '<td><input type="number" id="dr'+id+'w" placeholder="280" oninput="calcDisRow('+id+')" style="width:65px"></td>' +
+    '<td><input type="number" id="dr'+id+'t" placeholder="55" oninput="calcDisRow('+id+')" style="width:55px"></td>' +
+    '<td class="mono" id="dr'+id+'cft" style="color:var(--wood);padding:8px">—</td>' +
+    '<td class="mono" id="dr'+id+'cost" style="color:var(--ink3);padding:8px">—</td>' +
+    '<td><button onclick="document.getElementById(\'dr'+id+'\').remove();calcDispatchTotals()" style="background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer;padding:4px 8px">✕</button></td>';
+  document.getElementById('dis-rows').appendChild(tr);
+}
+
+function calcDisRow(id) {
+  const l=parseFloat(document.getElementById('dr'+id+'l')?.value)||0;
+  const w=parseFloat(document.getElementById('dr'+id+'w')?.value)||0;
+  const t=parseFloat(document.getElementById('dr'+id+'t')?.value)||0;
+  const cft=Math.round((l*w*t)/1e9*35.31466560103903*1000)/1000;
+  const inv=document.getElementById('d-batch')?.value||'';
+  const b=ST.batches.find(x=>x.invoiceNo===inv);
+  const billRate=(b?parseFloat(b.rateCFT||0):0)+CFG.markup;
+  const cftEl=document.getElementById('dr'+id+'cft');
+  const costEl=document.getElementById('dr'+id+'cost');
+  if(cftEl) cftEl.textContent=cft>0?cft.toFixed(3):'—';
+  if(costEl) costEl.textContent=cft>0?'₹'+Math.round(cft*billRate).toLocaleString('en-IN'):'—';
+  calcDispatchTotals();
+}
+
+function calcDispatchTotals() {
+  let totalCFT=0,totalVal=0,slabCount=0;
+  document.querySelectorAll('#dis-rows tr').forEach(tr=>{
+    const id=tr.id.replace('dr','');
+    const l=parseFloat(document.getElementById('dr'+id+'l')?.value)||0;
+    const w=parseFloat(document.getElementById('dr'+id+'w')?.value)||0;
+    const t=parseFloat(document.getElementById('dr'+id+'t')?.value)||0;
+    if(!l||!w||!t) return;
+    const cft=Math.round((l*w*t)/1e9*35.31466560103903*1000)/1000;
+    const inv=document.getElementById('d-batch')?.value||'';
+    const b=ST.batches.find(x=>x.invoiceNo===inv);
+    const billRate=(b?parseFloat(b.rateCFT||0):0)+CFG.markup;
+    totalCFT+=cft; totalVal+=cft*billRate; slabCount++;
+  });
+  const ts=document.getElementById('d-total-slabs');
+  const tc=document.getElementById('d-total-cft');
+  const tv=document.getElementById('d-total-val');
+  if(ts) ts.textContent=slabCount>0?slabCount+' slabs':'—';
+  if(tc) tc.textContent=totalCFT>0?totalCFT.toFixed(3)+' CFT':'—';
+  if(tv) tv.textContent=totalVal>0?'₹'+Math.round(totalVal).toLocaleString('en-IN'):'—';
+}
+
+function updateDispatchRate() { calcDispatchTotals(); }
 
 async function saveDispatch() {
   const btn = document.getElementById('dis-save-btn');
   const billNo = document.getElementById('d-billno').value.trim();
   const date = document.getElementById('d-date').value;
-  const invoiceNo = document.getElementById('d-batch').value;
-  if (!billNo || !invoiceNo) { toast('Fill bill number and batch', 'err'); return; }
+  if (!billNo) { toast('Enter bill / challan number', 'err'); return; }
 
+  const species = Object.keys(disSpeciesGroups);
+
+  // Check if we have species groups from register read
+  if (species.length > 0) {
+    // Multi-species save — one dispatch per species
+    let saved = 0;
+    btn.disabled = true; btn.textContent = 'Saving…';
+    for (const sp of species) {
+      const batchSelId = 'dis-batch-' + sp.replace(/\s/g,'_');
+      const invoiceNo = (document.getElementById(batchSelId)?.value || '').trim();
+      const slabs = disSpeciesGroups[sp];
+      if (!slabs.length) continue;
+      const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
+      const billRate = (b ? parseFloat(b.rateCFT||0) : 0) + CFG.markup;
+      const slabsWithCost = slabs.map(s => ({ ...s, cbm: (s.lengthMM*s.widthMM*s.thickMM)/1e9, cost: s.cft*billRate, billRate }));
+      const totalCFT = Math.round(slabs.reduce((s,r)=>s+r.cft,0)*1000)/1000;
+      try {
+        const r = await apiPost({ action: 'saveSWDispatch', data: {
+          billNo, date, invoiceNo: invoiceNo || sp + '-' + date,
+          species: sp, vendor: b?.vendor || '',
+          slabs: slabsWithCost, totalCFT,
+          totalValue: Math.round(totalCFT * billRate),
+          notes: document.getElementById('d-notes').value.trim()
+        }});
+        if (r.success) saved++;
+        else toast('Error saving ' + sp + ': ' + (r.error||'Failed'), 'err');
+      } catch(e) { toast('Network error for ' + sp, 'err'); }
+    }
+    btn.disabled = false; btn.innerHTML = '🚚 Save Dispatch';
+    if (saved > 0) { toast(saved + ' dispatch(es) saved ✓', 'ok'); closeDisModal(); await loadAll(); }
+    return;
+  }
+
+  // Fallback — manual rows, single batch
+  const invoiceNo = document.getElementById('d-batch')?.value || '';
   const rows = [];
   document.querySelectorAll('#dis-rows tr').forEach(tr => {
-    const id = tr.id.replace('dr', '');
-    const l = parseFloat(document.getElementById('dr'+id+'l')?.value) || 0;
-    const w = parseFloat(document.getElementById('dr'+id+'w')?.value) || 0;
-    const t = parseFloat(document.getElementById('dr'+id+'t')?.value) || 0;
-    if (l && w && t) {
-      const cbm = (l * w * t) / 1e9;
-      const cft = cbm * 35.3147;
-      const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
-      const vendorRate = b ? parseFloat(b.rateCFT || (b.rateCBM||0)/35.3147 || 0) : 0;
-      const billRate = vendorRate + CFG.markup;
-      rows.push({ lengthMM: l, widthMM: w, thickMM: t, cbm, cft, cost: cft * billRate, billRate });
+    const id = tr.id.replace('dr','');
+    const l=parseFloat(document.getElementById('dr'+id+'l')?.value)||0;
+    const w=parseFloat(document.getElementById('dr'+id+'w')?.value)||0;
+    const t=parseFloat(document.getElementById('dr'+id+'t')?.value)||0;
+    if(l&&w&&t){
+      const cbm=(l*w*t)/1e9;
+      const cft=Math.round(cbm*35.31466560103903*1000)/1000;
+      const b=ST.batches.find(x=>x.invoiceNo===invoiceNo);
+      const billRate=(b?parseFloat(b.rateCFT||0):0)+CFG.markup;
+      rows.push({lengthMM:l,widthMM:w,thickMM:t,cbm,cft,cost:cft*billRate,billRate});
     }
   });
-  if (!rows.length) { toast('Add at least one slab', 'err'); return; }
-
-  btn.disabled = true; btn.textContent = 'Saving…';
-  const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
-  const data = {
-    billNo, date, invoiceNo,
-    species: b?.species || '',
-    vendor: b?.vendor || '',
-    slabs: rows,
-    totalCFT: rows.reduce((s, r) => s + r.cft, 0),
-    totalValue: rows.reduce((s, r) => s + r.cost, 0),
-    notes: document.getElementById('d-notes').value.trim()
-  };
+  if (!rows.length) { toast('Add slabs or upload register', 'err'); return; }
+  btn.disabled=true; btn.textContent='Saving…';
+  const b=ST.batches.find(x=>x.invoiceNo===invoiceNo);
   try {
-    const r = await apiPost({ action: 'saveSWDispatch', data });
-    if (r.success) { toast('Dispatch saved ✓', 'ok'); closeDisModal(); await loadAll(); }
-    else toast('Error: ' + (r.error || 'Failed'), 'err');
-  } catch(e) { toast('Network error', 'err'); }
-  btn.disabled = false; btn.innerHTML = '🚚 Save Dispatch';
+    const r=await apiPost({action:'saveSWDispatch',data:{
+      billNo,date,invoiceNo,species:b?.species||'',vendor:b?.vendor||'',
+      slabs:rows,totalCFT:rows.reduce((s,r)=>s+r.cft,0),
+      totalValue:rows.reduce((s,r)=>s+r.cost,0),
+      notes:document.getElementById('d-notes').value.trim()
+    }});
+    if(r.success){toast('Dispatch saved ✓','ok');closeDisModal();await loadAll();}
+    else toast('Error: '+(r.error||'Failed'),'err');
+  }catch(e){toast('Network error','err');}
+  btn.disabled=false; btn.innerHTML='🚚 Save Dispatch';
 }
 
 // ── BATCH DETAIL (for seasoning status update) ──
