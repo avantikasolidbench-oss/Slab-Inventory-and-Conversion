@@ -232,15 +232,22 @@ select option{background:var(--bg3);color:var(--ink)}
 
     <!-- DASHBOARD -->
     <div class="screen active" id="screen-dash">
-      <div class="kpi-grid">
+      <div class="kpi-grid" style="grid-template-columns:1fr 1fr 1fr">
         <div class="kpi"><div class="kpi-lbl">Total Stock</div><div class="kpi-val" id="k-stock">—</div><div class="kpi-sub" id="k-stock-val" style="color:var(--wood);font-weight:600;font-size:13px;margin-top:2px">—</div><div class="kpi-sub">CFT · value</div></div>
         <div class="kpi"><div class="kpi-lbl">Seasoned</div><div class="kpi-val" id="k-seasoned" style="color:var(--seasoned)">—</div><div class="kpi-sub" id="k-seasoned-val" style="color:var(--seasoned);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">ready to dispatch</div></div>
-        <div class="kpi"><div class="kpi-lbl">In Chamber</div><div class="kpi-val" id="k-chamber" style="color:var(--amber)">—</div><div class="kpi-sub" id="k-chamber-val" style="color:var(--amber);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">gas + solar + hyd</div></div>
+        <div class="kpi"><div class="kpi-lbl">In Chamber</div><div class="kpi-val" id="k-chamber" style="color:var(--amber)">—</div><div class="kpi-sub" id="k-chamber-val" style="color:var(--amber);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">gas + solar only</div></div>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:1fr 1fr;margin-top:0">
+        <div class="kpi"><div class="kpi-lbl">Sent to Hyd</div><div class="kpi-val" id="k-hyd" style="color:var(--hyd)">—</div><div class="kpi-sub" id="k-hyd-val" style="color:var(--hyd);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">at Hyderabad</div></div>
         <div class="kpi"><div class="kpi-lbl">Unseasoned</div><div class="kpi-val" id="k-raw" style="color:var(--ink3)">—</div><div class="kpi-sub" id="k-raw-val" style="color:var(--ink3);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">not yet started</div></div>
       </div>
 
       <div class="card">
-        <div class="card-head"><span class="card-title">Stock by Species</span></div>
+        <div class="card-head"><span class="card-title">Dispatches to Solid Bench</span><span id="dispatch-month-label" style="font-size:11px;color:var(--ink3)"></span></div>
+        <div id="dispatch-by-species"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
+      </div>
+
+      <div class="card">
         <div id="species-list"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
       </div>
 
@@ -300,6 +307,11 @@ select option{background:var(--bg3);color:var(--ink)}
         <div class="card-head"><span class="card-title">Purchase Batches</span></div>
         <div id="batch-list"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
       </div>
+
+      <div class="sec-title" style="margin-top:16px">Batch Margin Summary</div>
+      <div class="card">
+        <div id="margin-summary"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
+      </div>
     </div>
 
     <!-- DISPATCH -->
@@ -316,94 +328,6 @@ select option{background:var(--bg3);color:var(--ink)}
     </div>
 
     <!-- COSTS -->
-    <div class="screen" id="screen-costs">
-      <div class="sec-title">Add External Cost Bill</div>
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-head"><span class="card-title">New Hyderabad Cost Bill</span></div>
-        <div class="card-body">
-
-          <!-- Upload or Manual toggle -->
-          <div style="display:flex;gap:8px;margin-bottom:16px">
-            <button class="btn btn-sm" id="cost-mode-upload" onclick="setCostMode('upload')" style="background:var(--wood);color:white;flex:1">📷 Upload Bill</button>
-            <button class="btn btn-sec btn-sm" id="cost-mode-manual" onclick="setCostMode('manual')" style="flex:1">✏️ Enter Manually</button>
-          </div>
-
-          <!-- Upload zone -->
-          <div id="cost-upload-zone" style="margin-bottom:14px">
-            <div class="uz" onclick="document.getElementById('f-cost-bill').click()" style="padding:20px">
-              <input type="file" id="f-cost-bill" accept="image/*,.pdf" onchange="procCostBill(event)" style="display:none">
-              <div class="uz-icon" style="font-size:24px">📄</div>
-              <div class="uz-title" style="font-size:13px">Upload Hyd seasoning or freight bill</div>
-              <div class="uz-sub">AI extracts amount and date</div>
-            </div>
-            <div class="ai-spin-wrap" id="ai-cost"><div class="ai-spin"></div> Reading bill…</div>
-          </div>
-
-          <!-- Manual / AI-filled form -->
-          <div id="cost-form">
-            <div class="field">
-              <label>Bill Type</label>
-              <select id="cost-type" onchange="toggleCostFreight()">
-                <option value="hyd_seasoning">🏭 Hyderabad Seasoning</option>
-                <option value="hyd_transit">🚛 Hyderabad Transit (Freight)</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Amount ₹ <span style="color:var(--ink3);font-size:10px">(pre-GST taxable)</span></label>
-              <input type="number" id="cost-amount" placeholder="50850">
-            </div>
-            <div class="field" id="cost-freight-wrap" style="display:none">
-              <label>Shipping on Seasoning Bill ₹ <span style="color:var(--ink3);font-size:10px">(separate line on bill)</span></label>
-              <input type="number" id="cost-freight-amt" placeholder="0">
-            </div>
-            <div class="field">
-              <label>Bill Date</label>
-              <input type="date" id="cost-date">
-            </div>
-            <div class="field">
-              <label>Bill / Reference No.</label>
-              <input type="text" id="cost-billno" placeholder="HYD/001/2026">
-            </div>
-            <div class="field">
-              <label>Covers slabs sent to Hyd between</label>
-              <div style="display:flex;gap:8px;align-items:center">
-                <input type="date" id="cost-from" style="flex:1">
-                <span style="color:var(--ink3);font-size:12px">to</span>
-                <input type="date" id="cost-to" style="flex:1">
-              </div>
-            </div>
-            <button class="btn btn-sec btn-full" onclick="previewCostApportionment()" style="margin-bottom:10px">Preview Apportionment →</button>
-
-            <!-- Preview -->
-            <div id="cost-preview" style="display:none">
-              <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:12px">
-                <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);margin-bottom:8px">Cost will be split across:</div>
-                <div id="cost-preview-rows"></div>
-                <div style="border-top:1px solid var(--rule);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between">
-                  <span style="font-size:12px;color:var(--ink3)">Total CFT covered</span>
-                  <span class="mono" id="cost-total-cft" style="color:var(--wood)">—</span>
-                </div>
-                <div style="display:flex;justify-content:space-between;margin-top:4px">
-                  <span style="font-size:12px;color:var(--ink3)">Rate per CFT</span>
-                  <span class="mono" id="cost-per-cft" style="color:var(--amber)">—</span>
-                </div>
-              </div>
-              <button class="btn btn-primary btn-full" onclick="saveCostBill()" id="cost-save-btn">💾 Save & Apportion</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="sec-title">Cost Bills History</div>
-      <div class="card">
-        <div id="cost-history"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
-      </div>
-
-      <div class="sec-title" style="margin-top:20px">Batch Margin Summary</div>
-      <div class="card">
-        <div id="margin-summary"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
-      </div>
-    </div>
 
   </div><!-- /content -->
 
@@ -420,9 +344,6 @@ select option{background:var(--bg3);color:var(--ink)}
     </button>
     <button class="bn-item" id="nav-dis" onclick="goTo('dis')">
       <span class="bn-icon">🚚</span>Dispatch
-    </button>
-    <button class="bn-item" id="nav-costs" onclick="goTo('costs')">
-      <span class="bn-icon">💰</span>Costs
     </button>
   </nav>
 </div>
@@ -451,6 +372,67 @@ select option{background:var(--bg3);color:var(--ink)}
       <button class="btn btn-sec" onclick="closeSWCfg()" style="flex:1">Cancel</button>
       <button class="btn btn-primary" onclick="saveSWCfg()" style="flex:2">Save</button>
     </div>
+  </div>
+</div>
+
+<!-- SLAB ENTRY MODAL (for unseasoned/chambered batches) -->
+<div class="modal" id="slab-entry-modal">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📋 Slab Stock Entry</div>
+    <div class="modal-sub" id="se-sub"></div>
+
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn btn-sec btn-sm" onclick="document.getElementById('f-se-xl').click()">📊 Upload Excel</button>
+      <button class="btn btn-sec btn-sm" onclick="document.getElementById('f-se-img').click()">📷 Upload Register</button>
+      <button class="btn btn-sec btn-sm" onclick="toggleSEManual()">+ Manual</button>
+      <input type="file" id="f-se-xl" accept=".xlsx,.xls,.csv" style="display:none" onchange="uploadSEExcel(event)">
+      <input type="file" id="f-se-img" accept="image/*" multiple style="display:none" onchange="uploadSERegister(event)">
+    </div>
+    <div class="ai-spin-wrap" id="ai-se"><div class="ai-spin"></div> Reading…</div>
+
+    <!-- Manual entry row -->
+    <div id="se-manual" style="display:none;background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:12px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div><label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:4px">L mm</label><input type="number" id="se-ml" placeholder="3000" style="width:75px;background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;font-family:var(--mono)"></div>
+        <div><label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:4px">W mm</label><input type="number" id="se-mw" placeholder="280" style="width:70px;background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;font-family:var(--mono)"></div>
+        <div><label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:4px">T mm</label><input type="number" id="se-mt" placeholder="50" style="width:65px;background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;font-family:var(--mono)"></div>
+        <button class="btn btn-primary btn-sm" onclick="addSEManualRow()">Add</button>
+      </div>
+    </div>
+
+    <!-- Staged slabs -->
+    <div id="se-staged-wrap" style="display:none;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:12px;font-weight:600;color:var(--ink2)" id="se-staged-count"></span>
+        <button class="btn btn-primary btn-sm" onclick="saveSESlabs()" id="se-save-btn">💾 Save Slabs</button>
+      </div>
+      <div style="max-height:180px;overflow-y:auto;border:1px solid var(--rule);border-radius:4px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:var(--bg3)">
+            <th style="padding:6px 8px;text-align:left;color:var(--ink3)">L</th>
+            <th style="padding:6px 8px;text-align:left;color:var(--ink3)">W</th>
+            <th style="padding:6px 8px;text-align:left;color:var(--ink3)">T</th>
+            <th style="padding:6px 8px;text-align:left;color:var(--ink3)">CFT</th>
+            <th style="width:28px"></th>
+          </tr></thead>
+          <tbody id="se-staged-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Existing slabs -->
+    <div id="se-existing-wrap">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:12px;font-weight:600;color:var(--ink2)">Existing Stock</span>
+        <span class="mono" id="se-existing-count" style="font-size:12px;color:var(--ink3)"></span>
+      </div>
+      <div id="se-existing-list" style="max-height:220px;overflow-y:auto;border:1px solid var(--rule);border-radius:4px">
+        <div style="padding:16px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div>
+      </div>
+    </div>
+
+    <button class="btn btn-sec btn-full" onclick="closeSlabEntryModal()" style="margin-top:12px">Close</button>
   </div>
 </div>
 
@@ -888,16 +870,14 @@ function goTo(s) {
   document.querySelectorAll('.bn-item').forEach(x => x.classList.remove('active'));
   document.getElementById('screen-' + s).classList.add('active');
   document.getElementById('nav-' + s).classList.add('active');
-  if (s === 'costs') { loadCosts(); loadMarginSummary(); }
+  if (s === 'pur') { loadBatches(); loadMarginSummary(); }
 }
-
 // ── LOAD ALL ──
 async function loadAll() {
   await loadBatches();
   loadDash();
   loadSlabs();
   loadDispatches();
-  loadCosts();
 }
 
 // ── LOAD BATCHES ──
@@ -934,8 +914,9 @@ function renderBatches(batches) {
           <div class="bi-val">of ${cft} CFT</div>
           <div class="bi-val">₹${parseInt(b.woodValue||b.taxableValue||0).toLocaleString('en-IN')}</div>
         </div>
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;gap:6px;margin-top:4px">
           <button onclick="editBatch('${b.invoiceNo}')" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink2);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">✏️ Edit</button>
+          <button onclick="openSlabEntryModal('${b.invoiceNo}','${b.species}')" style="background:rgba(58,122,176,.15);border:1px solid rgba(58,122,176,.3);color:var(--gas);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">📋 Slabs</button>
           <button onclick="deleteBatch('${b.invoiceNo}')" style="background:rgba(192,74,58,.15);border:1px solid rgba(192,74,58,.3);color:var(--red);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">🗑 Delete</button>
         </div>
       </div>
@@ -1252,16 +1233,14 @@ function loadDash() {
   const totalCFT = ST.batches.reduce((s, b) => s + parseFloat(b.remainingCFT || b.totalCFT || 0), 0);
   const totalValue = ST.batches.reduce((s, b) => s + parseFloat(b.woodValue || b.taxableValue || 0), 0);
 
-  // Calculate CFT and value by status from slabs
   const statusMap = {};
   ST.slabs.forEach(s => {
     const st = s.status || 'Unseasoned';
-    if (!statusMap[st]) statusMap[st] = { cft: 0 };
+    if (!statusMap[st]) statusMap[st] = { cft: 0, value: 0 };
     statusMap[st].cft += parseFloat(s.cft || 0);
   });
 
-  // Calculate value by status — apportion batch value by CFT ratio
-  const totalSlabCFT = ST.slabs.reduce((s, x) => s + parseFloat(x.cft||0), 0);
+  // Apportion value by CFT ratio
   ST.slabs.forEach(s => {
     const batch = ST.batches.find(b => b.invoiceNo === s.invoiceNo);
     if (!batch) return;
@@ -1269,17 +1248,18 @@ function loadDash() {
     const batchCFT = parseFloat(batch.totalCFT || 1);
     const slabValue = batchValue / batchCFT * parseFloat(s.cft || 0);
     const st = s.status || 'Unseasoned';
-    if (!statusMap[st]) statusMap[st] = { cft: 0 };
-    if (!statusMap[st].value) statusMap[st].value = 0;
-    statusMap[st].value += slabValue;
+    if (statusMap[st]) statusMap[st].value = (statusMap[st].value || 0) + slabValue;
   });
 
-  const seasonedCFT  = (statusMap['Seasoned']?.cft || 0);
-  const seasonedVal  = (statusMap['Seasoned']?.value || 0);
-  const chamberCFT   = (statusMap['Gas Chamber']?.cft || 0) + (statusMap['Solar Chamber']?.cft || 0) + (statusMap['Sent to Hyderabad']?.cft || 0);
-  const chamberVal   = (statusMap['Gas Chamber']?.value || 0) + (statusMap['Solar Chamber']?.value || 0) + (statusMap['Sent to Hyderabad']?.value || 0);
-  const rawCFT       = (statusMap['Unseasoned']?.cft || 0);
-  const rawVal       = (statusMap['Unseasoned']?.value || 0);
+  const seasonedCFT  = statusMap['Seasoned']?.cft || 0;
+  const seasonedVal  = statusMap['Seasoned']?.value || 0;
+  // Chamber = Gas + Solar ONLY (not Hyd)
+  const chamberCFT   = (statusMap['Gas Chamber']?.cft || 0) + (statusMap['Solar Chamber']?.cft || 0);
+  const chamberVal   = (statusMap['Gas Chamber']?.value || 0) + (statusMap['Solar Chamber']?.value || 0);
+  const hydCFT       = statusMap['Sent to Hyderabad']?.cft || 0;
+  const hydVal       = statusMap['Sent to Hyderabad']?.value || 0;
+  const rawCFT       = statusMap['Unseasoned']?.cft || 0;
+  const rawVal       = statusMap['Unseasoned']?.value || 0;
 
   document.getElementById('k-stock').textContent    = totalCFT.toFixed(1);
   document.getElementById('k-stock-val').textContent = '₹' + Math.round(totalValue).toLocaleString('en-IN');
@@ -1287,8 +1267,57 @@ function loadDash() {
   document.getElementById('k-seasoned-val').textContent = seasonedVal > 0 ? '₹' + Math.round(seasonedVal).toLocaleString('en-IN') : '';
   document.getElementById('k-chamber').textContent   = chamberCFT.toFixed(1);
   document.getElementById('k-chamber-val').textContent = chamberVal > 0 ? '₹' + Math.round(chamberVal).toLocaleString('en-IN') : '';
+  document.getElementById('k-hyd').textContent       = hydCFT.toFixed(1);
+  document.getElementById('k-hyd-val').textContent   = hydVal > 0 ? '₹' + Math.round(hydVal).toLocaleString('en-IN') : '';
   document.getElementById('k-raw').textContent       = rawCFT.toFixed(1);
   document.getElementById('k-raw-val').textContent   = rawVal > 0 ? '₹' + Math.round(rawVal).toLocaleString('en-IN') : '';
+
+  // ── Dispatch by species ──
+  const now = new Date();
+  const thisMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  const lastMonth = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const lastMonthStr = lastMonth.getFullYear() + '-' + String(lastMonth.getMonth()+1).padStart(2,'0');
+
+  // Build monthly dispatch totals by species
+  const dispBySpecies = {}; // { species: { thisMonth: cft, lastMonth: cft, total: cft } }
+  ST.dispatches.forEach(d => {
+    const sp = d.species || 'Unknown';
+    const mo = (d.date || '').slice(0, 7);
+    if (!dispBySpecies[sp]) dispBySpecies[sp] = { thisMonth: 0, lastMonth: 0, total: 0 };
+    const cft = parseFloat(d.totalCFT || 0);
+    dispBySpecies[sp].total += cft;
+    if (mo === thisMonth) dispBySpecies[sp].thisMonth += cft;
+    if (mo === lastMonthStr) dispBySpecies[sp].lastMonth += cft;
+  });
+
+  const thisMonLabel = now.toLocaleString('en-IN', { month: 'short', year: '2-digit' });
+  const lastMonLabel = lastMonth.toLocaleString('en-IN', { month: 'short', year: '2-digit' });
+  document.getElementById('dispatch-month-label').textContent = thisMonLabel + ' vs ' + lastMonLabel;
+
+  const totalDispatched = ST.dispatches.reduce((s, d) => s + parseFloat(d.totalCFT||0), 0);
+
+  if (!ST.dispatches.length) {
+    document.getElementById('dispatch-by-species').innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No dispatches yet</div>';
+  } else {
+    document.getElementById('dispatch-by-species').innerHTML =
+      '<div style="padding:10px 16px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;font-size:12px;color:var(--ink3)">' +
+        '<span>Species</span><span style="display:flex;gap:32px"><span>' + thisMonLabel + '</span><span>' + lastMonLabel + '</span><span>Total</span></span>' +
+      '</div>' +
+      Object.entries(dispBySpecies).sort((a,b) => b[1].total - a[1].total).map(([sp, d]) =>
+        '<div style="padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center">' +
+          '<div><span style="font-weight:600;font-size:13px">' + sp + '</span></div>' +
+          '<div style="display:flex;gap:32px;font-family:var(--mono);font-size:13px">' +
+            '<span style="color:var(--wood);font-weight:600;min-width:52px;text-align:right">' + d.thisMonth.toFixed(1) + '</span>' +
+            '<span style="color:var(--ink3);min-width:52px;text-align:right">' + d.lastMonth.toFixed(1) + '</span>' +
+            '<span style="color:var(--ink);min-width:52px;text-align:right">' + d.total.toFixed(1) + '</span>' +
+          '</div>' +
+        '</div>'
+      ).join('') +
+      '<div style="padding:10px 16px;display:flex;justify-content:space-between;font-size:12px;font-weight:600">' +
+        '<span style="color:var(--ink3)">Total</span>' +
+        '<span class="mono" style="color:var(--wood)">' + totalDispatched.toFixed(1) + ' CFT</span>' +
+      '</div>';
+  } // end else
 
   // Species breakdown
   const speciesMap = {};
@@ -2142,7 +2171,157 @@ async function saveHydDispatch() {
   btn.disabled = false; btn.innerHTML = '🚚 Save Dispatch';
 }
 
-function toggleCostFreight() {
+// ── SLAB ENTRY (per batch, for inventory tracking) ────────
+let SE = { invoiceNo: '', species: '', staged: [] };
+
+async function openSlabEntryModal(invoiceNo, species) {
+  SE.invoiceNo = invoiceNo; SE.species = species; SE.staged = [];
+  document.getElementById('se-sub').textContent = invoiceNo + ' · ' + species;
+  document.getElementById('slab-entry-modal').classList.add('show');
+  document.getElementById('se-manual').style.display = 'none';
+  document.getElementById('se-staged-wrap').style.display = 'none';
+  document.getElementById('ai-se').classList.remove('show');
+  renderSEStaged();
+  await loadSEExisting();
+}
+function closeSlabEntryModal() { document.getElementById('slab-entry-modal').classList.remove('show'); }
+function toggleSEManual() { const m=document.getElementById('se-manual'); m.style.display=m.style.display==='none'?'block':'none'; }
+
+function addSEManualRow() {
+  const l=parseFloat(document.getElementById('se-ml').value)||0;
+  const w=parseFloat(document.getElementById('se-mw').value)||0;
+  const t=parseFloat(document.getElementById('se-mt').value)||0;
+  if(!l||!w||!t){toast('Enter L, W and T','err');return;}
+  const cft=Math.round((l*w*t)/1e9*35.31466560103903*1000)/1000;
+  SE.staged.push({lengthMM:l,widthMM:w,thickMM:t,cft});
+  document.getElementById('se-ml').value=''; document.getElementById('se-mw').value='';
+  renderSEStaged();
+}
+
+function renderSEStaged() {
+  const wrap=document.getElementById('se-staged-wrap');
+  if(!SE.staged.length){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  const total=SE.staged.reduce((s,r)=>s+r.cft,0);
+  document.getElementById('se-staged-count').textContent=SE.staged.length+' staged · '+total.toFixed(3)+' CFT';
+  document.getElementById('se-staged-tbody').innerHTML=SE.staged.map((r,i)=>
+    '<tr style="border-bottom:1px solid var(--rule)">' +
+    '<td style="padding:5px 8px;font-family:var(--mono);font-size:12px">'+r.lengthMM+'</td>' +
+    '<td style="padding:5px 8px;font-family:var(--mono);font-size:12px">'+r.widthMM+'</td>' +
+    '<td style="padding:5px 8px;font-family:var(--mono);font-size:12px">'+r.thickMM+'</td>' +
+    '<td style="padding:5px 8px;font-family:var(--mono);font-size:12px;color:var(--wood)">'+r.cft.toFixed(3)+'</td>' +
+    '<td><button onclick="SE.staged.splice('+i+',1);renderSEStaged()" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:14px;padding:2px 6px">✕</button></td>' +
+    '</tr>'
+  ).join('');
+}
+
+async function loadSEExisting() {
+  const el=document.getElementById('se-existing-list');
+  el.innerHTML='<div style="padding:12px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div>';
+  try {
+    const r=await apiGet({action:'getSWSlabs',invoiceNo:SE.invoiceNo});
+    // Filter to slabs for this batch that aren't dispatched
+    const slabs=(r.slabs||[]).filter(s=>s.invoiceNo===SE.invoiceNo && s.status!=='Dispatched to SB');
+    const avail=slabs.filter(s=>s.status!=='Dispatched to SB');
+    const totalCFT=avail.reduce((s,x)=>s+parseFloat(x.cft||0),0);
+    document.getElementById('se-existing-count').textContent=avail.length+' slabs · '+totalCFT.toFixed(3)+' CFT';
+    if(!slabs.length){
+      el.innerHTML='<div style="padding:16px;text-align:center;color:var(--ink3);font-size:13px">No slabs entered yet</div>';
+      return;
+    }
+    el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+      '<thead><tr style="background:var(--bg3)">' +
+      '<th style="padding:5px 8px;text-align:left;color:var(--ink3)">L</th>' +
+      '<th style="padding:5px 8px;text-align:left;color:var(--ink3)">W</th>' +
+      '<th style="padding:5px 8px;text-align:left;color:var(--ink3)">T</th>' +
+      '<th style="padding:5px 8px;text-align:left;color:var(--ink3)">CFT</th>' +
+      '<th style="padding:5px 8px;text-align:left;color:var(--ink3)">Status</th>' +
+      '</tr></thead><tbody>' +
+      slabs.map(s=>
+        '<tr style="border-bottom:1px solid var(--rule)">' +
+        '<td style="padding:5px 8px;font-family:var(--mono)">'+s.lengthMM+'</td>' +
+        '<td style="padding:5px 8px;font-family:var(--mono)">'+s.widthMM+'</td>' +
+        '<td style="padding:5px 8px;font-family:var(--mono)">'+s.thickMM+'</td>' +
+        '<td style="padding:5px 8px;font-family:var(--mono);color:var(--wood)">'+parseFloat(s.cft).toFixed(3)+'</td>' +
+        '<td style="padding:5px 8px">'+statusBadge(s.status)+'</td>' +
+        '</tr>'
+      ).join('') + '</tbody></table>';
+  } catch(e){el.innerHTML='<div style="padding:12px;text-align:center;color:var(--red);font-size:13px">Error</div>';}
+}
+
+async function uploadSEExcel(event) {
+  const file=event.target.files[0]; if(!file) return;
+  document.getElementById('ai-se').classList.add('show');
+  try {
+    if(!window.XLSX) await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+    const data=await file.arrayBuffer();
+    const wb=XLSX.read(data);
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+    const header=(rows[0]||[]).map(h=>String(h||'').toLowerCase());
+    const lIdx=header.findIndex(h=>/length|^l$/.test(h));
+    const wIdx=header.findIndex(h=>/width|^w$/.test(h));
+    const tIdx=header.findIndex(h=>/height|thick|^h$|^t$/.test(h));
+    const cIdx=header.findIndex(h=>/cft/.test(h));
+    if(lIdx<0||wIdx<0||tIdx<0){toast('Could not find L/W/T columns','err');document.getElementById('ai-se').classList.remove('show');return;}
+    const slabs=rows.slice(1).filter(r=>r[lIdx]&&r[wIdx]&&r[tIdx]).map(r=>{
+      const l=parseFloat(r[lIdx])||0,w=parseFloat(r[wIdx])||0,t=parseFloat(r[tIdx])||0;
+      return {lengthMM:l,widthMM:w,thickMM:t,cft:cIdx>=0&&r[cIdx]?parseFloat(r[cIdx]):Math.round(l*w*t/1e9*35.31466560103903*1000)/1000};
+    });
+    SE.staged.push(...slabs);
+    document.getElementById('ai-se').classList.remove('show');
+    renderSEStaged(); toast(slabs.length+' slabs read ✓','ok');
+  } catch(e){document.getElementById('ai-se').classList.remove('show');toast('Excel read failed','err');}
+  document.getElementById('f-se-xl').value='';
+}
+
+async function uploadSERegister(event) {
+  const files=Array.from(event.target.files); if(!files.length) return;
+  if(!CFG.key){toast('API key not set','err');return;}
+  document.getElementById('ai-se').classList.add('show');
+  let total=0;
+  for(const file of files){
+    try {
+      const b64=await toB64(file);
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':CFG.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64.split(',')[1]}},
+          {type:'text',text:'Read slab register. Each row: L mm, W mm, T mm. Return ONLY JSON: [{"lengthMM":3000,"widthMM":280,"thickMM":50},...]'}
+        ]}]})});
+      const d=await resp.json();
+      const txt=d.content?.[0]?.text||'[]';
+      let rows;
+      try{rows=JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim());}
+      catch(e){const lc=txt.lastIndexOf('}');rows=lc>0?JSON.parse(txt.substring(0,lc+1)+']'):[];}
+      rows.forEach(r=>{SE.staged.push({lengthMM:r.lengthMM,widthMM:r.widthMM,thickMM:r.thickMM,cft:Math.round((r.lengthMM*r.widthMM*r.thickMM)/1e9*35.31466560103903*1000)/1000});total++;});
+    }catch(e){toast('Failed one photo','err');}
+  }
+  document.getElementById('ai-se').classList.remove('show');
+  renderSEStaged(); toast(total+' slabs read from '+files.length+' photo(s) ✓','ok');
+  document.getElementById('f-se-img').value='';
+}
+
+async function saveSESlabs() {
+  if(!SE.staged.length) return;
+  const btn=document.getElementById('se-save-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+  // Get current batch seasoning status for initial slab status
+  const batch=ST.batches.find(b=>b.invoiceNo===SE.invoiceNo);
+  const status=batch?batch.seasoningStatus:'Unseasoned';
+  try {
+    const r=await apiPost({action:'saveSlabsForBatch',data:{
+      invoiceNo:SE.invoiceNo, species:SE.species,
+      status, date:new Date().toISOString().slice(0,10),
+      slabs:SE.staged
+    }});
+    if(r.success){
+      toast(r.added+' slabs saved ✓','ok');
+      SE.staged=[]; renderSEStaged(); await loadSEExisting();
+    } else toast('Error: '+(r.error||'Failed'),'err');
+  }catch(e){toast('Network error','err');}
+  btn.disabled=false; btn.innerHTML='💾 Save Slabs';
+}
   const type = document.getElementById('cost-type').value;
   const wrap = document.getElementById('cost-freight-wrap');
   if (wrap) wrap.style.display = type === 'hyd_seasoning' ? 'block' : 'none';
