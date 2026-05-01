@@ -232,19 +232,24 @@ select option{background:var(--bg3);color:var(--ink)}
 
     <!-- DASHBOARD -->
     <div class="screen active" id="screen-dash">
-      <div class="kpi-grid" style="grid-template-columns:1fr 1fr 1fr">
+      <div class="kpi-grid" style="grid-template-columns:1fr 1fr">
         <div class="kpi"><div class="kpi-lbl">Total Stock</div><div class="kpi-val" id="k-stock">—</div><div class="kpi-sub" id="k-stock-val" style="color:var(--wood);font-weight:600;font-size:13px;margin-top:2px">—</div><div class="kpi-sub">CFT · value</div></div>
         <div class="kpi"><div class="kpi-lbl">Seasoned</div><div class="kpi-val" id="k-seasoned" style="color:var(--seasoned)">—</div><div class="kpi-sub" id="k-seasoned-val" style="color:var(--seasoned);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">ready to dispatch</div></div>
-        <div class="kpi"><div class="kpi-lbl">In Chamber</div><div class="kpi-val" id="k-chamber" style="color:var(--amber)">—</div><div class="kpi-sub" id="k-chamber-val" style="color:var(--amber);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">gas + solar only</div></div>
-      </div>
-      <div class="kpi-grid" style="grid-template-columns:1fr 1fr;margin-top:0">
-        <div class="kpi"><div class="kpi-lbl">Sent to Hyd</div><div class="kpi-val" id="k-hyd" style="color:var(--hyd)">—</div><div class="kpi-sub" id="k-hyd-val" style="color:var(--hyd);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">at Hyderabad</div></div>
+        <div class="kpi"><div class="kpi-lbl">In Chamber</div><div class="kpi-val" id="k-chamber" style="color:var(--amber)">—</div><div class="kpi-sub" id="k-chamber-val" style="color:var(--amber);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">gas + solar</div></div>
         <div class="kpi"><div class="kpi-lbl">Unseasoned</div><div class="kpi-val" id="k-raw" style="color:var(--ink3)">—</div><div class="kpi-sub" id="k-raw-val" style="color:var(--ink3);font-weight:600;font-size:13px;margin-top:2px"></div><div class="kpi-sub">not yet started</div></div>
       </div>
 
       <div class="card">
-        <div class="card-head"><span class="card-title">Dispatches to Solid Bench</span><span id="dispatch-month-label" style="font-size:11px;color:var(--ink3)"></span></div>
-        <div id="dispatch-by-species"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
+        <div class="card-head">
+          <span class="card-title">Dispatches to Solid Bench</span>
+          <span id="dispatch-month-label" style="font-size:11px;color:var(--ink3)"></span>
+        </div>
+        <div id="dispatch-this-month" style="padding:0"></div>
+        <div id="dispatch-history-wrap" style="display:none">
+          <div style="padding:8px 16px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);border-top:1px solid var(--rule);margin-top:4px">History</div>
+          <div id="dispatch-history-list"></div>
+        </div>
+        <button id="dispatch-history-btn" onclick="toggleDispatchHistory()" style="display:none;width:100%;padding:10px;background:none;border:none;border-top:1px solid var(--rule);color:var(--ink3);font-size:12px;cursor:pointer;text-align:center">Show all dispatches ↓</button>
       </div>
 
       <div class="card">
@@ -280,8 +285,8 @@ select option{background:var(--bg3);color:var(--ink)}
         <div id="inv-sum-hyd-wrap" style="display:none"><span style="font-size:10px;color:var(--hyd);text-transform:uppercase;letter-spacing:1px">In Hyd</span> <span class="mono" id="inv-sum-hyd" style="color:var(--hyd);font-size:13px">—</span></div>
       </div>
 
-      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-        <button class="btn btn-primary btn-sm" onclick="openHydModal()">🚛 Send to Hyd</button>
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="openAddSlabDetailsModal()" id="add-slab-details-btn">+ Add Slab Details</button>
         <button class="btn btn-sec btn-sm" id="bulk-mode-btn" onclick="toggleBulkMode()">☑ Bulk Update</button>
         <span style="font-size:12px;color:var(--ink3)" id="slab-count-lbl"></span>
       </div>
@@ -990,6 +995,7 @@ function renderSlabs(slabs) {
 
 function filterSlabs(f) {
   slabFilter = f;
+  window._currentSlabFilter = f;
   ['all','raw','gas','solar','seasoned'].forEach(x => {
     const el = document.getElementById('flt-' + x);
     if (el) el.style.background = '';
@@ -1213,19 +1219,73 @@ async function loadDispatches() {
 
 function renderDispatches(dispatches) {
   const el = document.getElementById('dispatch-list');
-  if (!dispatches.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No dispatches yet</div>'; return; }
-  el.innerHTML = dispatches.slice(0, 20).map(d => `
-    <div class="batch-item">
-      <div class="bi-main">
-        <div class="bi-inv">${d.billNo}</div>
-        <div class="bi-meta">${d.date} · ${d.invoiceNo} · <span class="sp-tag">${d.species||'—'}</span></div>
-        <div style="margin-top:4px"><span class="badge b-wood">${d.slabCount} slabs</span></div>
-      </div>
-      <div class="bi-nums">
-        <div class="bi-cft">${parseFloat(d.totalCFT||0).toFixed(2)} CFT</div>
-        <div class="bi-val">₹${parseInt(d.totalValue||0).toLocaleString('en-IN')}</div>
-      </div>
-    </div>`).join('');
+  if (!dispatches.length) {
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No dispatches yet</div>';
+    return;
+  }
+  el.innerHTML = dispatches.map((d, idx) => {
+    const isHyd = (d.notes||'').includes('[Hyd→SB]') || d.dispatchType === 'hyd_to_sb';
+    const tag = isHyd
+      ? '<span class="badge b-hyd" style="font-size:10px">🏭 via Hyd</span>'
+      : '<span class="badge b-wood" style="font-size:10px">🚚 Direct</span>';
+    const slabs = d.slabs || [];
+    const hasSlabs = slabs.length > 0;
+
+    // Slab detail rows
+    const slabRows = hasSlabs
+      ? '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">' +
+        '<thead><tr style="background:var(--bg3)">' +
+        '<th style="padding:5px 8px;text-align:left;color:var(--ink3);font-weight:500">#</th>' +
+        '<th style="padding:5px 8px;text-align:left;color:var(--ink3);font-weight:500">L mm</th>' +
+        '<th style="padding:5px 8px;text-align:left;color:var(--ink3);font-weight:500">W mm</th>' +
+        '<th style="padding:5px 8px;text-align:left;color:var(--ink3);font-weight:500">T mm</th>' +
+        '<th style="padding:5px 8px;text-align:right;color:var(--ink3);font-weight:500">CFT</th>' +
+        '</tr></thead><tbody>' +
+        slabs.map((s, i) =>
+          '<tr style="border-bottom:1px solid rgba(255,255,255,.04)">' +
+          '<td style="padding:5px 8px;color:var(--ink3);font-size:11px">' + (i+1) + '</td>' +
+          '<td style="padding:5px 8px;font-family:var(--mono)">' + (s.lengthMM||'—') + '</td>' +
+          '<td style="padding:5px 8px;font-family:var(--mono)">' + (s.widthMM||'—') + '</td>' +
+          '<td style="padding:5px 8px;font-family:var(--mono)">' + (s.thickMM||'—') + '</td>' +
+          '<td style="padding:5px 8px;font-family:var(--mono);color:var(--wood);text-align:right">' + parseFloat(s.cft||0).toFixed(3) + '</td>' +
+          '</tr>'
+        ).join('') +
+        '<tr style="background:var(--bg3)">' +
+        '<td colspan="4" style="padding:6px 8px;font-size:11px;color:var(--ink3)">Total · ' + slabs.length + ' slabs</td>' +
+        '<td style="padding:6px 8px;font-family:var(--mono);color:var(--wood);font-weight:700;text-align:right">' + parseFloat(d.totalCFT||0).toFixed(3) + '</td>' +
+        '</tr></tbody></table>'
+      : '<div style="padding:12px 0 4px;font-size:12px;color:var(--ink3)">No slab-level detail stored</div>';
+
+    return '<div class="batch-item" style="padding:0">' +
+      // Header — always visible, clickable to expand
+      '<div onclick="toggleDispatchExpand(\'dis-'+idx+'\')" style="padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start">' +
+        '<div style="flex:1">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
+            '<span class="bi-inv" style="font-size:13px">' + (d.billNo||'—') + '</span>' +
+            tag +
+          '</div>' +
+          '<div class="bi-meta" style="font-size:11px">' + d.date + ' · ' + d.invoiceNo + ' · <span class="sp-tag">' + (d.species||'—') + '</span></div>' +
+        '</div>' +
+        '<div style="text-align:right;flex-shrink:0;margin-left:12px">' +
+          '<div class="bi-cft" style="font-size:15px;font-weight:700">' + parseFloat(d.totalCFT||0).toFixed(3) + ' CFT</div>' +
+          '<div style="font-size:11px;color:var(--ink3);margin-top:2px">' + (d.slabCount||0) + ' slabs · ₹' + parseInt(d.totalValue||0).toLocaleString('en-IN') + '</div>' +
+          '<div style="font-size:10px;color:var(--ink3);margin-top:3px" id="dis-'+idx+'-arrow">▾ details</div>' +
+        '</div>' +
+      '</div>' +
+      // Expandable slab detail
+      '<div id="dis-'+idx+'" style="display:none;padding:0 16px 14px;border-top:1px solid var(--rule)">' +
+        slabRows +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleDispatchExpand(id) {
+  const el = document.getElementById(id);
+  const arrow = document.getElementById(id + '-arrow');
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.textContent = open ? '▾ details' : '▴ hide';
 }
 
 // ── DASHBOARD ──
@@ -1253,71 +1313,70 @@ function loadDash() {
 
   const seasonedCFT  = statusMap['Seasoned']?.cft || 0;
   const seasonedVal  = statusMap['Seasoned']?.value || 0;
-  // Chamber = Gas + Solar ONLY (not Hyd)
+  // In Process = Gas + Solar only (Hyd = dispatched, not in Sangwari stock)
   const chamberCFT   = (statusMap['Gas Chamber']?.cft || 0) + (statusMap['Solar Chamber']?.cft || 0);
   const chamberVal   = (statusMap['Gas Chamber']?.value || 0) + (statusMap['Solar Chamber']?.value || 0);
-  const hydCFT       = statusMap['Sent to Hyderabad']?.cft || 0;
-  const hydVal       = statusMap['Sent to Hyderabad']?.value || 0;
   const rawCFT       = statusMap['Unseasoned']?.cft || 0;
   const rawVal       = statusMap['Unseasoned']?.value || 0;
+  // Total excludes Hyd (dispatched) and already Dispatched to SB
+  const activeCFT    = rawCFT + chamberCFT + seasonedCFT;
+  const activeVal    = rawVal + chamberVal + seasonedVal;
 
-  document.getElementById('k-stock').textContent    = totalCFT.toFixed(1);
-  document.getElementById('k-stock-val').textContent = '₹' + Math.round(totalValue).toLocaleString('en-IN');
+  document.getElementById('k-stock').textContent    = activeCFT.toFixed(1);
+  document.getElementById('k-stock-val').textContent = '₹' + Math.round(activeVal).toLocaleString('en-IN');
   document.getElementById('k-seasoned').textContent  = seasonedCFT.toFixed(1);
   document.getElementById('k-seasoned-val').textContent = seasonedVal > 0 ? '₹' + Math.round(seasonedVal).toLocaleString('en-IN') : '';
   document.getElementById('k-chamber').textContent   = chamberCFT.toFixed(1);
   document.getElementById('k-chamber-val').textContent = chamberVal > 0 ? '₹' + Math.round(chamberVal).toLocaleString('en-IN') : '';
-  document.getElementById('k-hyd').textContent       = hydCFT.toFixed(1);
-  document.getElementById('k-hyd-val').textContent   = hydVal > 0 ? '₹' + Math.round(hydVal).toLocaleString('en-IN') : '';
   document.getElementById('k-raw').textContent       = rawCFT.toFixed(1);
   document.getElementById('k-raw-val').textContent   = rawVal > 0 ? '₹' + Math.round(rawVal).toLocaleString('en-IN') : '';
 
-  // ── Dispatch by species ──
+  // ── Dispatch tile ──
   const now = new Date();
   const thisMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
-  const lastMonth = new Date(now.getFullYear(), now.getMonth()-1, 1);
-  const lastMonthStr = lastMonth.getFullYear() + '-' + String(lastMonth.getMonth()+1).padStart(2,'0');
+  const thisMonLabel = now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+  document.getElementById('dispatch-month-label').textContent = thisMonLabel;
 
-  // Build monthly dispatch totals by species
-  const dispBySpecies = {}; // { species: { thisMonth: cft, lastMonth: cft, total: cft } }
-  ST.dispatches.forEach(d => {
+  const thisMonDispatches = ST.dispatches.filter(d => (d.date||'').slice(0,7) === thisMonth);
+  const bySpeciesThis = {};
+  thisMonDispatches.forEach(d => {
     const sp = d.species || 'Unknown';
-    const mo = (d.date || '').slice(0, 7);
-    if (!dispBySpecies[sp]) dispBySpecies[sp] = { thisMonth: 0, lastMonth: 0, total: 0 };
-    const cft = parseFloat(d.totalCFT || 0);
-    dispBySpecies[sp].total += cft;
-    if (mo === thisMonth) dispBySpecies[sp].thisMonth += cft;
-    if (mo === lastMonthStr) dispBySpecies[sp].lastMonth += cft;
+    if (!bySpeciesThis[sp]) bySpeciesThis[sp] = 0;
+    bySpeciesThis[sp] += parseFloat(d.totalCFT || 0);
   });
 
-  const thisMonLabel = now.toLocaleString('en-IN', { month: 'short', year: '2-digit' });
-  const lastMonLabel = lastMonth.toLocaleString('en-IN', { month: 'short', year: '2-digit' });
-  document.getElementById('dispatch-month-label').textContent = thisMonLabel + ' vs ' + lastMonLabel;
-
-  const totalDispatched = ST.dispatches.reduce((s, d) => s + parseFloat(d.totalCFT||0), 0);
-
-  if (!ST.dispatches.length) {
-    document.getElementById('dispatch-by-species').innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No dispatches yet</div>';
+  const monthEl = document.getElementById('dispatch-this-month');
+  if (!thisMonDispatches.length) {
+    monthEl.innerHTML = '<div style="padding:20px 16px;text-align:center;color:var(--ink3);font-size:13px">No dispatches this month</div>';
   } else {
-    document.getElementById('dispatch-by-species').innerHTML =
-      '<div style="padding:10px 16px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;font-size:12px;color:var(--ink3)">' +
-        '<span>Species</span><span style="display:flex;gap:32px"><span>' + thisMonLabel + '</span><span>' + lastMonLabel + '</span><span>Total</span></span>' +
-      '</div>' +
-      Object.entries(dispBySpecies).sort((a,b) => b[1].total - a[1].total).map(([sp, d]) =>
-        '<div style="padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center">' +
-          '<div><span style="font-weight:600;font-size:13px">' + sp + '</span></div>' +
-          '<div style="display:flex;gap:32px;font-family:var(--mono);font-size:13px">' +
-            '<span style="color:var(--wood);font-weight:600;min-width:52px;text-align:right">' + d.thisMonth.toFixed(1) + '</span>' +
-            '<span style="color:var(--ink3);min-width:52px;text-align:right">' + d.lastMonth.toFixed(1) + '</span>' +
-            '<span style="color:var(--ink);min-width:52px;text-align:right">' + d.total.toFixed(1) + '</span>' +
-          '</div>' +
+    monthEl.innerHTML = Object.entries(bySpeciesThis)
+      .sort((a,b) => b[1]-a[1])
+      .map(([sp, cft]) =>
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--rule)">' +
+          '<span style="font-weight:600;font-size:14px">' + sp + '</span>' +
+          '<span class="mono" style="color:var(--wood);font-size:15px;font-weight:700">' + cft.toFixed(3) + ' CFT</span>' +
         '</div>'
       ).join('') +
-      '<div style="padding:10px 16px;display:flex;justify-content:space-between;font-size:12px;font-weight:600">' +
-        '<span style="color:var(--ink3)">Total</span>' +
-        '<span class="mono" style="color:var(--wood)">' + totalDispatched.toFixed(1) + ' CFT</span>' +
+      '<div style="padding:8px 16px;display:flex;justify-content:space-between;font-size:12px;color:var(--ink3)">' +
+        '<span>Total dispatched</span>' +
+        '<span class="mono" style="color:var(--wood);font-weight:600">' + thisMonDispatches.reduce((s,d)=>s+parseFloat(d.totalCFT||0),0).toFixed(3) + ' CFT</span>' +
       '</div>';
-  } // end else
+  }
+
+  // History button
+  const histBtn = document.getElementById('dispatch-history-btn');
+  if (ST.dispatches.length > thisMonDispatches.length) {
+    histBtn.style.display = 'block';
+    // Pre-render history
+    const older = ST.dispatches.filter(d => (d.date||'').slice(0,7) !== thisMonth);
+    document.getElementById('dispatch-history-list').innerHTML = older.map(d =>
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--rule)">' +
+        '<div><div style="font-size:12px;font-weight:600">' + (d.species||'—') + '</div>' +
+        '<div style="font-size:11px;color:var(--ink3)">' + d.date + ' · Bill ' + (d.billNo||'—') + '</div></div>' +
+        '<span class="mono" style="font-size:13px;color:var(--ink2)">' + parseFloat(d.totalCFT||0).toFixed(3) + ' CFT</span>' +
+      '</div>'
+    ).join('');
+  } else { histBtn.style.display = 'none'; }
 
   // Species breakdown
   const speciesMap = {};
@@ -2321,6 +2380,57 @@ async function saveSESlabs() {
     } else toast('Error: '+(r.error||'Failed'),'err');
   }catch(e){toast('Network error','err');}
   btn.disabled=false; btn.innerHTML='💾 Save Slabs';
+}
+
+function toggleDispatchHistory() {
+  const wrap = document.getElementById('dispatch-history-wrap');
+  const btn = document.getElementById('dispatch-history-btn');
+  const showing = wrap.style.display !== 'none';
+  wrap.style.display = showing ? 'none' : 'block';
+  btn.textContent = showing ? 'Show all dispatches ↓' : 'Hide history ↑';
+}
+
+function openAddSlabDetailsModal() {
+  // Show batch picker — filter by current status filter
+  const status = window._currentSlabFilter || 'all';
+  const batches = status === 'all'
+    ? ST.batches.filter(b => !b.isCreditNote)
+    : ST.batches.filter(b => !b.isCreditNote && (b.seasoningStatus === status || status === 'all'));
+
+  if (!batches.length) {
+    // Fall back to all batches
+    const allBatches = ST.batches.filter(b => !b.isCreditNote);
+    if (!allBatches.length) { toast('No batches found', 'err'); return; }
+    openBatchPickerForSlabEntry(allBatches);
+  } else if (batches.length === 1) {
+    openSlabEntryModal(batches[0].invoiceNo, batches[0].species);
+  } else {
+    openBatchPickerForSlabEntry(batches);
+  }
+}
+
+function openBatchPickerForSlabEntry(batches) {
+  // If multiple batches — show a quick picker modal
+  const existing = document.getElementById('batch-picker-modal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'batch-picker-modal';
+  modal.className = 'modal show';
+  modal.innerHTML = '<div class="modal-box"><div class="modal-handle"></div>' +
+    '<div class="modal-title">Select Batch</div>' +
+    '<div class="modal-sub">Choose which batch to add slab details for</div>' +
+    '<div style="max-height:400px;overflow-y:auto">' +
+    batches.map(b =>
+      '<button onclick="document.getElementById(\'batch-picker-modal\').remove();openSlabEntryModal(\''+b.invoiceNo+'\',\''+b.species+'\')" ' +
+      'style="width:100%;text-align:left;background:var(--bg3);border:1px solid var(--rule);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;cursor:pointer;color:var(--ink)">' +
+        '<div style="font-weight:600;font-size:13px">'+(b.batchName||b.invoiceNo)+'</div>' +
+        '<div style="font-size:11px;color:var(--ink3);margin-top:2px">'+b.species+' · '+parseFloat(b.totalCFT||0).toFixed(1)+' CFT · '+(b.seasoningStatus||'Unseasoned')+'</div>' +
+      '</button>'
+    ).join('') +
+    '</div>' +
+    '<button class="btn btn-sec btn-full" onclick="document.getElementById(\'batch-picker-modal\').remove()" style="margin-top:8px">Cancel</button>' +
+    '</div>';
+  document.body.appendChild(modal);
 }
 
 function toggleCostFreight() {
