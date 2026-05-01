@@ -257,11 +257,6 @@ select option{background:var(--bg3);color:var(--ink)}
       </div>
 
       <div class="card">
-        <div class="card-head"><span class="card-title">Recent Dispatches to Solid Bench</span></div>
-        <div id="recent-dispatch"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
-      </div>
-
-      <div class="card">
         <div class="card-head"><span class="card-title">Batches Needing Attention</span></div>
         <div id="attention-list"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
       </div>
@@ -1224,16 +1219,10 @@ function renderDispatches(dispatches) {
     return;
   }
   el.innerHTML = dispatches.map((d, idx) => {
-    const isHyd = (d.notes||'').includes('[Hyd→SB]') || d.dispatchType === 'hyd_to_sb';
-    const tag = isHyd
-      ? '<span class="badge b-hyd" style="font-size:10px">🏭 via Hyd</span>'
-      : '<span class="badge b-wood" style="font-size:10px">🚚 Direct</span>';
-    const slabs = d.slabs || [];
-    const hasSlabs = slabs.length > 0;
-
-    // Check if purchase batch exists for this dispatch's species
+    const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
+    const tag = isHyd ? '<span class="badge b-hyd" style="font-size:10px">🏭 via Hyd</span>' : '<span class="badge b-wood" style="font-size:10px">🚚 Direct</span>';
     const hasBatch = ST.batches.some(b => b.invoiceNo === d.invoiceNo);
-    const missingBillBanner = !hasBatch
+    const missingBanner = !hasBatch
       ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;background:rgba(192,150,58,.15);border-top:1px solid rgba(192,150,58,.3)">' +
           '<span style="font-size:11px;color:var(--amber)">⚠ No purchase bill for ' + (d.species||'this species') + '</span>' +
           '<div style="display:flex;gap:6px;flex-shrink:0">' +
@@ -1242,34 +1231,8 @@ function renderDispatches(dispatches) {
           '</div>' +
         '</div>'
       : '';
-
-    // Slab detail rows
-    const slabRows = hasSlabs
-      ? '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">' +
-        '<thead><tr style="background:var(--bg3)">' +
-        '<th style="padding:5px 8px;text-align:left;color:var(--ink3);font-weight:500">#</th>' +
-        '<th style="padding:5px 8px;text-align:left;color:var(--ink3);font-weight:500">L mm</th>' +
-        '<th style="padding:5px 8px;text-align:left;color:var(--ink3);font-weight:500">W mm</th>' +
-        '<th style="padding:5px 8px;text-align:left;color:var(--ink3);font-weight:500">T mm</th>' +
-        '<th style="padding:5px 8px;text-align:right;color:var(--ink3);font-weight:500">CFT</th>' +
-        '</tr></thead><tbody>' +
-        slabs.map((s, i) =>
-          '<tr style="border-bottom:1px solid rgba(255,255,255,.04)">' +
-          '<td style="padding:5px 8px;color:var(--ink3);font-size:11px">' + (i+1) + '</td>' +
-          '<td style="padding:5px 8px;font-family:var(--mono)">' + (s.lengthMM||'—') + '</td>' +
-          '<td style="padding:5px 8px;font-family:var(--mono)">' + (s.widthMM||'—') + '</td>' +
-          '<td style="padding:5px 8px;font-family:var(--mono)">' + (s.thickMM||'—') + '</td>' +
-          '<td style="padding:5px 8px;font-family:var(--mono);color:var(--wood);text-align:right">' + parseFloat(s.cft||0).toFixed(3) + '</td>' +
-          '</tr>'
-        ).join('') +
-        '<tr style="background:var(--bg3)">' +
-        '<td colspan="4" style="padding:6px 8px;font-size:11px;color:var(--ink3)">Total · ' + slabs.length + ' slabs</td>' +
-        '<td style="padding:6px 8px;font-family:var(--mono);color:var(--wood);font-weight:700;text-align:right">' + parseFloat(d.totalCFT||0).toFixed(3) + '</td>' +
-        '</tr></tbody></table>'
-      : '<div style="padding:12px 0 4px;font-size:12px;color:var(--ink3)">No slab-level detail stored</div>';
-
     return '<div class="batch-item" style="padding:0;overflow:hidden">' +
-      '<div onclick="toggleDispatchExpand(\'dis-'+idx+'\')" style="padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start">' +
+      '<div onclick="toggleDispatchExpand(\'dis-'+idx+'\',\''+d.dispatchId+'\')" style="padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start">' +
         '<div style="flex:1">' +
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
             '<span class="bi-inv" style="font-size:13px">' + (d.billNo||'—') + '</span>' +
@@ -1281,23 +1244,37 @@ function renderDispatches(dispatches) {
         '<div style="text-align:right;flex-shrink:0;margin-left:12px">' +
           '<div class="bi-cft" style="font-size:15px;font-weight:700">' + parseFloat(d.totalCFT||0).toFixed(3) + ' CFT</div>' +
           '<div style="font-size:11px;color:var(--ink3);margin-top:2px">' + (d.slabCount||0) + ' slabs · ₹' + parseInt(d.totalValue||0).toLocaleString('en-IN') + '</div>' +
-          '<div style="font-size:10px;color:var(--ink3);margin-top:3px" id="dis-'+idx+'-arrow">▾ details</div>' +
+          '<div style="font-size:10px;color:var(--ink3);margin-top:3px" id="dis-'+idx+'-arrow">▾ slabs</div>' +
         '</div>' +
       '</div>' +
-      missingBillBanner +
-      '<div id="dis-'+idx+'" style="display:none;padding:0 16px 14px;border-top:1px solid var(--rule)">' +
-        slabRows +
-      '</div>' +
+      missingBanner +
+      '<div id="dis-'+idx+'" style="display:none;padding:12px 16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:13px">Loading…</div>' +
     '</div>';
   }).join('');
 }
 
-function toggleDispatchExpand(id) {
+async function toggleDispatchExpand(id, dispatchId) {
   const el = document.getElementById(id);
   const arrow = document.getElementById(id + '-arrow');
   const open = el.style.display !== 'none';
-  el.style.display = open ? 'none' : 'block';
-  if (arrow) arrow.textContent = open ? '▾ details' : '▴ hide';
+  if (open) {
+    el.style.display = 'none';
+    if (arrow) arrow.textContent = '▾ slabs';
+    return;
+  }
+  el.style.display = 'block';
+  if (arrow) arrow.textContent = '▴ hide';
+  // Load slab detail on demand
+  try {
+    const r = await apiGet({ action: 'getSWDispatchDetail', dispatchId });
+    const slabs = r.slabs || [];
+    if (!slabs.length) { el.innerHTML = '<div style="color:var(--ink3);font-size:13px">No slab-level detail stored</div>'; return; }
+    el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+      '<thead><tr style="background:var(--bg3)"><th style="padding:5px 8px;text-align:left;color:var(--ink3)">#</th><th style="padding:5px 8px;text-align:left;color:var(--ink3)">L mm</th><th style="padding:5px 8px;text-align:left;color:var(--ink3)">W mm</th><th style="padding:5px 8px;text-align:left;color:var(--ink3)">T mm</th><th style="padding:5px 8px;text-align:right;color:var(--ink3)">CFT</th></tr></thead><tbody>' +
+      slabs.map((s,i) => '<tr style="border-bottom:1px solid rgba(255,255,255,.04)"><td style="padding:5px 8px;color:var(--ink3);font-size:11px">'+(i+1)+'</td><td style="padding:5px 8px;font-family:var(--mono)">'+(s.lengthMM||'—')+'</td><td style="padding:5px 8px;font-family:var(--mono)">'+(s.widthMM||'—')+'</td><td style="padding:5px 8px;font-family:var(--mono)">'+(s.thickMM||'—')+'</td><td style="padding:5px 8px;font-family:var(--mono);color:var(--wood);text-align:right">'+parseFloat(s.cft||0).toFixed(3)+'</td></tr>').join('') +
+      '<tr style="background:var(--bg3)"><td colspan="4" style="padding:6px 8px;font-size:11px;color:var(--ink3)">Total · '+slabs.length+' slabs</td><td style="padding:6px 8px;font-family:var(--mono);color:var(--wood);font-weight:700;text-align:right">'+slabs.reduce((s,x)=>s+parseFloat(x.cft||0),0).toFixed(3)+'</td></tr>' +
+      '</tbody></table>';
+  } catch(e) { el.innerHTML = '<div style="color:var(--red);font-size:13px">Error loading slabs</div>'; }
 }
 
 async function markAsOpeningStock(invoiceNo, species) {
@@ -1377,64 +1354,50 @@ function loadDash() {
   document.getElementById('dispatch-month-label').textContent = thisMonLabel;
 
   const thisMonDispatches = ST.dispatches.filter(d => (d.date||'').slice(0,7) === thisMonth);
-  const bySpeciesThis = {};
-  thisMonDispatches.forEach(d => {
-    const sp = d.species || 'Unknown';
-    const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
-    if (!bySpeciesThis[sp]) bySpeciesThis[sp] = { cft: 0, isHyd };
-    bySpeciesThis[sp].cft += parseFloat(d.totalCFT || 0);
-    if (isHyd) bySpeciesThis[sp].isHyd = true;
-  });
+  const lastMonth = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const lastMonthStr = lastMonth.getFullYear() + '-' + String(lastMonth.getMonth()+1).padStart(2,'0');
+  const lastMonLabel = lastMonth.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+  const lastMonDispatches = ST.dispatches.filter(d => (d.date||'').slice(0,7) === lastMonthStr);
 
-  const monthEl = document.getElementById('dispatch-this-month');
-  if (!thisMonDispatches.length) {
-    monthEl.innerHTML = '<div style="padding:20px 16px;text-align:center;color:var(--ink3);font-size:13px">No dispatches this month</div>';
-  } else {
-    monthEl.innerHTML = Object.entries(bySpeciesThis)
-      .sort((a,b) => b[1].cft - a[1].cft)
-      .map(([sp, d]) =>
-        '<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--rule)">' +
-          '<div style="display:flex;align-items:center;gap:8px">' +
-            '<span style="font-weight:600;font-size:14px">' + sp + '</span>' +
-            (d.isHyd ? '<span class="badge b-hyd" style="font-size:10px">via Hyd</span>' : '<span class="badge b-wood" style="font-size:10px">direct</span>') +
-          '</div>' +
-          '<span class="mono" style="color:var(--wood);font-size:15px;font-weight:700">' + d.cft.toFixed(3) + ' CFT</span>' +
-        '</div>'
-      ).join('') +
-      '<div style="padding:8px 16px;display:flex;justify-content:space-between;font-size:12px;color:var(--ink3)">' +
-        '<span>' + thisMonLabel + ' total</span>' +
-        '<span class="mono" style="color:var(--wood);font-weight:600">' + thisMonDispatches.reduce((s,d)=>s+parseFloat(d.totalCFT||0),0).toFixed(3) + ' CFT</span>' +
-      '</div>';
+  function groupBySpecies(list) {
+    const map = {};
+    list.forEach(d => {
+      const sp = d.species || 'Unknown';
+      const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
+      if (!map[sp]) map[sp] = { cft: 0, isHyd };
+      map[sp].cft += parseFloat(d.totalCFT || 0);
+      if (isHyd) map[sp].isHyd = true;
+    });
+    return map;
   }
 
-  // History button — older months
-  const histBtn = document.getElementById('dispatch-history-btn');
-  const older = ST.dispatches.filter(d => (d.date||'').slice(0,7) !== thisMonth);
-  if (older.length) {
-    histBtn.style.display = 'block';
-    // Group older by month+species
-    const byMonth = {};
-    older.forEach(d => {
-      const mo = (d.date||'').slice(0,7);
-      const sp = d.species||'Unknown';
-      const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
-      const key = mo + '|' + sp;
-      if (!byMonth[key]) byMonth[key] = { mo, sp, cft: 0, isHyd };
-      byMonth[key].cft += parseFloat(d.totalCFT||0);
-      if (isHyd) byMonth[key].isHyd = true;
-    });
-    document.getElementById('dispatch-history-list').innerHTML = Object.values(byMonth)
-      .sort((a,b) => b.mo.localeCompare(a.mo))
-      .map(d =>
-        '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--rule)">' +
-          '<div>' +
-            '<div style="font-size:12px;font-weight:600">' + d.sp + (d.isHyd ? ' <span class="badge b-hyd" style="font-size:9px">via Hyd</span>' : '') + '</div>' +
-            '<div style="font-size:11px;color:var(--ink3)">' + d.mo + '</div>' +
-          '</div>' +
-          '<span class="mono" style="font-size:13px;color:var(--ink2)">' + d.cft.toFixed(3) + ' CFT</span>' +
-        '</div>'
-      ).join('');
-  } else { histBtn.style.display = 'none'; }
+  function renderMonthBlock(label, list) {
+    const bySpecies = groupBySpecies(list);
+    if (!list.length) return '<div style="padding:10px 16px;color:var(--ink3);font-size:12px">No dispatches</div>';
+    return Object.entries(bySpecies).sort((a,b)=>b[1].cft-a[1].cft).map(([sp, d]) =>
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--rule)">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-weight:600;font-size:13px">' + sp + '</span>' +
+          (d.isHyd ? '<span class="badge b-hyd" style="font-size:9px">via Hyd</span>' : '<span class="badge b-wood" style="font-size:9px">direct</span>') +
+        '</div>' +
+        '<span class="mono" style="color:var(--wood);font-size:14px;font-weight:700">' + d.cft.toFixed(3) + ' CFT</span>' +
+      '</div>'
+    ).join('') +
+    '<div style="padding:7px 16px;display:flex;justify-content:space-between;font-size:11px;color:var(--ink3);background:var(--bg3)">' +
+      '<span>Total</span>' +
+      '<span class="mono" style="font-weight:600">' + list.reduce((s,d)=>s+parseFloat(d.totalCFT||0),0).toFixed(3) + ' CFT</span>' +
+    '</div>';
+  }
+
+  const monthEl = document.getElementById('dispatch-this-month');
+  monthEl.innerHTML =
+    '<div style="padding:8px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--wood);font-weight:600">' + thisMonLabel + '</div>' +
+    renderMonthBlock(thisMonLabel, thisMonDispatches) +
+    '<div style="padding:8px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-top:4px">' + lastMonLabel + '</div>' +
+    renderMonthBlock(lastMonLabel, lastMonDispatches);
+
+  // Hide history button — 2 months is enough on dashboard
+  document.getElementById('dispatch-history-btn').style.display = 'none';
 
   // Species breakdown
   const speciesMap = {};
@@ -1463,16 +1426,6 @@ function loadDash() {
         <div class="prog-fill" style="width:${(d.cft/maxCFT*100).toFixed(0)}%;background:var(--wood)"></div>
       </div>
     </div>`).join('') || '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No data yet</div>';
-
-  // Recent dispatches
-  document.getElementById('recent-dispatch').innerHTML = ST.dispatches.slice(0, 5).map(d => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--rule)">
-      <div>
-        <div class="mono" style="color:var(--wood);font-size:13px">${d.billNo}</div>
-        <div style="font-size:11px;color:var(--ink3);margin-top:2px">${d.date} · ${d.slabCount} slabs</div>
-      </div>
-      <div class="mono" style="color:var(--ink)">${parseFloat(d.totalCFT||0).toFixed(2)} CFT</div>
-    </div>`).join('') || '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No dispatches yet</div>';
 
   // Attention needed
   const needsAttention = ST.batches.filter(b => b.seasoningStatus === 'Unseasoned' && parseFloat(b.remainingCFT||b.totalCFT||0) > 0);
