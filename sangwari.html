@@ -304,7 +304,10 @@ select option{background:var(--bg3);color:var(--ink)}
 
     <!-- DISPATCH -->
     <div class="screen" id="screen-dis">
-      <button class="btn btn-primary btn-full" onclick="showDispatchModal()" style="margin-bottom:16px">+ New Dispatch to Solid Bench</button>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="showDispatchModal()" style="flex:1">🚚 Dispatch to Solid Bench</button>
+        <button class="btn btn-sm" onclick="showHydDispatchModal()" style="flex:1;background:var(--hyd);color:white">🏭→🚚 Dispatch via Hyd</button>
+      </div>
 
       <div class="card">
         <div class="card-head"><span class="card-title">Dispatch History</span></div>
@@ -654,6 +657,89 @@ select option{background:var(--bg3);color:var(--ink)}
       </div>
     </div>
     <button class="btn btn-sec btn-full" onclick="closeStatusModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- DISPATCH VIA HYD MODAL -->
+<div class="modal" id="hyd-dis-modal">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🏭→🚚 Dispatch via Hyderabad</div>
+    <div class="modal-sub">Upload Xpertpack bill — slabs auto-matched from Hyd inventory</div>
+
+    <!-- Upload or manual -->
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn btn-sm" id="hyd-dis-mode-upload" onclick="setHydDisMode('upload')" style="background:var(--wood);color:white;flex:1">📄 Upload XP Bill</button>
+      <button class="btn btn-sec btn-sm" id="hyd-dis-mode-manual" onclick="setHydDisMode('manual')" style="flex:1">✏️ Enter Manually</button>
+    </div>
+
+    <!-- Upload zone -->
+    <div id="hyd-dis-upload-zone" style="margin-bottom:12px">
+      <div class="uz" onclick="document.getElementById('f-hyd-dis-bill').click()" style="padding:20px">
+        <input type="file" id="f-hyd-dis-bill" accept="image/*,.pdf" onchange="procHydDisBill(event)" style="display:none">
+        <div class="uz-icon" style="font-size:24px">📄</div>
+        <div class="uz-title" style="font-size:13px">Upload Xpertpack GST invoice</div>
+        <div class="uz-sub">AI reads bill no, CFT, species, date</div>
+      </div>
+      <div class="ai-spin-wrap" id="ai-hyd-dis"><div class="ai-spin"></div> Reading bill…</div>
+    </div>
+
+    <!-- Bill details form -->
+    <div id="hyd-dis-form">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>XP Bill No.</label><input type="text" id="hd-billno" placeholder="1T262701708"></div>
+        <div class="field"><label>Date</label><input type="date" id="hd-date"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="field"><label>Species</label>
+          <select id="hd-species">
+            <option>White Oak</option><option>White Ash</option><option>Rosewood</option>
+            <option>Uttarakhand Teak</option><option>CP Teak</option><option>Siris</option>
+            <option>Agar</option><option>Eucalyptus</option><option>Cedar</option>
+          </select>
+        </div>
+        <div class="field"><label>Bill CFT (from bill)</label><input type="number" id="hd-bill-cft" step="0.001" placeholder="161.962" oninput="checkHydCFTMatch()"></div>
+      </div>
+      <div class="field"><label>Source Batch</label>
+        <select id="hd-batch" onchange="loadHydSlabsForDispatch()">
+          <option value="">— select batch —</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Slab matching -->
+    <div id="hyd-dis-slabs-wrap" style="display:none">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:8px">Slabs Sent to Hyderabad — select what's being dispatched</div>
+
+      <!-- CFT match indicator -->
+      <div id="hd-cft-match" style="padding:8px 12px;border-radius:4px;margin-bottom:10px;font-size:12px;display:none"></div>
+
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn btn-sec btn-sm" onclick="selectAllHydSlabs()">Select All</button>
+        <span style="font-size:12px;color:var(--ink3);align-self:center" id="hd-sel-count">0 selected · 0.000 CFT</span>
+      </div>
+
+      <div id="hyd-dis-slab-list" style="max-height:250px;overflow-y:auto;border:1px solid var(--rule);border-radius:4px;margin-bottom:12px">
+        <div style="padding:16px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Rate info -->
+    <div id="hd-rate-info" style="display:none;background:var(--bg3);border-radius:var(--r);padding:10px 12px;margin-bottom:12px">
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px">Vendor Rate/CFT</div><div class="mono" id="hd-vendor-rate" style="color:var(--ink)">—</div></div>
+        <div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px">XP Markup</div><div class="mono" style="color:var(--amber)">+₹200</div></div>
+        <div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px">Bill Rate/CFT</div><div class="mono" id="hd-bill-rate" style="color:var(--wood);font-weight:700">—</div></div>
+        <div><div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px">Total Bill Value</div><div class="mono" id="hd-total-value" style="color:var(--wood);font-weight:700">—</div></div>
+      </div>
+    </div>
+
+    <div class="field"><label>Notes (optional)</label><textarea id="hd-notes" style="min-height:50px" placeholder="e.g. Batch 1 of 2 from Hyd"></textarea></div>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sec" onclick="closeHydDisModal()" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="saveHydDispatch()" style="flex:2;background:var(--hyd)" id="hyd-dis-save-btn">🚚 Save Dispatch</button>
+    </div>
   </div>
 </div>
 
@@ -1025,7 +1111,7 @@ function calcHydTotals() {
     const w = parseFloat(document.getElementById('hdr'+id+'w')?.value)||0;
     const t = parseFloat(document.getElementById('hdr'+id+'t')?.value)||0;
     if (!l||!w||!t) return;
-    const cft = (l*w*t)/1e9*35.3147;
+    const cft = Math.round((l*w*t)/1e9*35.31466560103903*1000)/1000;
     totalCFT += cft; count++;
     const el = document.getElementById('hdr'+id+'cft');
     if (el) el.textContent = cft.toFixed(3);
@@ -1061,7 +1147,7 @@ async function readHydSheet(event) {
         const id = ++hydRowCount;
         const tr = document.createElement('tr');
         tr.id = 'hdr' + id;
-        const cft = r.lengthMM && r.widthMM && r.thickMM ? ((r.lengthMM*r.widthMM*r.thickMM)/1e9*35.3147).toFixed(3) : '—';
+        const cft = r.lengthMM && r.widthMM && r.thickMM ? (Math.round((r.lengthMM*r.widthMM*r.thickMM)/1e9*35.31466560103903*1000)/1000).toFixed(3) : '—';
         tr.innerHTML = `
           <td><input type="number" id="hdr${id}l" value="${r.lengthMM||''}" oninput="calcHydTotals()" style="width:70px"></td>
           <td><input type="number" id="hdr${id}w" value="${r.widthMM||''}" oninput="calcHydTotals()" style="width:65px"></td>
@@ -1093,7 +1179,7 @@ async function saveSendToHyd() {
     const l = parseFloat(document.getElementById('hdr'+id+'l')?.value)||0;
     const w = parseFloat(document.getElementById('hdr'+id+'w')?.value)||0;
     const t = parseFloat(document.getElementById('hdr'+id+'t')?.value)||0;
-    if (l&&w&&t) { const cbm=(l*w*t)/1e9; slabs.push({lengthMM:l,widthMM:w,thickMM:t,cbm,cft:cbm*35.3147}); }
+    if (l&&w&&t) { const cbm=(l*w*t)/1e9; slabs.push({lengthMM:l,widthMM:w,thickMM:t,cbm,cft:Math.round(cbm*35.31466560103903*1000)/1000}); }
   });
   if (!slabs.length) { toast('Add at least one slab', 'err'); return; }
   const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
@@ -1839,6 +1925,223 @@ function renderCostHistory(costs) {
   }).join('');
 }
 
+// ── DISPATCH VIA HYD ─────────────────────────────────────
+let hydDisSelectedSlabs = new Set();
+let hydDisSlabsAvailable = [];
+
+function showHydDispatchModal() {
+  hydDisSelectedSlabs.clear();
+  hydDisSlabsAvailable = [];
+  document.getElementById('hd-billno').value = '';
+  document.getElementById('hd-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('hd-bill-cft').value = '';
+  document.getElementById('hd-notes').value = '';
+  document.getElementById('hyd-dis-slabs-wrap').style.display = 'none';
+  document.getElementById('hd-rate-info').style.display = 'none';
+  document.getElementById('hd-cft-match').style.display = 'none';
+  document.getElementById('ai-hyd-dis').classList.remove('show');
+  // Populate batch dropdown — only batches that have Sent to Hyd slabs
+  const sel = document.getElementById('hd-batch');
+  sel.innerHTML = '<option value="">— select batch —</option>' +
+    ST.batches.filter(b => parseFloat(b.remainingCFT||b.totalCFT||0) > 0)
+    .map(b => '<option value="'+b.invoiceNo+'">'+(b.batchName||b.invoiceNo)+' · '+b.species+'</option>').join('');
+  setHydDisMode('upload');
+  document.getElementById('hyd-dis-modal').classList.add('show');
+}
+
+function closeHydDisModal() { document.getElementById('hyd-dis-modal').classList.remove('show'); }
+
+function setHydDisMode(mode) {
+  document.getElementById('hyd-dis-upload-zone').style.display = mode === 'upload' ? 'block' : 'none';
+  document.getElementById('hyd-dis-mode-upload').style.background = mode === 'upload' ? 'var(--wood)' : '';
+  document.getElementById('hyd-dis-mode-upload').style.color = mode === 'upload' ? 'white' : '';
+  document.getElementById('hyd-dis-mode-manual').style.background = mode === 'manual' ? 'var(--wood)' : '';
+  document.getElementById('hyd-dis-mode-manual').style.color = mode === 'manual' ? 'white' : '';
+}
+
+async function procHydDisBill(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (!CFG.key) { toast('Claude API key not set', 'err'); return; }
+  document.getElementById('ai-hyd-dis').classList.add('show');
+  try {
+    const b64 = await toB64(file);
+    const mt = file.type === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
+    const prompt = `Read this Xpertpack GST invoice to Solid Bench for wood/timber.
+Extract:
+- billNo: document/invoice number
+- date: YYYY-MM-DD
+- species: map to "White Oak","White Ash","Rosewood","Uttarakhand Teak","CP Teak","Siris","Agar","Eucalyptus","Cedar"
+- totalCFT: total CFT quantity on bill
+- rateCFT: rate per CFT
+- totalValue: taxable amount (pre-GST)
+Return ONLY JSON: {"billNo":"1T262701708","date":"2026-05-01","species":"Rosewood","totalCFT":161.962,"rateCFT":2600,"totalValue":421101.2}`;
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':CFG.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:[
+        {type: mt==='application/pdf'?'document':'image', source:{type:'base64',media_type:mt,data:b64.split(',')[1]}},
+        {type:'text',text:prompt}
+      ]}]})
+    });
+    const data = await resp.json();
+    const txt = data.content?.[0]?.text || '{}';
+    const d = JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim());
+    document.getElementById('ai-hyd-dis').classList.remove('show');
+    if (d.billNo)    document.getElementById('hd-billno').value = d.billNo;
+    if (d.date)      document.getElementById('hd-date').value = d.date;
+    if (d.species)   document.getElementById('hd-species').value = d.species;
+    if (d.totalCFT)  { document.getElementById('hd-bill-cft').value = d.totalCFT; checkHydCFTMatch(); }
+    toast('Bill read ✓ — select batch and verify slabs', 'ok');
+  } catch(e) {
+    document.getElementById('ai-hyd-dis').classList.remove('show');
+    toast('Read failed — enter manually', 'err');
+  }
+  document.getElementById('f-hyd-dis-bill').value = '';
+}
+
+async function loadHydSlabsForDispatch() {
+  const batchId = document.getElementById('hd-batch').value;
+  if (!batchId) { document.getElementById('hyd-dis-slabs-wrap').style.display = 'none'; return; }
+  const species = document.getElementById('hd-species').value;
+
+  try {
+    const r = await apiGet({ action: 'getSWSlabs' });
+    // Filter slabs: Sent to Hyd, matching batch and species
+    hydDisSlabsAvailable = (r.slabs || []).filter(s =>
+      s.invoiceNo === batchId &&
+      s.status === 'Sent to Hyderabad' &&
+      (!species || s.species === species)
+    );
+
+    document.getElementById('hyd-dis-slabs-wrap').style.display = 'block';
+
+    // Show rate info
+    const b = ST.batches.find(x => x.invoiceNo === batchId);
+    if (b) {
+      const vendorRate = parseFloat(b.rateCFT || 0);
+      const billRate = vendorRate + 200; // Tier 2 markup
+      document.getElementById('hd-vendor-rate').textContent = '₹' + Math.round(vendorRate).toLocaleString('en-IN');
+      document.getElementById('hd-bill-rate').textContent = '₹' + Math.round(billRate).toLocaleString('en-IN');
+      document.getElementById('hd-rate-info').style.display = 'block';
+    }
+
+    renderHydDisSlabs();
+    checkHydCFTMatch();
+  } catch(e) { toast('Error loading slabs', 'err'); }
+}
+
+function renderHydDisSlabs() {
+  const el = document.getElementById('hyd-dis-slab-list');
+  if (!hydDisSlabsAvailable.length) {
+    el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--ink3);font-size:13px">No "Sent to Hyd" slabs found for this batch/species</div>';
+    return;
+  }
+  el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+    '<thead><tr style="background:var(--bg3)">' +
+    '<th style="width:32px;padding:6px 8px"></th>' +
+    '<th style="padding:6px 8px;text-align:left;color:var(--ink3)">L mm</th>' +
+    '<th style="padding:6px 8px;text-align:left;color:var(--ink3)">W mm</th>' +
+    '<th style="padding:6px 8px;text-align:left;color:var(--ink3)">T mm</th>' +
+    '<th style="padding:6px 8px;text-align:left;color:var(--ink3)">CFT</th>' +
+    '</tr></thead><tbody>' +
+    hydDisSlabsAvailable.map(s => {
+      const checked = hydDisSelectedSlabs.has(s.slabId);
+      return '<tr style="border-bottom:1px solid var(--rule);cursor:pointer;background:'+(checked?'rgba(138,74,176,.1)':'')+';" onclick="toggleHydDisSlab(\''+s.slabId+'\')">' +
+        '<td style="padding:6px 8px;text-align:center"><input type="checkbox" '+(checked?'checked':'')+' onclick="toggleHydDisSlab(\''+s.slabId+'\');event.stopPropagation()" style="cursor:pointer"></td>' +
+        '<td style="padding:6px 8px;font-family:var(--mono)">'+s.lengthMM+'</td>' +
+        '<td style="padding:6px 8px;font-family:var(--mono)">'+s.widthMM+'</td>' +
+        '<td style="padding:6px 8px;font-family:var(--mono)">'+s.thickMM+'</td>' +
+        '<td style="padding:6px 8px;font-family:var(--mono);color:var(--hyd)">'+parseFloat(s.cft).toFixed(3)+'</td>' +
+        '</tr>';
+    }).join('') + '</tbody></table>';
+  updateHydDisCount();
+}
+
+function toggleHydDisSlab(slabId) {
+  if (hydDisSelectedSlabs.has(slabId)) hydDisSelectedSlabs.delete(slabId);
+  else hydDisSelectedSlabs.add(slabId);
+  renderHydDisSlabs();
+  checkHydCFTMatch();
+}
+
+function selectAllHydSlabs() {
+  if (hydDisSelectedSlabs.size === hydDisSlabsAvailable.length) hydDisSelectedSlabs.clear();
+  else hydDisSlabsAvailable.forEach(s => hydDisSelectedSlabs.add(s.slabId));
+  renderHydDisSlabs();
+  checkHydCFTMatch();
+}
+
+function updateHydDisCount() {
+  const sel = hydDisSlabsAvailable.filter(s => hydDisSelectedSlabs.has(s.slabId));
+  const totalCFT = sel.reduce((sum, s) => sum + parseFloat(s.cft), 0);
+  document.getElementById('hd-sel-count').textContent = sel.length + ' selected · ' + totalCFT.toFixed(3) + ' CFT';
+
+  // Update total bill value
+  const b = ST.batches.find(x => x.invoiceNo === document.getElementById('hd-batch').value);
+  if (b && totalCFT > 0) {
+    const billRate = parseFloat(b.rateCFT || 0) + 200;
+    document.getElementById('hd-total-value').textContent = '₹' + Math.round(totalCFT * billRate).toLocaleString('en-IN');
+  }
+}
+
+function checkHydCFTMatch() {
+  updateHydDisCount();
+  const billCFT = parseFloat(document.getElementById('hd-bill-cft').value) || 0;
+  if (!billCFT || !hydDisSelectedSlabs.size) { document.getElementById('hd-cft-match').style.display = 'none'; return; }
+  const sel = hydDisSlabsAvailable.filter(s => hydDisSelectedSlabs.has(s.slabId));
+  const selCFT = Math.round(sel.reduce((sum, s) => sum + parseFloat(s.cft), 0) * 1000) / 1000;
+  const match = Math.abs(selCFT - billCFT) < 0.001;
+  const el = document.getElementById('hd-cft-match');
+  el.style.display = 'block';
+  el.style.background = match ? 'rgba(74,154,106,.15)' : 'rgba(192,74,58,.15)';
+  el.style.color = match ? 'var(--seasoned)' : 'var(--red)';
+  el.style.border = '1px solid ' + (match ? 'rgba(74,154,106,.3)' : 'rgba(192,74,58,.3)');
+  el.textContent = match
+    ? '✓ CFT matches bill exactly (' + selCFT.toFixed(3) + ' = ' + billCFT.toFixed(3) + ')'
+    : '⚠ CFT mismatch — selected: ' + selCFT.toFixed(3) + ' · bill: ' + billCFT.toFixed(3) + ' · diff: ' + Math.abs(selCFT - billCFT).toFixed(3);
+}
+
+async function saveHydDispatch() {
+  const btn = document.getElementById('hyd-dis-save-btn');
+  const billNo = document.getElementById('hd-billno').value.trim();
+  const date = document.getElementById('hd-date').value;
+  const invoiceNo = document.getElementById('hd-batch').value;
+  const billCFT = parseFloat(document.getElementById('hd-bill-cft').value) || 0;
+
+  if (!billNo) { toast('Enter bill number', 'err'); return; }
+  if (!invoiceNo) { toast('Select source batch', 'err'); return; }
+  if (!hydDisSelectedSlabs.size) { toast('Select slabs being dispatched', 'err'); return; }
+
+  const sel = hydDisSlabsAvailable.filter(s => hydDisSelectedSlabs.has(s.slabId));
+  const totalCFT = Math.round(sel.reduce((sum, s) => sum + parseFloat(s.cft), 0) * 1000) / 1000;
+  const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
+  const billRate = b ? parseFloat(b.rateCFT || 0) + 200 : 0;
+
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const r = await apiPost({ action: 'saveHydDispatch', data: {
+      billNo, date, invoiceNo,
+      species: document.getElementById('hd-species').value,
+      vendor: b?.vendor || '',
+      slabIds: [...hydDisSelectedSlabs],
+      slabs: sel.map(s => ({ lengthMM: s.lengthMM, widthMM: s.widthMM, thickMM: s.thickMM, cft: parseFloat(s.cft), cbm: parseFloat(s.cbm||0) })),
+      totalCFT,
+      billCFT: billCFT || totalCFT,
+      billRate,
+      totalValue: Math.round(totalCFT * billRate),
+      notes: document.getElementById('hd-notes').value.trim(),
+      dispatchType: 'hyd_to_sb'
+    }});
+    if (r.success) {
+      toast('Hyd dispatch saved ✓ — ' + sel.length + ' slabs · ' + totalCFT.toFixed(3) + ' CFT', 'ok');
+      closeHydDisModal();
+      await loadAll();
+    } else toast('Error: ' + (r.error||'Failed'), 'err');
+  } catch(e) { toast('Network error', 'err'); }
+  btn.disabled = false; btn.innerHTML = '🚚 Save Dispatch';
+}
+
 function toggleCostFreight() {
   const type = document.getElementById('cost-type').value;
   const wrap = document.getElementById('cost-freight-wrap');
@@ -1997,7 +2300,8 @@ function statusBadge(status) {
     'Solar Chamber':         '<span class="badge b-solar">☀️ Solar Chamber</span>',
     'Sent to Hyderabad':     '<span class="badge b-hyd">🚛 Sent to Hyd</span>',
     'Returned from Hyderabad':'<span class="badge b-hyd">↩️ Returned from Hyd</span>',
-    'Seasoned':              '<span class="badge b-seasoned">✅ Seasoned</span>'
+    'Seasoned':              '<span class="badge b-seasoned">✅ Seasoned</span>',
+    'Dispatched to SB':      '<span class="badge b-wood">🚚 Dispatched to SB</span>'
   };
   return map[status] || '<span class="badge b-raw">' + (status || 'Unknown') + '</span>';
 }
