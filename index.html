@@ -1876,7 +1876,20 @@ async function loadDash(){
         <td>${r.client}</td>
       </tr>`).join('');
     } else rtb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--ink3)">No issuances yet</td></tr>';
-  }catch(e){console.error('Dashboard',e);}
+  }catch(e){
+    console.error('Dashboard error:', e);
+    // Fallback — build basic dashboard from ST.batches without API
+    if (ST.batches && ST.batches.length) {
+      try {
+        const totalVal = ST.batches.reduce((s,b)=>s+parseFloat(b.woodValue||b.taxableValue||0),0);
+        const totalCBM = ST.batches.reduce((s,b)=>s+parseFloat(b.totalCBM||0),0);
+        document.getElementById('k-inv').textContent = '₹'+Math.round(totalVal).toLocaleString('en-IN');
+        document.getElementById('k-inv-s').textContent = ST.batches.filter(b=>!b.isCreditNote).length+' batches';
+        document.getElementById('k-cbm').textContent = toCFT(totalCBM).toFixed(2)+' CFT';
+        document.getElementById('k-cbm-s').textContent = 'from purchases';
+      } catch(e2) { console.error('Fallback dash failed:', e2); }
+    }
+  }
 }
 
 // ── STORE MODE TOGGLE ────────────────────────────────────
@@ -2978,12 +2991,32 @@ function renderPendingReceipt(r, confirmed) {
 
 async function confirmPendingReceipt(receiptId, invoiceNo) {
   const btn = event.target;
-  btn.disabled = true; btn.textContent = 'Confirming…';
+  btn.disabled = true; btn.textContent = 'Fetching slabs…';
+
+  let slabs = [];
+  // Find the dispatch in our loaded receipts to get dispatchId
+  try {
+    const pr = (await apiGet({action:'getPendingReceipts'})).receipts || [];
+    const receipt = pr.find(r => r.receiptId === receiptId);
+    const dispatchId = receipt?.dispatchId;
+
+    // Fetch slab details from Sangwari directly in browser
+    if (dispatchId && CFG.swUrl) {
+      try {
+        const r = await fetch(CFG.swUrl + '?action=getSWDispatchDetail&dispatchId=' + encodeURIComponent(dispatchId));
+        const d = await r.json();
+        slabs = d.slabs || [];
+      } catch(e) { console.log('Could not fetch slabs from Sangwari:', e); }
+    }
+  } catch(e) { console.log('Receipt lookup failed:', e); }
+
+  btn.textContent = 'Confirming…';
   try {
     const r = await apiPost({ action: 'confirmReceipt', data: {
       receiptId,
       batchInvoice: invoiceNo,
-      sangwariUrl: CFG.sangwariUrl || localStorage.getItem('sangwari_url') || ''
+      slabs, // pass slabs fetched from browser
+      sangwariUrl: CFG.swUrl || ''
     }});
     if (r.success) {
       toast('✓ Received — ' + r.slabsAdded + ' slabs added to Stock · Batch ' + r.batchInvoice, 'ok');
@@ -2991,7 +3024,7 @@ async function confirmPendingReceipt(receiptId, invoiceNo) {
       await loadBatches();
     } else toast('Error: ' + (r.error||'Failed'), 'err');
   } catch(e) { toast('Network error', 'err'); }
-  btn.disabled = false;
+  btn.disabled = false; btn.textContent = '✓ Confirm Received → Add to Stock';
 }
 
 // ── HYD COSTS (in SlabTrack) ─────────────────────────────
