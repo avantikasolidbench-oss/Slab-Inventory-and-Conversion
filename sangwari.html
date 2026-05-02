@@ -283,12 +283,12 @@ select option{background:var(--bg3);color:var(--ink)}
     <!-- INVENTORY (Slab level with seasoning) -->
     <div class="screen" id="screen-inv">
       <div style="display:flex;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px">
-        <button class="btn btn-sm" id="flt-all" onclick="filterSlabs('all')" style="background:var(--wood);color:white;white-space:nowrap">All</button>
         <button class="btn btn-sm btn-sec" id="flt-raw" onclick="filterSlabs('Unseasoned')" style="white-space:nowrap">🪵 Unseasoned</button>
         <button class="btn btn-sm btn-sec" id="flt-gas" onclick="filterSlabs('Gas Chamber')" style="white-space:nowrap">⚗️ Gas</button>
         <button class="btn btn-sm btn-sec" id="flt-solar" onclick="filterSlabs('Solar Chamber')" style="white-space:nowrap">☀️ Solar</button>
         <button class="btn btn-sm btn-sec" id="flt-seasoned" onclick="filterSlabs('Seasoned')" style="white-space:nowrap">✅ Seasoned</button>
-        <button class="btn btn-sm btn-sec" id="flt-hyd" onclick="filterSlabs('Sent to Hyderabad')" style="white-space:nowrap;opacity:.6">🚛 Hyd (dispatched)</button>
+        <button class="btn btn-sm btn-sec" id="flt-hyd" onclick="filterSlabs('Sent to Hyderabad')" style="white-space:nowrap">🚛 Hyd</button>
+        <button class="btn btn-sm btn-sec" id="flt-dispatched" onclick="filterSlabs('Dispatched to SB')" style="white-space:nowrap">📦 Dispatched</button>
       </div>
 
       <!-- Summary bar -->
@@ -301,6 +301,7 @@ select option{background:var(--bg3);color:var(--ink)}
       <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="openAddSlabDetailsModal()" id="add-slab-details-btn">+ Add Slab Details</button>
         <button class="btn btn-sec btn-sm" id="bulk-mode-btn" onclick="toggleBulkMode()">☑ Bulk Update</button>
+        <button class="btn btn-sm" id="dispatch-selected-btn" onclick="dispatchSelectedSlabs()" style="display:none;background:var(--seasoned);color:white">🚚 Dispatch Selected</button>
         <span style="font-size:12px;color:var(--ink3)" id="slab-count-lbl"></span>
       </div>
 
@@ -938,6 +939,13 @@ function goTo(s) {
   document.getElementById('screen-' + s).classList.add('active');
   document.getElementById('nav-' + s).classList.add('active');
   if (s === 'pur') { loadBatches(); loadMarginSummary(); }
+  if (s === 'inv') {
+    const f = window._currentSlabFilter;
+    const valid = ['Unseasoned','Gas Chamber','Solar Chamber','Seasoned','Sent to Hyderabad','Dispatched to SB'];
+    filterSlabs(valid.includes(f) ? f : 'Unseasoned');
+    loadSlabs();
+  }
+  if (s === 'dis') loadDispatches();
 }
 // ── LOAD ALL ──
 async function loadAll() {
@@ -1059,14 +1067,17 @@ function renderSlabs(slabs) {
 function filterSlabs(f) {
   slabFilter = f;
   window._currentSlabFilter = f;
-  ['all','raw','gas','solar','seasoned'].forEach(x => {
+  ['raw','gas','solar','seasoned','hyd','dispatched'].forEach(x => {
     const el = document.getElementById('flt-' + x);
-    if (el) el.style.background = '';
+    if (el) { el.style.background = ''; el.style.color = ''; el.className = 'btn btn-sm btn-sec'; }
   });
-  const map = { 'all': 'flt-all', 'Unseasoned': 'flt-raw', 'Gas Chamber': 'flt-gas', 'Solar Chamber': 'flt-solar', 'Seasoned': 'flt-seasoned' };
-  const btn = document.getElementById(map[f] || 'flt-all');
-  if (btn) btn.style.background = 'var(--wood)';
-  renderSlabs(ST.slabs);
+  const map = { 'Unseasoned':'flt-raw', 'Gas Chamber':'flt-gas', 'Solar Chamber':'flt-solar', 'Seasoned':'flt-seasoned', 'Sent to Hyderabad':'flt-hyd', 'Dispatched to SB':'flt-dispatched' };
+  const btn = document.getElementById(map[f]);
+  if (btn) { btn.style.background = 'var(--wood)'; btn.style.color = 'white'; btn.className = 'btn btn-sm'; }
+  // Auto-enable bulk mode on Seasoned so checkboxes ready for dispatch selection
+  if (f === 'Seasoned' && !bulkMode) toggleBulkMode();
+  else if (f !== 'Seasoned' && bulkMode) toggleBulkMode();
+  renderSlabs();
 }
 
 function toggleSlab(id) {
@@ -1080,9 +1091,7 @@ function toggleSlab(id) {
 
 function selectAllSlabs() {
   if (!bulkMode) return;
-  const filtered = slabFilter === 'all'
-    ? ST.slabs.filter(s => s.status !== 'Dispatched to SB')
-    : ST.slabs.filter(s => s.status === slabFilter);
+  const filtered = ST.slabs.filter(s => s.status === slabFilter);
   const allSelected = filtered.every(s => selectedSlabs.has(s.slabId));
   filtered.forEach(s => allSelected ? selectedSlabs.delete(s.slabId) : selectedSlabs.add(s.slabId));
   renderSlabs(ST.slabs);
@@ -1116,15 +1125,74 @@ function clearSelection() {
 
 function updateBulkBar() {
   const bar = document.getElementById('bulk-bar');
+  const dispBtn = document.getElementById('dispatch-selected-btn');
+  const countLbl = document.getElementById('slab-count-lbl');
+  const onSeasoned = window._currentSlabFilter === 'Seasoned';
+
   if (selectedSlabs.size > 0) {
     bar.classList.add('show');
     document.getElementById('bulk-count').textContent = selectedSlabs.size + ' slab' + (selectedSlabs.size > 1 ? 's' : '') + ' selected';
+    if (countLbl) countLbl.textContent = selectedSlabs.size + ' selected';
+    // Show dispatch button only on Seasoned tab
+    if (dispBtn) dispBtn.style.display = onSeasoned ? 'inline-flex' : 'none';
   } else {
     bar.classList.remove('show');
+    if (countLbl) countLbl.textContent = '';
+    if (dispBtn) dispBtn.style.display = 'none';
   }
 }
 
 let hydRowCount = 0;
+
+function dispatchSelectedSlabs() {
+  if (!selectedSlabs.size) return;
+
+  const sel = ST.slabs.filter(s => selectedSlabs.has(s.slabId));
+  if (!sel.length) return;
+
+  // Group by species/invoiceNo
+  const groups = {};
+  sel.forEach(s => {
+    const key = s.invoiceNo + '|' + s.species;
+    if (!groups[key]) groups[key] = { invoiceNo: s.invoiceNo, species: s.species, slabs: [] };
+    groups[key].slabs.push({
+      lengthMM: s.lengthMM, widthMM: s.widthMM, thickMM: s.thickMM,
+      cft: parseFloat(s.cft || 0), slabId: s.slabId
+    });
+  });
+
+  // Determine markup tier from batches
+  const batchMarkups = Object.values(groups).map(g => {
+    const b = ST.batches.find(x => x.invoiceNo === g.invoiceNo);
+    return b ? parseInt(b.markupTier || 300) : 300;
+  });
+  const uniqueMarkups = [...new Set(batchMarkups)];
+  const markup = uniqueMarkups[0] || 300; // use first batch's tier
+
+  // Pre-load into dispatch modal species groups
+  disSpeciesGroups = {};
+  Object.values(groups).forEach(g => {
+    disSpeciesGroups[g.species] = g.slabs.map(s => ({ ...s, invoiceNo: g.invoiceNo }));
+  });
+
+  // Open dispatch modal
+  showDispatchModal();
+
+  // Pre-set markup tier from batch
+  if (markup === 300) { disFinanced = true; disSeasoned = true; }
+  else if (markup === 200) { disFinanced = true; disSeasoned = false; }
+  else if (markup === 100) { disFinanced = false; disSeasoned = true; }
+  setDisMarkup('fin', disFinanced); // updates buttons + display
+
+  // Render species sections with pre-loaded slabs
+  renderDisSpeciesSections();
+
+  // Show info
+  const totalCFT = sel.reduce((s,x) => s + parseFloat(x.cft||0), 0);
+  const msg = sel.length + ' slabs · ' + totalCFT.toFixed(3) + ' CFT · markup ₹' + markup + '/CFT pre-set' +
+    (uniqueMarkups.length > 1 ? ' ⚠ Multiple tiers detected — verify' : ' ✓');
+  toast(msg, uniqueMarkups.length > 1 ? 'err' : 'ok');
+}
 
 function openHydModal() {
   document.getElementById('hyd-date').value = new Date().toISOString().slice(0, 10);
@@ -2438,8 +2506,16 @@ async function saveDispatch() {
           markupTier: getDisMarkup(),
           notes: document.getElementById('d-notes').value.trim()
         }});
-        if (r.success) saved++;
-        else toast('Error saving ' + sp + ': ' + (r.error||'Failed'), 'err');
+        if (r.success) {
+          saved++;
+          // Mark source slabs as Dispatched to SB if they came from inventory
+          const slabIds = slabsWithCost.map(s => s.slabId).filter(Boolean);
+          if (slabIds.length) {
+            await apiPost({ action: 'bulkUpdateSlabStatus', data: {
+              slabIds, status: 'Dispatched to SB', date: date
+            }});
+          }
+        } else toast('Error saving ' + sp + ': ' + (r.error||'Failed'), 'err');
       } catch(e) { toast('Network error for ' + sp, 'err'); }
     }
     btn.disabled = false; btn.innerHTML = '🚚 Save Dispatch';
@@ -2892,7 +2968,11 @@ let SE = { invoiceNo: '', species: '', staged: [] };
 
 async function openSlabEntryModal(invoiceNo, species) {
   SE.invoiceNo = invoiceNo; SE.species = species; SE.staged = [];
-  document.getElementById('se-sub').textContent = invoiceNo + ' · ' + species;
+  const filterStatus = window._currentSlabFilter;
+  const validStatuses = ['Unseasoned','Gas Chamber','Solar Chamber','Sent to Hyderabad','Seasoned'];
+  const status = validStatuses.includes(filterStatus) ? filterStatus : 'Unseasoned';
+  document.getElementById('se-sub').innerHTML = invoiceNo + ' · ' + species +
+    ' · Slabs will be saved as <strong style="color:var(--amber)">' + status + '</strong>';
   document.getElementById('slab-entry-modal').classList.add('show');
   document.getElementById('se-manual').style.display = 'none';
   document.getElementById('se-staged-wrap').style.display = 'none';
@@ -3022,9 +3102,10 @@ async function saveSESlabs() {
   if(!SE.staged.length) return;
   const btn=document.getElementById('se-save-btn');
   btn.disabled=true; btn.textContent='Saving…';
-  // Get current batch seasoning status for initial slab status
-  const batch=ST.batches.find(b=>b.invoiceNo===SE.invoiceNo);
-  const status=batch?batch.seasoningStatus:'Unseasoned';
+  // Use the active inventory filter as the status (e.g. if on Seasoned tab → Seasoned)
+  const filterStatus = window._currentSlabFilter;
+  const validStatuses = ['Unseasoned','Gas Chamber','Solar Chamber','Sent to Hyderabad','Seasoned'];
+  const status = validStatuses.includes(filterStatus) ? filterStatus : 'Unseasoned';
   try {
     const r=await apiPost({action:'saveSlabsForBatch',data:{
       invoiceNo:SE.invoiceNo, species:SE.species,
@@ -3032,8 +3113,10 @@ async function saveSESlabs() {
       slabs:SE.staged
     }});
     if(r.success){
-      toast(r.added+' slabs saved ✓','ok');
+      toast(r.added+' slabs saved as '+status+' ✓','ok');
       SE.staged=[]; renderSEStaged(); await loadSEExisting();
+      await loadSlabs(); // refresh inventory tab
+      renderSlabs();    // re-render with current filter
     } else toast('Error: '+(r.error||'Failed'),'err');
   }catch(e){toast('Network error','err');}
   btn.disabled=false; btn.innerHTML='💾 Save Slabs';
