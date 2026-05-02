@@ -777,6 +777,31 @@ select option{background:var(--bg3);color:var(--ink)}
     <div class="modal-handle"></div>
     <div class="modal-title">🚚 Dispatch to Solid Bench</div>
 
+    <!-- Markup tier selector — first thing shown -->
+    <div style="background:var(--bg3);border-radius:var(--r);padding:14px;margin-bottom:14px;border:1px solid rgba(255,255,255,.08)">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:12px">Arrangement with Solid Bench</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div>
+          <div style="font-size:11px;color:var(--ink3);margin-bottom:6px">Financed by Xpertpack?</div>
+          <div style="display:flex;gap:6px">
+            <button id="dis-fin-yes" onclick="setDisMarkup('fin',true)" class="btn btn-sm" style="flex:1;background:var(--wood);color:white">Yes</button>
+            <button id="dis-fin-no" onclick="setDisMarkup('fin',false)" class="btn btn-sec btn-sm" style="flex:1">No</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--ink3);margin-bottom:6px">Seasoned by Xpertpack?</div>
+          <div style="display:flex;gap:6px">
+            <button id="dis-sea-yes" onclick="setDisMarkup('sea',true)" class="btn btn-sm" style="flex:1;background:var(--wood);color:white">Yes</button>
+            <button id="dis-sea-no" onclick="setDisMarkup('sea',false)" class="btn btn-sec btn-sm" style="flex:1">No</button>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg4);border-radius:4px">
+        <span style="font-size:12px;color:var(--ink3)">Markup to Solid Bench</span>
+        <span class="mono" id="dis-markup-display" style="font-size:16px;font-weight:700;color:var(--amber)">₹300/CFT</span>
+      </div>
+    </div>
+
     <!-- Step 1: Cover page -->
     <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:12px">
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:8px">Step 1 — Bill / Challan Cover</div>
@@ -959,6 +984,7 @@ function renderBatches(batches) {
         <div style="display:flex;gap:6px;margin-top:4px">
           <button onclick="editBatch('${b.invoiceNo}')" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink2);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">✏️ Edit</button>
           <button onclick="openSlabEntryModal('${b.invoiceNo}','${b.species}')" style="background:rgba(58,122,176,.15);border:1px solid rgba(58,122,176,.3);color:var(--gas);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">📋 Slabs</button>
+          <button onclick="printInventoryAnnexure('${b.invoiceNo}','${b.species}')" style="background:rgba(74,154,106,.15);border:1px solid rgba(74,154,106,.3);color:var(--seasoned);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">📄 Annexure</button>
           <button onclick="deleteBatch('${b.invoiceNo}')" style="background:rgba(192,74,58,.15);border:1px solid rgba(192,74,58,.3);color:var(--red);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">🗑 Delete</button>
         </div>
       </div>
@@ -1289,6 +1315,7 @@ function renderDispatches(dispatches) {
           '<div class="bi-cft" style="font-size:15px;font-weight:700">' + parseFloat(d.totalCFT||0).toFixed(3) + ' CFT</div>' +
           '<div style="font-size:11px;color:var(--ink3);margin-top:2px">' + (d.slabCount||0) + ' slabs · ₹' + parseInt(d.totalValue||0).toLocaleString('en-IN') + '</div>' +
           '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">' +
+            '<button onclick="event.stopPropagation();printDispatchAnnexure(\''+d.dispatchId+'\')" style="font-size:10px;padding:3px 8px;background:rgba(58,122,176,.2);border:1px solid rgba(58,122,176,.3);color:var(--gas);border-radius:3px;cursor:pointer">📄 Print</button>' +
             '<button onclick="event.stopPropagation();editDispatch(\''+d.dispatchId+'\')" style="font-size:10px;padding:3px 8px;background:var(--bg3);border:1px solid var(--rule);color:var(--ink3);border-radius:3px;cursor:pointer">✏️ Edit</button>' +
             '<span style="font-size:10px;color:var(--ink3);align-self:center" id="dis-'+idx+'-arrow">▾ slabs</span>' +
           '</div>' +
@@ -1364,6 +1391,208 @@ async function saveEditDispatch() {
     } else toast('Error: ' + (r.error||'Failed'), 'err');
   } catch(e) { toast('Network error', 'err'); }
   btn.disabled = false; btn.innerHTML = '💾 Save Changes';
+}
+
+async function printSlabAnnexure(dispatchId) {
+  // Called from dispatch tile - load via API
+  const d = ST.dispatches.find(x => x.dispatchId === dispatchId);
+  if (!d) return;
+  toast('Preparing annexure…', '');
+  let slabs = [];
+  try {
+    const r = await apiGet({ action: 'getSWDispatchDetail', dispatchId });
+    slabs = r.slabs || [];
+  } catch(e) {}
+  generateAnnexurePDF({
+    billNo: d.billNo || '',
+    date: d.date || '',
+    species: d.species || '',
+    invoiceNo: d.invoiceNo || '',
+    slabCount: d.slabCount || slabs.length,
+    totalCFT: d.totalCFT || 0,
+    slabs
+  });
+}
+
+async function printInventoryAnnexure(invoiceNo, species) {
+  // Called from inventory/batch — uses slabs from ST.slabs
+  toast('Preparing annexure…', '');
+  const batch = ST.batches.find(b => b.invoiceNo === invoiceNo);
+  const slabs = ST.slabs.filter(s => s.invoiceNo === invoiceNo && s.status !== 'Dispatched to SB');
+  const totalCFT = slabs.reduce((s, x) => s + parseFloat(x.cft || 0), 0);
+  generateAnnexurePDF({
+    billNo: '',
+    date: new Date().toISOString().slice(0, 10),
+    species: species || batch?.species || '',
+    invoiceNo,
+    batchName: batch?.batchName || invoiceNo,
+    slabCount: slabs.length,
+    totalCFT,
+    slabs: slabs.map(s => ({ lengthMM: s.lengthMM, widthMM: s.widthMM, thickMM: s.thickMM, cft: s.cft }))
+  });
+}
+
+async function printDispatchAnnexure(dispatchId) {
+  return printSlabAnnexure(dispatchId);
+}
+
+async function generateAnnexurePDF(data) {
+  const { billNo='', date='', species='', invoiceNo='', batchName='', slabCount=0, totalCFT=0, slabs=[] } = data;
+
+  // Load jsPDF if not already loaded
+  if (!window.jspdf) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+  if (!window.jspdf?.jsPDF) { toast('PDF library failed to load', 'err'); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210, margin = 15;
+  let y = 20;
+
+  // Header
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('Xpertpack Transport Packaging Pvt. Ltd.', margin, y);
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(100);
+  doc.text('Plot No. 379, Sector-3, Phase-IV IMT Bawal, Rewari, Haryana - 123501', margin, y);
+  y += 4;
+  doc.text('GSTIN: 06AADCB4264F1ZY  |  Ph: 8527192518  |  accounts@xpertpack.in', margin, y);
+  y += 8;
+
+  // Divider
+  doc.setDrawColor(180);
+  doc.line(margin, y, W - margin, y);
+  y += 6;
+
+  // Title
+  doc.setTextColor(0);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('SLAB DETAIL ANNEXURE', W / 2, y, { align: 'center' });
+  y += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(80);
+  const billRef = d.billNo ? 'Against Bill No: ' + d.billNo : 'Bill No. to be assigned';
+  doc.text(billRef, W / 2, y, { align: 'center' });
+  y += 8;
+
+  // Bill details box
+  doc.setTextColor(0);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Bill No:', margin, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(billNo || '_______________', margin + 20, y);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Date:', 110, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(date || '_______________', 122, y);
+  y += 5;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Species:', margin, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(species || '—', margin + 20, y);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Batch:', 110, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(batchName || invoiceNo || '—', 122, y);
+  y += 5;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Total Slabs:', margin, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(String(slabCount || slabs.length), margin + 25, y);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Total CFT:', 110, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(parseFloat(totalCFT || 0).toFixed(3), 128, y);
+  y += 8;
+
+  doc.setDrawColor(180);
+  doc.line(margin, y, W - margin, y);
+  y += 5;
+
+  if (!slabs.length) {
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text('No slab-level detail available for this dispatch.', margin, y);
+    y += 6;
+  } else {
+    // Table header
+    const cols = [
+      { label: 'Sr', x: margin, w: 10, align: 'center' },
+      { label: 'Length (mm)', x: margin + 10, w: 28, align: 'right' },
+      { label: 'Width (mm)', x: margin + 38, w: 26, align: 'right' },
+      { label: 'Thick (mm)', x: margin + 64, w: 26, align: 'right' },
+      { label: 'CFT', x: margin + 90, w: 20, align: 'right' }
+    ];
+
+    doc.setFillColor(40, 40, 40);
+    doc.rect(margin, y - 3, W - margin * 2, 7, 'F');
+    doc.setTextColor(255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    cols.forEach(c => doc.text(c.label, c.x + (c.align === 'right' ? c.w - 2 : c.w / 2), y + 1, { align: c.align === 'right' ? 'right' : 'center' }));
+    y += 7;
+
+    // Rows
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    let totalCFT = 0;
+    slabs.forEach((s, i) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+        // Repeat header on new page
+        doc.setFillColor(40, 40, 40);
+        doc.rect(margin, y - 3, W - margin * 2, 7, 'F');
+        doc.setTextColor(255);
+        doc.setFont('helvetica', 'bold');
+        cols.forEach(c => doc.text(c.label, c.x + (c.align === 'right' ? c.w - 2 : c.w / 2), y + 1, { align: c.align === 'right' ? 'right' : 'center' }));
+        doc.setFont('helvetica', 'normal');
+        y += 7;
+      }
+      if (i % 2 === 0) {
+        doc.setFillColor(248, 248, 248);
+        doc.rect(margin, y - 3, W - margin * 2, 6, 'F');
+      }
+      doc.setTextColor(0);
+      const cft = parseFloat(s.cft || 0);
+      totalCFT += cft;
+      const row = [i + 1, s.lengthMM || '—', s.widthMM || '—', s.thickMM || '—', cft.toFixed(3)];
+      cols.forEach((c, ci) => doc.text(String(row[ci]), c.x + (c.align === 'right' ? c.w - 2 : c.w / 2), y + 1, { align: c.align === 'right' ? 'right' : 'center' }));
+      y += 6;
+    });
+
+    // Total row
+    doc.setDrawColor(120);
+    doc.line(margin, y, W - margin, y);
+    y += 4;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('Total: ' + slabs.length + ' slabs', margin, y);
+    doc.text(totalCFT.toFixed(3) + ' CFT', W - margin, y, { align: 'right' });
+    y += 10;
+  }
+
+  // Footer
+  doc.setFontSize(7);
+  doc.setTextColor(120);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Generated by SangwariTrack · Xpertpack Transport Packaging Pvt. Ltd.', W / 2, 290, { align: 'center' });
+
+  const filename = 'Annexure_' + (billNo || invoiceNo || 'Draft').replace(/\//g, '-') + '.pdf';
+  doc.save(filename);
+  toast('PDF downloaded ✓', 'ok');
 }
 
 async function markAsOpeningStock(invoiceNo, species) {
@@ -1886,10 +2115,43 @@ function calcDispatchTotals() {
 
 // ── DISPATCH — two-level read ────────────────────────────
 let disSpeciesGroups = {};
+let disFinanced = true;  // financed by XP
+let disSeasoned = true;  // seasoned by XP
+
+function getDisMarkup() {
+  if (disFinanced && disSeasoned) return 300;
+  if (disFinanced && !disSeasoned) return 200;
+  if (!disFinanced && disSeasoned) return 100;
+  return 0;
+}
+
+function setDisMarkup(type, val) {
+  if (type === 'fin') disFinanced = val;
+  if (type === 'sea') disSeasoned = val;
+  const markup = getDisMarkup();
+  document.getElementById('dis-markup-display').textContent = '₹' + markup + '/CFT';
+  // Update button styles
+  document.getElementById('dis-fin-yes').className = 'btn btn-sm' + (disFinanced ? '' : ' btn-sec');
+  document.getElementById('dis-fin-yes').style.background = disFinanced ? 'var(--wood)' : '';
+  document.getElementById('dis-fin-yes').style.color = disFinanced ? 'white' : '';
+  document.getElementById('dis-fin-no').className = 'btn btn-sm' + (!disFinanced ? '' : ' btn-sec');
+  document.getElementById('dis-fin-no').style.background = !disFinanced ? 'var(--wood)' : '';
+  document.getElementById('dis-fin-no').style.color = !disFinanced ? 'white' : '';
+  document.getElementById('dis-sea-yes').className = 'btn btn-sm' + (disSeasoned ? '' : ' btn-sec');
+  document.getElementById('dis-sea-yes').style.background = disSeasoned ? 'var(--wood)' : '';
+  document.getElementById('dis-sea-yes').style.color = disSeasoned ? 'white' : '';
+  document.getElementById('dis-sea-no').className = 'btn btn-sm' + (!disSeasoned ? '' : ' btn-sec');
+  document.getElementById('dis-sea-no').style.background = !disSeasoned ? 'var(--wood)' : '';
+  document.getElementById('dis-sea-no').style.color = !disSeasoned ? 'white' : '';
+  // Update species section rates if already rendered
+  renderDisSpeciesSections();
+}
 
 function showDispatchModal() {
   disSpeciesGroups = {};
   disRowCount = 0;
+  disFinanced = true;
+  disSeasoned = true;
   document.getElementById('dis-modal').classList.add('show');
   document.getElementById('d-date').value = new Date().toISOString().slice(0,10);
   document.getElementById('d-billno').value = '';
@@ -1900,6 +2162,8 @@ function showDispatchModal() {
   document.getElementById('d-cover-summary').style.display = 'none';
   document.getElementById('ai-dis').classList.remove('show');
   document.getElementById('ai-dis-cover').classList.remove('show');
+  document.getElementById('dis-markup-display').textContent = '₹300/CFT';
+  setDisMarkup('fin', true); // reset buttons
 }
 function closeDisModal() { document.getElementById('dis-modal').classList.remove('show'); }
 
@@ -2043,10 +2307,20 @@ function renderDisSpeciesSections() {
     const slabs = disSpeciesGroups[sp];
     const totalCFT = slabs.reduce((s,r) => s+r.cft, 0);
     // Find matching batch
+    const markup = getDisMarkup();
     const matchBatch = ST.batches.find(b => b.species === sp && !b.isCreditNote);
+    const vendorRate = matchBatch ? parseFloat(matchBatch.rateCFT||0) : 0;
+    const billRate = vendorRate + markup;
     const batchOpts = ST.batches.filter(b => !b.isCreditNote)
-      .map(b => '<option value="'+b.invoiceNo+'"'+(b.invoiceNo===matchBatch?.invoiceNo?' selected':'')+'>'+(b.batchName||b.invoiceNo)+' · '+b.species+'</option>')
+      .map(b => '<option value="'+b.invoiceNo+'"'+(b.invoiceNo===matchBatch?.invoiceNo?' selected':'')+'>'+(b.batchName||b.invoiceNo)+' · '+b.species+' · ₹'+parseFloat(b.rateCFT||0).toFixed(0)+'/CFT</option>')
       .join('');
+
+    const billRateCheck = vendorRate > 0
+      ? '<div style="font-size:11px;margin-top:6px;padding:5px 8px;background:var(--bg4);border-radius:3px">' +
+          '₹'+vendorRate.toFixed(0)+' + ₹'+markup+' = <strong style="color:var(--wood)">₹'+billRate.toFixed(0)+'/CFT</strong> bill rate · ' +
+          totalCFT.toFixed(3)+' CFT = <strong style="color:var(--wood)">₹'+Math.round(totalCFT*billRate).toLocaleString('en-IN')+'</strong> expected bill value' +
+        '</div>'
+      : '<div style="font-size:11px;color:var(--ink3);margin-top:4px">⚠ Select batch to verify bill amount</div>';
 
     return '<div style="background:var(--bg3);border-radius:var(--r);padding:14px;margin-bottom:12px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
@@ -2058,10 +2332,11 @@ function renderDisSpeciesSections() {
       '</div>' +
       '<div class="field" style="margin-bottom:0">' +
         '<label style="font-size:10px">Batch for ' + sp + '</label>' +
-        '<select id="dis-batch-'+sp.replace(/\s/g,'_')+'" style="background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;width:100%;font-size:13px">' +
+        '<select id="dis-batch-'+sp.replace(/\s/g,'_')+'" onchange="renderDisSpeciesSections()" style="background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;width:100%;font-size:13px">' +
           '<option value="">— select batch —</option>' +
           batchOpts +
         '</select>' +
+        billRateCheck +
         (!matchBatch ? '<div style="font-size:11px;color:var(--amber);margin-top:4px">⚠ No batch found for ' + sp + ' — select manually or save without batch</div>' : '') +
       '</div>' +
     '</div>';
@@ -2160,6 +2435,7 @@ async function saveDispatch() {
           species: sp, vendor: b?.vendor || '',
           slabs: slabsWithCost, totalCFT,
           totalValue: Math.round(totalCFT * billRate),
+          markupTier: getDisMarkup(),
           notes: document.getElementById('d-notes').value.trim()
         }});
         if (r.success) saved++;
@@ -2928,41 +3204,30 @@ async function loadMarginSummary() {
 
 function renderMarginSummary(margins) {
   const el = document.getElementById('margin-summary');
-  if (!margins.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No margin data yet — add batches and cost bills</div>'; return; }
+  if (!margins.length) { el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No margin data yet — dispatch batches first</div>'; return; }
   el.innerHTML = margins.map(m => {
     const marginOk = m.marginPerCFT >= 0;
-    const pct = m.totalCostPerCFT > 0 ? ((m.marginPerCFT / m.totalCostPerCFT) * 100).toFixed(1) : 0;
-    return `<div style="padding:14px 16px;border-bottom:1px solid var(--rule)">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-        <div>
-          <div class="mono" style="font-size:13px;color:var(--wood)">${m.invoiceNo}</div>
-          <div style="font-size:11px;color:var(--ink3);margin-top:2px"><span class="sp-tag">${m.species}</span> · ${m.totalCFT} CFT</div>
-        </div>
-        <span class="badge ${marginOk ? 'b-seasoned' : 'b-red'}" style="font-size:11px">${marginOk ? '✓' : '⚠'} ₹${Math.round(m.marginPerCFT)}/CFT</span>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;font-size:11px">
-        <div style="background:var(--bg3);padding:8px;border-radius:4px">
-          <div style="color:var(--ink3);margin-bottom:2px">Cost/CFT</div>
-          <div class="mono" style="color:var(--ink)">₹${Math.round(m.totalCostPerCFT)}</div>
-        </div>
-        <div style="background:var(--bg3);padding:8px;border-radius:4px">
-          <div style="color:var(--ink3);margin-bottom:2px">SP/CFT</div>
-          <div class="mono" style="color:var(--amber)">₹${Math.round(m.billRatePerCFT)}</div>
-        </div>
-        <div style="background:var(--bg3);padding:8px;border-radius:4px">
-          <div style="color:var(--ink3);margin-bottom:2px">Margin/CFT</div>
-          <div class="mono" style="color:${marginOk?'var(--seasoned)':'var(--red)'}">₹${Math.round(m.marginPerCFT)}</div>
-        </div>
-        <div style="background:${marginOk?'rgba(74,154,106,.1)':'rgba(192,74,58,.1)'};padding:8px;border-radius:4px">
-          <div style="color:var(--ink3);margin-bottom:2px">Margin %</div>
-          <div class="mono" style="color:${marginOk?'var(--seasoned)':'var(--red)'}">${pct}%</div>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px">
-        <span style="color:var(--ink3)">₹300 markup − Frt+Lab ₹${Math.round(m.freightPerCFT)}${m.hydCostPerCFT > 0 ? ` − Hyd ₹${Math.round(m.hydCostPerCFT)}` : ''}/CFT = <strong style="color:${marginOk?'var(--seasoned)':'var(--red)'}">₹${Math.round(m.marginPerCFT)}/CFT margin</strong></span>
-        <span class="mono" style="color:${marginOk?'var(--seasoned)':'var(--red)'}">₹${Math.round(m.totalMargin).toLocaleString('en-IN')}</span>
-      </div>
-    </div>`;
+    const pct = m.billRatePerCFT > 0 ? ((m.marginPerCFT / m.billRatePerCFT) * 100).toFixed(1) : 0;
+    const tierLabel = m.markup === 300 ? 'Financed + Seasoned' : m.markup === 200 ? 'Financed only' : m.markup === 100 ? 'Seasoned only' : '₹'+m.markup;
+    return '<div style="padding:14px 16px;border-bottom:1px solid var(--rule)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
+        '<div>' +
+          '<div class="mono" style="font-size:13px;color:var(--wood)">' + (m.batchName||m.invoiceNo) + '</div>' +
+          '<div style="font-size:11px;color:var(--ink3);margin-top:2px"><span class="sp-tag">' + m.species + '</span> · ' + m.totalCFT + ' CFT · <span style="color:var(--amber)">+₹' + m.markup + ' ' + tierLabel + '</span></div>' +
+        '</div>' +
+        '<span class="badge ' + (marginOk ? 'b-seasoned' : 'b-red') + '" style="font-size:11px">' + (marginOk ? '✓' : '⚠') + ' ₹' + Math.round(m.marginPerCFT) + '/CFT</span>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;font-size:11px">' +
+        '<div style="background:var(--bg3);padding:8px;border-radius:4px"><div style="color:var(--ink3);margin-bottom:2px">Wood/CFT</div><div class="mono">₹' + Math.round(m.woodCostPerCFT) + '</div></div>' +
+        '<div style="background:var(--bg3);padding:8px;border-radius:4px"><div style="color:var(--ink3);margin-bottom:2px">Frt+Lab/CFT</div><div class="mono">₹' + Math.round(m.freightPerCFT) + '</div></div>' +
+        '<div style="background:var(--bg3);padding:8px;border-radius:4px"><div style="color:var(--ink3);margin-bottom:2px">Bill Rate/CFT</div><div class="mono" style="color:var(--amber)">₹' + Math.round(m.billRatePerCFT) + '</div></div>' +
+        '<div style="background:' + (marginOk?'rgba(74,154,106,.1)':'rgba(192,74,58,.1)') + ';padding:8px;border-radius:4px"><div style="color:var(--ink3);margin-bottom:2px">Margin %</div><div class="mono" style="color:' + (marginOk?'var(--seasoned)':'var(--red)') + '">' + pct + '%</div></div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px">' +
+        '<span style="color:var(--ink3)">₹' + Math.round(m.woodCostPerCFT) + ' wood + ₹' + m.markup + ' markup − ₹' + Math.round(m.freightPerCFT) + ' frt = <strong style="color:' + (marginOk?'var(--seasoned)':'var(--red)') + '">₹' + Math.round(m.marginPerCFT) + '/CFT margin</strong></span>' +
+        '<span class="mono" style="color:' + (marginOk?'var(--seasoned)':'var(--red)') + '">₹' + Math.round(m.totalMargin).toLocaleString('en-IN') + '</span>' +
+      '</div>' +
+    '</div>';
   }).join('');
 }
 function statusBadge(status) {
