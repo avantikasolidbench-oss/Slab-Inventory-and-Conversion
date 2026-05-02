@@ -456,6 +456,11 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
           <button class="tab" id="tab-cli" onclick="switchTab('cli')">🛒 Client Invoices</button>
           <button class="tab" id="tab-bat" onclick="switchTab('bat')">📋 All Batches</button>
           <button class="tab" id="tab-sw" onclick="switchTab('sw')">🏭 From Sangwari</button>
+          <button class="tab" id="tab-pending" onclick="switchTab('pending')" style="position:relative">
+            📥 Pending
+            <span id="pending-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:var(--red);color:white;border-radius:8px;font-size:9px;padding:1px 5px;font-weight:700"></span>
+          </button>
+          <button class="tab" id="tab-hyd" onclick="switchTab('hyd')">💰 Hyd Costs</button>
         </div>
 
         <!-- Purchase -->
@@ -607,6 +612,89 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
                 Click Refresh to load pending dispatches from Sangwari
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- PENDING FROM SANGWARI PANEL -->
+        <div id="panel-pending" style="display:none">
+          <div class="card" style="margin:0 0 16px">
+            <div class="ch">
+              <span class="ct">📥 Pending Receipts from Sangwari</span>
+              <button class="btn btn-s btn-sm" onclick="loadPendingReceipts()">↻ Refresh</button>
+            </div>
+            <div id="pending-list"><div style="padding:24px;text-align:center;color:var(--ink3)">Click Refresh to check for pending dispatches</div></div>
+          </div>
+        </div>
+
+        <!-- HYD COSTS PANEL -->
+        <div id="panel-hyd" style="display:none">
+          <div class="card" style="margin:0 0 16px">
+            <div class="ch"><span class="ct">Add Hyderabad Cost Bill</span></div>
+            <div class="cb">
+              <div style="display:flex;gap:8px;margin-bottom:12px">
+                <button class="btn btn-p btn-sm" id="hyd-cost-mode-upload" onclick="setHydCostMode('upload')" style="flex:1">📷 Upload Bill</button>
+                <button class="btn btn-s btn-sm" id="hyd-cost-mode-manual" onclick="setHydCostMode('manual')" style="flex:1">✏️ Enter Manually</button>
+              </div>
+              <div id="hyd-cost-upload-zone" style="margin-bottom:12px">
+                <div class="uz" onclick="document.getElementById('f-hyd-cost-bill').click()" style="padding:20px">
+                  <input type="file" id="f-hyd-cost-bill" accept="image/*,.pdf" onchange="procHydCostBill(event)" style="display:none">
+                  <div class="uz-icon" style="font-size:24px">📄</div>
+                  <div class="uz-title" style="font-size:13px">Upload Hyd seasoning or freight bill</div>
+                  <div class="uz-sub">AI extracts amount and date</div>
+                </div>
+                <div class="ai-r" id="ai-hyd-cost" style="display:none"><div class="ai-spin"></div> Reading bill…</div>
+              </div>
+              <div class="field mb24">
+                <label>Bill Type</label>
+                <select id="hyd-cost-type" onchange="toggleHydCostFreight()">
+                  <option value="hyd_seasoning">🏭 Hyderabad Seasoning</option>
+                  <option value="hyd_transit">🚛 Hyderabad Transit (Freight)</option>
+                </select>
+              </div>
+              <div class="field mb24">
+                <label>Amount ₹ <span style="color:var(--ink3);font-size:11px">(pre-GST taxable)</span></label>
+                <input type="number" id="hyd-cost-amount" placeholder="50850">
+              </div>
+              <div class="field mb24" id="hyd-cost-shipping-wrap" style="display:none">
+                <label>Shipping on Bill ₹ <span style="color:var(--ink3);font-size:11px">(separate line)</span></label>
+                <input type="number" id="hyd-cost-shipping" placeholder="0">
+              </div>
+              <div class="field mb24">
+                <label>Bill Date</label>
+                <input type="date" id="hyd-cost-date">
+              </div>
+              <div class="field mb24">
+                <label>Bill / Reference No.</label>
+                <input type="text" id="hyd-cost-billno" placeholder="HYD/001/2026">
+              </div>
+              <div class="field mb24">
+                <label>Link to Xpertpack Batch</label>
+                <select id="hyd-cost-batch" style="background:white;border:1.5px solid var(--rule);color:var(--ink);padding:9px 12px;border-radius:3px;font-family:var(--sans);font-size:13px;width:100%">
+                  <option value="">— select batch —</option>
+                </select>
+              </div>
+              <div class="field mb24">
+                <label>Total CFT of that batch</label>
+                <input type="number" id="hyd-cost-cft" placeholder="161.962" step="0.001" readonly style="background:var(--paper2);opacity:.8">
+              </div>
+              <button class="btn btn-s btn-full mb24" onclick="previewHydCostApportionment()">Preview Cost per CFT →</button>
+              <div id="hyd-cost-preview" style="display:none;background:var(--paper2);border-radius:4px;padding:14px;margin-bottom:14px">
+                <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+                  <span style="font-size:13px;color:var(--ink3)">Cost per CFT</span>
+                  <span class="mono" id="hyd-cost-per-cft" style="color:var(--amber);font-weight:600">—</span>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span style="font-size:13px;color:var(--ink3)">Total extra cost on batch</span>
+                  <span class="mono" id="hyd-cost-total" style="color:var(--wood);font-weight:600">—</span>
+                </div>
+              </div>
+              <button class="btn btn-p btn-full" onclick="saveHydCostBill()" id="hyd-cost-save-btn">💾 Save Cost Bill</button>
+            </div>
+          </div>
+
+          <div class="card" style="margin:0 0 16px">
+            <div class="ch"><span class="ct">Hyd Cost Bills</span><button class="btn btn-s btn-sm" onclick="loadHydCosts()">↻ Refresh</button></div>
+            <div id="hyd-cost-history"><div style="padding:24px;text-align:center;color:var(--ink3)">Click Refresh to load</div></div>
           </div>
         </div>
     <div class="screen" id="screen-dash">
@@ -1023,6 +1111,14 @@ function enterApp(role){
   else if(role==='store') goTo('store');
   else goTo('dash');
   loadBatches();
+  // Load pending badge count silently
+  if (role === 'finance' || role === 'admin') {
+    apiGet({action:'getPendingReceipts'}).then(r=>{
+      const count = (r.receipts||[]).filter(x=>x.status==='Pending').length;
+      const badge = document.getElementById('pending-badge');
+      if (badge && count > 0) { badge.style.display='inline'; badge.textContent=count; }
+    }).catch(()=>{});
+  }
 }
 function logout(){
   ST.role='';
@@ -1060,7 +1156,7 @@ async function apiGet(p){
   return r.json();
 }
 
-function toCFT(cbm){ return parseFloat((parseFloat(cbm||0)*35.3147).toFixed(3)); }
+function toCFT(cbm){ return Math.round(parseFloat(cbm||0)*35.31466560103903*1000)/1000; }
 function fmtCFT(cbm){ return toCFT(cbm).toFixed(3)+' CFT'; }
 async function apiPost(d){
   if(!CFG.url) throw new Error('No URL configured');
@@ -1217,7 +1313,7 @@ function cr(id){
   const w=parseFloat(document.getElementById(id+'w').value)||0;
   const t=parseFloat(document.getElementById(id+'t').value)||0;
   const cbm=(l*w*t)/1e9;
-  const cft=cbm*35.3147;
+  const cft=Math.round(cbm*35.31466560103903*1000)/1000;
   const batchEl=document.getElementById(id+'b');
   const inv=batchEl?batchEl.value:'';
   const b=ST.batches.find(x=>x.invoiceNo===inv);
@@ -1262,12 +1358,14 @@ async function saveIssuances(){
 
 // ── INVOICE TABS ─────────────────────────────────────────
 function switchTab(t){
-  ['pur','cli','bat','sw'].forEach(x=>{
+  ['pur','cli','bat','sw','pending','hyd'].forEach(x=>{
     document.getElementById('panel-'+x).style.display=x===t?'block':'none';
     document.getElementById('tab-'+x).classList.toggle('active',x===t);
   });
   if(t==='bat') loadBatTable();
   if(t==='sw') loadSWDispatches();
+  if(t==='pending') loadPendingReceipts();
+  if(t==='hyd') initHydCostsTab();
 }
 
 // ── FILE UPLOAD + AI ─────────────────────────────────────
@@ -1612,7 +1710,7 @@ async function loadBatTable(){
       const cftDisplay = isCN
         ? `<span style="color:var(--red)">${parseFloat(b.totalCFT||0).toFixed(3)}</span>`
         : parseFloat(b.totalCFT||toCFT(b.totalCBM)).toFixed(3);
-      const rateCFT = b.rateCBM ? Math.round(parseFloat(b.rateCBM)/35.3147) : 0;
+      const rateCFT = b.rateCBM ? Math.round(parseFloat(b.rateCBM)/35.31466560103903) : 0;
       const issuedCFT   = parseFloat(b.issuedCFT||toCFT(b.issuedCBM||0)).toFixed(3);
       const remainCFT   = parseFloat(b.remainingCFT||toCFT(b.remainingCBM||0));
       return `<tr style="${rowStyle}">
@@ -2242,7 +2340,7 @@ function renderLogTable(){
   document.getElementById('log-next').disabled=(logCurrentPage+1)*LOG_PAGE_SIZE>=logFiltered.length;
 
   const summary=document.getElementById('log-summary');
-  const totalCFT=logFiltered.reduce((s,r)=>s+(parseFloat(r.cbm)||0),0)*35.3147;
+  const totalCFT=logFiltered.reduce((s,r)=>s+(parseFloat(r.cbm)||0),0)*35.31466560103903;
   const totalCost=logFiltered.reduce((s,r)=>s+(parseFloat(r.cost)||0),0);
   summary.textContent=`Total: ${totalCFT.toFixed(3)} CFT · ₹${Math.round(totalCost).toLocaleString('en-IN')} cost`;
 
@@ -2301,7 +2399,7 @@ function calcEpCost(){
   const w=parseFloat(document.getElementById('ep-w').value)||0;
   const t=parseFloat(document.getElementById('ep-t').value)||0;
   const cbm=(l*w*t)/1e9;
-  const cft=cbm*35.3147;
+  const cft=Math.round(cbm*35.31466560103903*1000)/1000;
   const inv=document.getElementById('ep-batch').value;
   const b=ST.batches.find(x=>x.invoiceNo===inv);
   const cost=b?cbm*parseFloat(b.rateCBM):0;
@@ -2582,7 +2680,7 @@ async function importSWDispatch(dispatch){
   const totalCFT = parseFloat(dispatch.totalCFT) || 0;
   const totalValue = parseFloat(dispatch.totalValue) || 0;
   const rateCFT = totalCFT > 0 ? Math.round(totalValue / totalCFT) : 0;
-  const totalCBM = totalCFT / 35.3147;
+  const totalCBM = totalCFT / 35.31466560103903;
 
   const batchData = {
     invoiceNo:    dispatch.billNo,
@@ -2595,7 +2693,7 @@ async function importSWDispatch(dispatch){
     thicknessMM:  dispatch.slabs?.[0]?.thickMM || 0,
     taxableValue: Math.round(totalValue),
     woodValue:    Math.round(totalValue),
-    rateCBM:      Math.round(rateCFT * 35.3147),
+    rateCBM:      Math.round(rateCFT * 35.31466560103903),
     rateCFT:      rateCFT,
     notes:        'Imported from Sangwari · Ref: ' + dispatch.invoiceNo
   };
@@ -2804,6 +2902,167 @@ async function issueFromStock() {
   } catch(e) { toast('Network error', 'err'); }
   btn.disabled = false; btn.innerHTML = '💾 Issue Selected Slabs';
 }
+// ── PENDING RECEIPTS FROM SANGWARI ───────────────────────
+async function loadPendingReceipts() {
+  const el = document.getElementById('pending-list');
+  el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--ink3)">Loading…</div>';
+  try {
+    const r = await apiGet({ action: 'getPendingReceipts' });
+    const receipts = r.receipts || [];
+    const pending = receipts.filter(x => x.status === 'Pending');
+    const received = receipts.filter(x => x.status === 'Received');
+
+    // Update badge
+    const badge = document.getElementById('pending-badge');
+    if (badge) {
+      badge.style.display = pending.length ? 'inline' : 'none';
+      badge.textContent = pending.length;
+    }
+
+    if (!receipts.length) {
+      el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3)">No pending receipts from Sangwari yet</div>';
+      return;
+    }
+
+    el.innerHTML =
+      (pending.length ? '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);padding:10px 16px 4px">Awaiting Confirmation</div>' : '') +
+      pending.map(r => renderPendingReceipt(r, false)).join('') +
+      (received.length ? '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);padding:14px 16px 4px">Confirmed</div>' : '') +
+      received.map(r => renderPendingReceipt(r, true)).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="padding:16px;color:var(--red);text-align:center">Error loading — check API URL in settings</div>';
+  }
+}
+
+function renderPendingReceipt(r, confirmed) {
+  return '<div style="padding:14px 16px;border-bottom:1px solid var(--rule);' + (confirmed ? 'opacity:.6' : '') + '">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">' +
+      '<div>' +
+        '<div style="font-weight:600;font-size:13px;font-family:var(--mono)">' + (r.billNo||'No bill no.') + '</div>' +
+        '<div style="font-size:11px;color:var(--ink3);margin-top:2px">' +
+          r.date + ' · <span class="sp-tag">' + r.species + '</span> · ' + r.invoiceNo +
+          ' · ₹' + Math.round(r.totalCFT * r.markupTier).toLocaleString('en-IN') + ' @ ₹' + r.markupTier + '/CFT' +
+        '</div>' +
+      '</div>' +
+      '<div style="text-align:right">' +
+        '<div style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--wood)">' + r.totalCFT.toFixed(3) + ' CFT</div>' +
+        '<div style="font-size:11px;color:var(--ink3)">' + r.slabCount + ' slabs</div>' +
+      '</div>' +
+    '</div>' +
+    (confirmed
+      ? '<div style="font-size:11px;color:var(--green)">✓ Confirmed ' + r.confirmedDate + ' · Batch ' + r.batchCreated + '</div>'
+      : '<button class="btn btn-p btn-sm" onclick="confirmPendingReceipt(\'' + r.receiptId + '\',\'' + r.invoiceNo + '\')" style="width:100%;margin-top:4px">✓ Confirm Received → Add to Stock</button>'
+    ) +
+  '</div>';
+}
+
+async function confirmPendingReceipt(receiptId, invoiceNo) {
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = 'Confirming…';
+  try {
+    const r = await apiPost({ action: 'confirmReceipt', data: { receiptId, batchInvoice: invoiceNo } });
+    if (r.success) {
+      toast('✓ Received — ' + r.slabsAdded + ' slabs added to Stock · Batch ' + r.batchInvoice, 'ok');
+      await loadPendingReceipts();
+      await loadBatches();
+    } else toast('Error: ' + (r.error||'Failed'), 'err');
+  } catch(e) { toast('Network error', 'err'); }
+  btn.disabled = false;
+}
+
+// ── HYD COSTS (in SlabTrack) ─────────────────────────────
+function initHydCostsTab() {
+  const sel = document.getElementById('hyd-cost-batch');
+  const batchList = (ST.batches||[]).filter(b=>!b.isCreditNote);
+  sel.innerHTML = '<option value="">— select batch —</option>' +
+    batchList.map(b=>{
+      const cft = parseFloat(b.totalCFT||toCFT(b.totalCBM)||0).toFixed(3);
+      return '<option value="'+b.invoiceNo+'" data-cft="'+cft+'">'+b.invoiceNo+' · '+b.species+' · '+cft+' CFT</option>';
+    }).join('');
+  sel.onchange = function() {
+    const opt = sel.options[sel.selectedIndex];
+    document.getElementById('hyd-cost-cft').value = opt.dataset.cft||'';
+  };
+  document.getElementById('hyd-cost-date').value = new Date().toISOString().slice(0,10);
+  setHydCostMode('upload');
+}
+function setHydCostMode(mode) {
+  document.getElementById('hyd-cost-upload-zone').style.display = mode==='upload'?'block':'none';
+  document.getElementById('hyd-cost-mode-upload').className = 'btn btn-sm '+(mode==='upload'?'btn-p':'btn-s');
+  document.getElementById('hyd-cost-mode-manual').className = 'btn btn-sm '+(mode==='manual'?'btn-p':'btn-s');
+}
+function toggleHydCostFreight() {
+  document.getElementById('hyd-cost-shipping-wrap').style.display =
+    document.getElementById('hyd-cost-type').value==='hyd_seasoning'?'block':'none';
+}
+async function procHydCostBill(event) {
+  const file=event.target.files[0]; if(!file) return;
+  if(!CFG.key){toast('Claude API key not set','err');return;}
+  const spin=document.getElementById('ai-hyd-cost'); spin.style.display='flex';
+  try {
+    const b64=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result.split(',')[1]);fr.onerror=rej;fr.readAsDataURL(file);});
+    const mt=file.type==='application/pdf'?'application/pdf':'image/jpeg';
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':CFG.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,messages:[{role:'user',content:[
+        {type:mt==='application/pdf'?'document':'image',source:{type:'base64',media_type:mt,data:b64}},
+        {type:'text',text:'Read this bill. Extract: billType ("hyd_seasoning" or "hyd_transit"), amount (pre-GST taxable), shipping (separate shipping if any else 0), date YYYY-MM-DD, billNo. Return ONLY JSON: {"billType":"hyd_seasoning","amount":50850,"shipping":8000,"date":"2026-03-12","billNo":"1"}'}
+      ]}]})});
+    const d=await resp.json();
+    const r=JSON.parse((d.content?.[0]?.text||'{}').replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim());
+    spin.style.display='none';
+    if(r.billType) document.getElementById('hyd-cost-type').value=r.billType;
+    if(r.amount)   document.getElementById('hyd-cost-amount').value=Math.round(r.amount);
+    if(r.shipping&&r.shipping>0) document.getElementById('hyd-cost-shipping').value=Math.round(r.shipping);
+    if(r.date)     document.getElementById('hyd-cost-date').value=r.date;
+    if(r.billNo)   document.getElementById('hyd-cost-billno').value=r.billNo;
+    toggleHydCostFreight();
+    toast('Bill read ✓ — link to batch and preview','ok');
+  } catch(e){spin.style.display='none';toast('Read failed — enter manually','err');}
+  document.getElementById('f-hyd-cost-bill').value='';
+}
+function previewHydCostApportionment() {
+  const amount=parseFloat(document.getElementById('hyd-cost-amount').value)||0;
+  const shipping=parseFloat(document.getElementById('hyd-cost-shipping').value)||0;
+  const total=amount+shipping;
+  const cft=parseFloat(document.getElementById('hyd-cost-cft').value)||0;
+  if(!total||!cft){toast('Fill amount and select batch','err');return;}
+  document.getElementById('hyd-cost-per-cft').textContent='₹'+(total/cft).toFixed(2)+'/CFT';
+  document.getElementById('hyd-cost-total').textContent='₹'+Math.round(total).toLocaleString('en-IN');
+  document.getElementById('hyd-cost-preview').style.display='block';
+}
+async function saveHydCostBill() {
+  const btn=document.getElementById('hyd-cost-save-btn');
+  const batchId=document.getElementById('hyd-cost-batch').value;
+  const amount=parseFloat(document.getElementById('hyd-cost-amount').value)||0;
+  const shipping=parseFloat(document.getElementById('hyd-cost-shipping').value)||0;
+  if(!batchId){toast('Select a batch','err');return;}
+  if(!amount){toast('Enter amount','err');return;}
+  btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const r=await apiPost({action:'saveHydCost',data:{
+      type:document.getElementById('hyd-cost-type').value,
+      amount:amount+shipping,date:document.getElementById('hyd-cost-date').value,
+      billNo:document.getElementById('hyd-cost-billno').value.trim(),
+      batchId,cft:parseFloat(document.getElementById('hyd-cost-cft').value)||0
+    }});
+    if(r.success){toast('Hyd cost saved ✓','ok');document.getElementById('hyd-cost-amount').value='';document.getElementById('hyd-cost-billno').value='';document.getElementById('hyd-cost-preview').style.display='none';await loadHydCosts();}
+    else toast('Error: '+(r.error||'Failed'),'err');
+  } catch(e){toast('Network error','err');}
+  btn.disabled=false; btn.innerHTML='💾 Save Cost Bill';
+}
+async function loadHydCosts() {
+  const el=document.getElementById('hyd-cost-history');
+  el.innerHTML='<div style="padding:16px;text-align:center;color:var(--ink3)">Loading…</div>';
+  try {
+    const r=await apiGet({action:'getHydCosts'});
+    const costs=r.costs||[];
+    if(!costs.length){el.innerHTML='<div style="padding:24px;text-align:center;color:var(--ink3)">No Hyd cost bills yet</div>';return;}
+    el.innerHTML='<table class="tbl"><thead><tr><th>Bill No</th><th>Type</th><th>Date</th><th>Batch</th><th>Amount ₹</th><th>Per CFT ₹</th></tr></thead><tbody>'+
+      costs.map(c=>'<tr><td class="mono">'+( c.billNo||'—')+'</td><td style="font-size:12px">'+(c.type==='hyd_seasoning'?'🏭 Seasoning':'🚛 Freight')+'</td><td style="font-size:12px;color:var(--ink3)">'+c.date+'</td><td class="mono" style="font-size:12px">'+c.batchId+'</td><td class="mono">₹'+parseInt(c.amount).toLocaleString('en-IN')+'</td><td class="mono" style="color:var(--amber)">₹'+parseFloat(c.perCFT||0).toFixed(2)+'</td></tr>').join('')+'</tbody></table>';
+  } catch(e){el.innerHTML='<div style="padding:16px;color:var(--red);text-align:center">Error loading</div>';}
+}
+
 let SS = { batchId: '', species: '', staged: [] };
 
 async function openSlabStockModal(batchId, species) {
@@ -2825,7 +3084,7 @@ function addSSManualRow() {
   const w=parseFloat(document.getElementById('ss-mw').value)||0;
   const t=parseFloat(document.getElementById('ss-mt').value)||0;
   if(!l||!w||!t){toast('Enter L, W and T','err');return;}
-  SS.staged.push({lengthMM:l,widthMM:w,thickMM:t,cft:(l*w*t)/1e9*35.3147});
+  SS.staged.push({lengthMM:l,widthMM:w,thickMM:t,cft:(l*w*t)/1e9*35.31466560103903});
   document.getElementById('ss-ml').value=''; document.getElementById('ss-mw').value='';
   renderSSStaged();
 }
@@ -2901,7 +3160,7 @@ async function uploadSSExcel(event) {
     if(lIdx<0||wIdx<0||tIdx<0){toast('Could not find L/W/T columns in Excel','err');document.getElementById('ai-ss').style.display='none';return;}
     const slabs=rows.slice(1).filter(r=>r[lIdx]&&r[wIdx]&&r[tIdx]).map(r=>{
       const l=parseFloat(r[lIdx])||0,w=parseFloat(r[wIdx])||0,t=parseFloat(r[tIdx])||0;
-      return {lengthMM:l,widthMM:w,thickMM:t,cft:cIdx>=0&&r[cIdx]?parseFloat(r[cIdx]):l*w*t/1e9*35.3147};
+      return {lengthMM:l,widthMM:w,thickMM:t,cft:cIdx>=0&&r[cIdx]?parseFloat(r[cIdx]):l*w*t/1e9*35.31466560103903};
     });
     SS.staged.push(...slabs);
     document.getElementById('ai-ss').style.display='none';
@@ -2926,7 +3185,7 @@ async function uploadSSRegister(event) {
       const d=await resp.json();
       const txt=d.content?.[0]?.text||'[]';
       let rows; try{rows=JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim());}catch(e){const lc=txt.lastIndexOf('}');rows=lc>0?JSON.parse(txt.substring(0,lc+1)+']'):[];}
-      rows.forEach(r=>{SS.staged.push({lengthMM:r.lengthMM,widthMM:r.widthMM,thickMM:r.thickMM,cft:(r.lengthMM*r.widthMM*r.thickMM)/1e9*35.3147});total++;});
+      rows.forEach(r=>{SS.staged.push({lengthMM:r.lengthMM,widthMM:r.widthMM,thickMM:r.thickMM,cft:(r.lengthMM*r.widthMM*r.thickMM)/1e9*35.31466560103903});total++;});
     }catch(e){toast('Failed reading one photo','err');}
   }
   document.getElementById('ai-ss').style.display='none';
