@@ -1048,13 +1048,14 @@ function closeConfirm(){
 }
 
 // ── CONFIG ──────────────────────────────────────────────
-let CFG={url:'',key:'',swUrl:''};
+let CFG={url:'',key:'',swUrl:'',sangwariUrl:''};
 let ST={role:'',batches:[],clients:[]};
 
 function loadCfg(){
   CFG.url=localStorage.getItem('st_url')||'https://script.google.com/macros/s/AKfycbzFMpD4hAMGJnP3hxRpZUPnE4iHdq6KoWWbYkSCDXb9EzQVuBGrfnjUR_lEQyeL4P25aA/exec';
   CFG.key=localStorage.getItem('st_key')||'';
   CFG.swUrl=localStorage.getItem('sw_url')||'';
+  CFG.sangwariUrl=localStorage.getItem('sw_url')||''; // same as swUrl
 }
 function saveCfg(){
   CFG.url=document.getElementById('cfg-url').value.trim();
@@ -2960,7 +2961,11 @@ async function confirmPendingReceipt(receiptId, invoiceNo) {
   const btn = event.target;
   btn.disabled = true; btn.textContent = 'Confirming…';
   try {
-    const r = await apiPost({ action: 'confirmReceipt', data: { receiptId, batchInvoice: invoiceNo } });
+    const r = await apiPost({ action: 'confirmReceipt', data: {
+      receiptId,
+      batchInvoice: invoiceNo,
+      sangwariUrl: CFG.sangwariUrl || localStorage.getItem('sangwari_url') || ''
+    }});
     if (r.success) {
       toast('✓ Received — ' + r.slabsAdded + ' slabs added to Stock · Batch ' + r.batchInvoice, 'ok');
       await loadPendingReceipts();
