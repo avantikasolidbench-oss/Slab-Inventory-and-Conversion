@@ -607,7 +607,10 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
               <span class="ct">🏭 Dispatches from Sangwari (Xpertpack)</span>
               <button class="btn btn-s btn-sm" onclick="loadPendingReceipts()">↻ Refresh</button>
             </div>
-            <div style="padding:8px 16px;font-size:12px;color:var(--ink3);border-bottom:1px solid var(--rule)">Sangwari pushes dispatches here automatically. Confirm receipt to add slabs to stock.</div>
+            <div style="padding:8px 16px;font-size:12px;color:var(--ink3);border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center">
+              <span>Sangwari pushes dispatches here automatically. Confirm receipt to add slabs to stock.</span>
+              <button class="btn btn-s btn-sm" onclick="importFromSangwari()" style="white-space:nowrap;margin-left:8px">⬇ Import Existing</button>
+            </div>
             <div id="pending-list"><div style="padding:24px;text-align:center;color:var(--ink3)">Click Refresh to check for dispatches</div></div>
           </div>
         </div>
@@ -2591,7 +2594,8 @@ async function loadInv(){
 
 // ── SANGWARI IMPORT ──────────────────────────────────────
 async function loadSWDispatches(){
-  const el=document.getElementById('sw-pending');
+  const el=document.getElementById('sw-pending') || document.getElementById('pending-list');
+  if(!el) return;
   if(!CFG.swUrl){
     el.innerHTML=`<div style="text-align:center;padding:32px;color:var(--ink3)">
       Sangwari API URL not set — go to ⚙ Settings and add the Sangwari Apps Script URL
@@ -2891,6 +2895,34 @@ async function issueFromStock() {
   btn.disabled = false; btn.innerHTML = '💾 Issue Selected Slabs';
 }
 // ── PENDING RECEIPTS FROM SANGWARI ───────────────────────
+async function importFromSangwari() {
+  if (!CFG.swUrl) { toast('Sangwari API URL not set in Settings', 'err'); return; }
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = 'Importing…';
+  try {
+    // Fetch all dispatches from Sangwari
+    const r = await fetch(CFG.swUrl + '?action=getSWDispatches');
+    const data = await r.json();
+    const dispatches = data.dispatches || [];
+    if (!dispatches.length) { toast('No dispatches found in Sangwari', 'err'); btn.disabled=false; btn.textContent='⬇ Import Existing'; return; }
+    let imported = 0;
+    for (const d of dispatches) {
+      const res = await apiPost({ action: 'savePendingReceipt', data: {
+        dispatchId: d.dispatchId, billNo: d.billNo, date: d.date,
+        species: d.species, vendor: d.vendor, invoiceNo: d.invoiceNo,
+        totalCFT: d.totalCFT, slabCount: d.slabCount, totalValue: d.totalValue,
+        slabs: [], // slabs fetched on confirm
+        markupTier: d.notes && d.notes.includes('[markup:') ? parseInt(d.notes.match(/\[markup:(\d+)\]/)?.[1]||300) : 300,
+        dispatchType: d.dispatchType
+      }});
+      if (res.success && !res.alreadyExists) imported++;
+    }
+    toast(imported + ' dispatch(es) imported · ' + (dispatches.length - imported) + ' already existed', 'ok');
+    await loadPendingReceipts();
+  } catch(e) { toast('Import failed: ' + e.message, 'err'); }
+  btn.disabled = false; btn.textContent = '⬇ Import Existing';
+}
+
 async function loadPendingReceipts() {
   const el = document.getElementById('pending-list');
   el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--ink3)">Loading…</div>';
