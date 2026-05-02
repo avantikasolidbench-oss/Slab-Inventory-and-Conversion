@@ -387,6 +387,10 @@ select option{background:var(--bg3);color:var(--ink)}
       <label>Claude API Key (for AI bill reading)</label>
       <input type="password" id="sw-cfg-key" placeholder="sk-ant-...">
     </div>
+    <div class="field">
+      <label>SlabTrack API URL <span style="color:var(--ink3);font-size:10px">(for auto-sending dispatches to Solid Bench)</span></label>
+      <input type="text" id="sw-cfg-sb-url" placeholder="https://script.google.com/macros/s/...">
+    </div>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn btn-sec" onclick="closeSWCfg()" style="flex:1">Cancel</button>
       <button class="btn btn-primary" onclick="saveSWCfg()" style="flex:2">Save</button>
@@ -898,7 +902,8 @@ select option{background:var(--bg3);color:var(--ink)}
 const CFG = {
   url: localStorage.getItem('sw_url') || 'https://script.google.com/macros/s/AKfycbweEVPc_MBvUl_yYyl-X4yor_wjpg_mVseMK2wM8GmC2sAwddXuhCE_2VbEWC609Mimkw/exec',
   key: localStorage.getItem('sw_key') || '',
-  pin: localStorage.getItem('sw_pin') || '5678',  // default manager PIN
+  pin: localStorage.getItem('sw_pin') || '5678',
+  sbUrl: localStorage.getItem('sw_sb_url') || '',
   markup: 300  // ₹ per CFT markup
 };
 
@@ -910,10 +915,22 @@ let disRowId = 0;
 
 function showSWCfg(){ document.getElementById('sw-cfg-key').value=CFG.key||''; document.getElementById('sw-cfg-modal').classList.add('show'); }
 function closeSWCfg(){ document.getElementById('sw-cfg-modal').classList.remove('show'); }
+function openSWCfg(){
+  document.getElementById('sw-cfg-key').value = CFG.key || '';
+  document.getElementById('sw-cfg-sb-url').value = CFG.sbUrl || '';
+  document.getElementById('sw-cfg-modal').classList.add('show');
+}
 function saveSWCfg(){
-  CFG.key=document.getElementById('sw-cfg-key').value.trim();
-  localStorage.setItem('sw_key',CFG.key);
-  closeSWCfg(); toast('Settings saved ✓','ok');
+  CFG.key = document.getElementById('sw-cfg-key').value.trim();
+  CFG.sbUrl = document.getElementById('sw-cfg-sb-url').value.trim();
+  localStorage.setItem('sw_key', CFG.key);
+  localStorage.setItem('sw_sb_url', CFG.sbUrl);
+  // Also save SlabTrack URL to Config sheet for server-side use
+  if (CFG.sbUrl && CFG.url) {
+    apiPost({ action: 'saveSWConfig', data: { key: 'slabtrack_url', value: CFG.sbUrl } })
+      .catch(e => console.log('Config save failed:', e));
+  }
+  closeSWCfg(); toast('Settings saved ✓', 'ok');
 }
 
 // ── LOGIN ──
