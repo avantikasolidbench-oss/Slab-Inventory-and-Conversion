@@ -287,8 +287,8 @@ select option{background:var(--bg3);color:var(--ink)}
         <button class="btn btn-sm btn-sec" id="flt-gas" onclick="filterSlabs('Gas Chamber')" style="white-space:nowrap">⚗️ Gas</button>
         <button class="btn btn-sm btn-sec" id="flt-solar" onclick="filterSlabs('Solar Chamber')" style="white-space:nowrap">☀️ Solar</button>
         <button class="btn btn-sm btn-sec" id="flt-seasoned" onclick="filterSlabs('Seasoned')" style="white-space:nowrap">✅ Seasoned</button>
-        <button class="btn btn-sm btn-sec" id="flt-hyd" onclick="filterSlabs('Sent to Hyderabad')" style="white-space:nowrap">🚛 Hyd</button>
-        <button class="btn btn-sm btn-sec" id="flt-dispatched" onclick="filterSlabs('Dispatched to SB')" style="white-space:nowrap">📦 Dispatched</button>
+        <button class="btn btn-sm btn-sec" id="flt-disphyd" onclick="filterSlabs('Dispatched via Hyd')" style="white-space:nowrap">🏭 Disp via Hyd</button>
+        <button class="btn btn-sm btn-sec" id="flt-dispatched" onclick="filterSlabs('Dispatched to SB')" style="white-space:nowrap">📦 Dispatched to SB</button>
       </div>
 
       <!-- Summary bar -->
@@ -744,6 +744,46 @@ select option{background:var(--bg3);color:var(--ink)}
   </div>
 </div>
 
+<!-- EDIT SLAB MODAL -->
+<div class="modal" id="edit-slab-modal">
+  <div class="modal-box" style="max-width:340px">
+    <div class="modal-handle"></div>
+    <div class="modal-title">✏️ Edit Slab</div>
+    <div class="modal-sub" id="edit-slab-id" style="font-family:var(--mono);font-size:11px"></div>
+    <input type="hidden" id="es-slabid">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="field" style="margin-bottom:0">
+        <label>L mm</label>
+        <input type="number" id="es-l" style="background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:10px;border-radius:4px;width:100%;font-family:var(--mono);font-size:15px;text-align:center">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>W mm</label>
+        <input type="number" id="es-w" style="background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:10px;border-radius:4px;width:100%;font-family:var(--mono);font-size:15px;text-align:center">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>T mm</label>
+        <input type="number" id="es-t" style="background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:10px;border-radius:4px;width:100%;font-family:var(--mono);font-size:15px;text-align:center">
+      </div>
+    </div>
+    <div id="es-cft-preview" style="text-align:center;font-family:var(--mono);font-size:18px;color:var(--wood);font-weight:700;margin-bottom:14px">—</div>
+    <div class="field" style="margin-bottom:14px">
+      <label>Status</label>
+      <select id="es-status" style="background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:10px;border-radius:4px;width:100%;font-size:13px">
+        <option>Unseasoned</option>
+        <option>Gas Chamber</option>
+        <option>Solar Chamber</option>
+        <option>Sent to Hyderabad</option>
+        <option>Seasoned</option>
+        <option>Dispatched to SB</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sec" onclick="document.getElementById('edit-slab-modal').classList.remove('show')" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditSlab()" style="flex:2" id="es-save-btn">💾 Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- EDIT DISPATCH MODAL -->
 <div class="modal" id="edit-dis-modal">
   <div class="modal-box">
@@ -917,6 +957,10 @@ function logout() {
   document.getElementById('app').classList.remove('show');
   document.getElementById('login').classList.add('show');
   document.getElementById('pin').value = '';
+  document.getElementById('lg-err').textContent = '';
+  // Reset login button
+  const btn = document.querySelector('.lg-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Enter →'; }
 }
 
 // ── API ──
@@ -941,7 +985,7 @@ function goTo(s) {
   if (s === 'pur') { loadBatches(); loadMarginSummary(); }
   if (s === 'inv') {
     const f = window._currentSlabFilter;
-    const valid = ['Unseasoned','Gas Chamber','Solar Chamber','Seasoned','Sent to Hyderabad','Dispatched to SB'];
+    const valid = ['Unseasoned','Gas Chamber','Solar Chamber','Seasoned','Sent to Hyderabad','Dispatched to SB','Dispatched via Hyd'];
     filterSlabs(valid.includes(f) ? f : 'Unseasoned');
     loadSlabs();
   }
@@ -1002,12 +1046,12 @@ function renderBatches(batches) {
 
 // ── LOAD SLABS (slab-level view with seasoning) ──
 async function loadSlabs() {
-  if (!CFG.url) { renderSlabs([]); return; }
+  if (!CFG.url) { renderSlabs(); return; }
   try {
     const r = await apiGet({ action: 'getSWSlabs' });
     ST.slabs = r.slabs || [];
-    renderSlabs(ST.slabs);
-  } catch(e) { renderSlabs([]); }
+    renderSlabs();
+  } catch(e) { renderSlabs(); }
 }
 
 let bulkMode = false;
@@ -1018,20 +1062,21 @@ function toggleBulkMode() {
   btn.style.background = bulkMode ? 'var(--wood)' : '';
   btn.style.color = bulkMode ? 'white' : '';
   if (!bulkMode) { selectedSlabs.clear(); updateBulkBar(); }
-  renderSlabs(ST.slabs);
+  renderSlabs();
 }
 
-function renderSlabs(slabs) {
-  const filtered = slabFilter === 'all' ? slabs : slabs.filter(s => s.status === slabFilter);
+function renderSlabs() {
+  const slabs = ST.slabs || [];
+  const filtered = slabs.filter(s => s.status === slabFilter);
 
   // Update summary bar
   const totalCFT = filtered.reduce((s, x) => s + parseFloat(x.cft||0), 0);
-  const hydCFT   = slabs.filter(s => s.status === 'Sent to Hyderabad').reduce((s, x) => s + parseFloat(x.cft||0), 0);
+  const hydCFT   = slabs.filter(s => s.status === 'Dispatched via Hyd').reduce((s, x) => s + parseFloat(x.cft||0), 0);
   document.getElementById('inv-sum-count').textContent = filtered.length + ' slabs';
   document.getElementById('inv-sum-cft').textContent   = totalCFT.toFixed(2) + ' CFT';
   document.getElementById('slab-count-lbl').textContent = bulkMode ? (selectedSlabs.size + ' selected') : '';
   const hydWrap = document.getElementById('inv-sum-hyd-wrap');
-  if (slabFilter !== 'Sent to Hyderabad' && hydCFT > 0) {
+  if (slabFilter !== 'Dispatched via Hyd' && hydCFT > 0) {
     hydWrap.style.display = 'block';
     document.getElementById('inv-sum-hyd').textContent = hydCFT.toFixed(2) + ' CFT';
   } else { hydWrap.style.display = 'none'; }
@@ -1067,11 +1112,14 @@ function renderSlabs(slabs) {
 function filterSlabs(f) {
   slabFilter = f;
   window._currentSlabFilter = f;
-  ['raw','gas','solar','seasoned','hyd','dispatched'].forEach(x => {
+  ['raw','gas','solar','seasoned','disphyd','dispatched'].forEach(x => {
     const el = document.getElementById('flt-' + x);
     if (el) { el.style.background = ''; el.style.color = ''; el.className = 'btn btn-sm btn-sec'; }
   });
-  const map = { 'Unseasoned':'flt-raw', 'Gas Chamber':'flt-gas', 'Solar Chamber':'flt-solar', 'Seasoned':'flt-seasoned', 'Sent to Hyderabad':'flt-hyd', 'Dispatched to SB':'flt-dispatched' };
+  const map = {
+    'Unseasoned':'flt-raw', 'Gas Chamber':'flt-gas', 'Solar Chamber':'flt-solar',
+    'Seasoned':'flt-seasoned', 'Dispatched via Hyd':'flt-disphyd', 'Dispatched to SB':'flt-dispatched'
+  };
   const btn = document.getElementById(map[f]);
   if (btn) { btn.style.background = 'var(--wood)'; btn.style.color = 'white'; btn.className = 'btn btn-sm'; }
   // Auto-enable bulk mode on Seasoned so checkboxes ready for dispatch selection
@@ -1094,32 +1142,60 @@ function selectAllSlabs() {
   const filtered = ST.slabs.filter(s => s.status === slabFilter);
   const allSelected = filtered.every(s => selectedSlabs.has(s.slabId));
   filtered.forEach(s => allSelected ? selectedSlabs.delete(s.slabId) : selectedSlabs.add(s.slabId));
-  renderSlabs(ST.slabs);
+  renderSlabs();
   updateBulkBar();
 }
 
 function editSlab(slabId) {
   const s = ST.slabs.find(x => x.slabId === slabId);
   if (!s) return;
-  const newL = prompt('Length mm:', s.lengthMM);
-  if (newL === null) return;
-  const newW = prompt('Width mm:', s.widthMM);
-  if (newW === null) return;
-  const newT = prompt('Thickness mm:', s.thickMM);
-  if (newT === null) return;
-  const newStatus = prompt('Status (Unseasoned/Gas Chamber/Solar Chamber/Sent to Hyderabad/Seasoned):', s.status);
-  if (newStatus === null) return;
-  apiPost({ action: 'updateSlab', data: {
-    slabId, lengthMM: parseFloat(newL), widthMM: parseFloat(newW), thickMM: parseFloat(newT), status: newStatus
-  }}).then(r => {
-    if (r.success) { toast('Slab updated ✓', 'ok'); loadSlabs(); }
-    else toast('Error: ' + (r.error||'Failed'), 'err');
+  document.getElementById('es-slabid').value = slabId;
+  document.getElementById('edit-slab-id').textContent = slabId;
+  document.getElementById('es-l').value = s.lengthMM || '';
+  document.getElementById('es-w').value = s.widthMM || '';
+  document.getElementById('es-t').value = s.thickMM || '';
+  document.getElementById('es-status').value = s.status || 'Unseasoned';
+  updateEsCFT();
+  document.getElementById('edit-slab-modal').classList.add('show');
+  // Auto-update CFT preview on input
+  ['es-l','es-w','es-t'].forEach(id => {
+    document.getElementById(id).oninput = updateEsCFT;
   });
+}
+
+function updateEsCFT() {
+  const l = parseFloat(document.getElementById('es-l').value)||0;
+  const w = parseFloat(document.getElementById('es-w').value)||0;
+  const t = parseFloat(document.getElementById('es-t').value)||0;
+  const cft = l&&w&&t ? Math.round(l*w*t/1e9*35.31466560103903*1000)/1000 : 0;
+  document.getElementById('es-cft-preview').textContent = cft > 0 ? cft.toFixed(3) + ' CFT' : '—';
+}
+
+async function saveEditSlab() {
+  const btn = document.getElementById('es-save-btn');
+  const slabId = document.getElementById('es-slabid').value;
+  const l = parseFloat(document.getElementById('es-l').value)||0;
+  const w = parseFloat(document.getElementById('es-w').value)||0;
+  const t = parseFloat(document.getElementById('es-t').value)||0;
+  if (!l||!w||!t) { toast('Enter all dimensions','err'); return; }
+  btn.disabled=true; btn.textContent='Saving…';
+  try {
+    const r = await apiPost({ action: 'updateSlab', data: {
+      slabId, lengthMM: l, widthMM: w, thickMM: t,
+      status: document.getElementById('es-status').value
+    }});
+    if (r.success) {
+      toast('Slab updated ✓','ok');
+      document.getElementById('edit-slab-modal').classList.remove('show');
+      await loadSlabs(); renderSlabs();
+    } else toast('Error: '+(r.error||'Failed'),'err');
+  } catch(e) { toast('Network error','err'); }
+  btn.disabled=false; btn.innerHTML='💾 Save';
 }
 
 function clearSelection() {
   selectedSlabs.clear();
-  renderSlabs(ST.slabs);
+  renderSlabs();
   updateBulkBar();
 }
 
@@ -2634,7 +2710,7 @@ function openBatchDetail(invoiceNo) {
   if (!batchSlabs.length) { toast('No individual slabs tracked for this batch yet', ''); return; }
   batchSlabs.forEach(s => selectedSlabs.add(s.slabId));
   goTo('inv');
-  renderSlabs(ST.slabs);
+  renderSlabs();
   updateBulkBar();
   toast(batchSlabs.length + ' slabs from ' + invoiceNo + ' selected', 'ok');
 }
@@ -3321,7 +3397,8 @@ function statusBadge(status) {
     'Sent to Hyderabad':     '<span class="badge b-hyd">🚛 Sent to Hyd</span>',
     'Returned from Hyderabad':'<span class="badge b-hyd">↩️ Returned from Hyd</span>',
     'Seasoned':              '<span class="badge b-seasoned">✅ Seasoned</span>',
-    'Dispatched to SB':      '<span class="badge b-wood">🚚 Dispatched to SB</span>'
+    'Dispatched to SB':      '<span class="badge b-wood">🚚 Dispatched to SB</span>',
+    'Dispatched via Hyd':    '<span class="badge b-hyd">🏭 Dispatched via Hyd</span>'
   };
   return map[status] || '<span class="badge b-raw">' + (status || 'Unknown') + '</span>';
 }
