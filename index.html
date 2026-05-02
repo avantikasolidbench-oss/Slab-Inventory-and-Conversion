@@ -455,9 +455,8 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
           <button class="tab active" id="tab-pur" onclick="switchTab('pur')">📦 Purchase Bills</button>
           <button class="tab" id="tab-cli" onclick="switchTab('cli')">🛒 Client Invoices</button>
           <button class="tab" id="tab-bat" onclick="switchTab('bat')">📋 All Batches</button>
-          <button class="tab" id="tab-sw" onclick="switchTab('sw')">🏭 From Sangwari</button>
           <button class="tab" id="tab-pending" onclick="switchTab('pending')" style="position:relative">
-            📥 Pending
+            🏭 From Sangwari
             <span id="pending-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:var(--red);color:white;border-radius:8px;font-size:9px;padding:1px 5px;font-weight:700"></span>
           </button>
           <button class="tab" id="tab-hyd" onclick="switchTab('hyd')">💰 Hyd Costs</button>
@@ -601,28 +600,15 @@ body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:
           </div>
         </div>
         <!-- Sangwari Import -->
-        <div id="panel-sw" style="display:none">
-          <div class="card" style="margin:0">
-            <div class="ch">
-              <span class="ct">Pending Sangwari Dispatches</span>
-              <button class="btn btn-s btn-sm" onclick="loadSWDispatches()">↻ Refresh</button>
-            </div>
-            <div class="cb" id="sw-pending">
-              <div style="text-align:center;padding:24px;color:var(--ink3)">
-                Click Refresh to load pending dispatches from Sangwari
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- PENDING FROM SANGWARI PANEL -->
         <div id="panel-pending" style="display:none">
           <div class="card" style="margin:0 0 16px">
             <div class="ch">
-              <span class="ct">📥 Pending Receipts from Sangwari</span>
+              <span class="ct">🏭 Dispatches from Sangwari (Xpertpack)</span>
               <button class="btn btn-s btn-sm" onclick="loadPendingReceipts()">↻ Refresh</button>
             </div>
-            <div id="pending-list"><div style="padding:24px;text-align:center;color:var(--ink3)">Click Refresh to check for pending dispatches</div></div>
+            <div style="padding:8px 16px;font-size:12px;color:var(--ink3);border-bottom:1px solid var(--rule)">Sangwari pushes dispatches here automatically. Confirm receipt to add slabs to stock.</div>
+            <div id="pending-list"><div style="padding:24px;text-align:center;color:var(--ink3)">Click Refresh to check for dispatches</div></div>
           </div>
         </div>
 
@@ -1359,12 +1345,13 @@ async function saveIssuances(){
 
 // ── INVOICE TABS ─────────────────────────────────────────
 function switchTab(t){
-  ['pur','cli','bat','sw','pending','hyd'].forEach(x=>{
-    document.getElementById('panel-'+x).style.display=x===t?'block':'none';
-    document.getElementById('tab-'+x).classList.toggle('active',x===t);
+  ['pur','cli','bat','pending','hyd'].forEach(x=>{
+    const p = document.getElementById('panel-'+x);
+    if(p) p.style.display=x===t?'block':'none';
+    const tb = document.getElementById('tab-'+x);
+    if(tb) tb.classList.toggle('active',x===t);
   });
   if(t==='bat') loadBatTable();
-  if(t==='sw') loadSWDispatches();
   if(t==='pending') loadPendingReceipts();
   if(t==='hyd') initHydCostsTab();
 }
