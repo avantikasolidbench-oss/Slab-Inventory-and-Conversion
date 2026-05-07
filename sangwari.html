@@ -1990,6 +1990,7 @@ function loadDash() {
 
   document.getElementById('dispatch-month-label').textContent = 'Jan 2026 – ' + thisMonLabel;
 
+  const byMonth = {};
   ST.dispatches.forEach(d => {
     const mo = (d.date||'').slice(0,7);
     if (!mo || mo < '2026-01') return;
@@ -2001,6 +2002,15 @@ function loadDash() {
     byMonth[mo][sp].value += parseFloat(d.totalValue || 0);
     if (isHyd) byMonth[mo][sp].isHyd = true;
   });
+
+  const allMonths = [];
+  const cur2 = new Date();
+  let dy = 2026, dm = 1;
+  while (dy < cur2.getFullYear() || (dy === cur2.getFullYear() && dm <= cur2.getMonth()+1)) {
+    allMonths.push(dy + '-' + String(dm).padStart(2,'0'));
+    dm++; if (dm > 12) { dm = 1; dy++; }
+  }
+  allMonths.reverse();
 
   const grandTotal = ST.dispatches.reduce((s,d) => s + parseFloat(d.totalCFT||0), 0);
   const grandValue = ST.dispatches.reduce((s,d) => s + parseFloat(d.totalValue||0), 0);
