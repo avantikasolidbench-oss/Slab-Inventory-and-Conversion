@@ -288,7 +288,6 @@ select option{background:var(--bg3);color:var(--ink)}
         <button class="btn btn-sm btn-sec" id="flt-solar" onclick="filterSlabs('Solar Chamber')" style="white-space:nowrap">☀️ Solar</button>
         <button class="btn btn-sm btn-sec" id="flt-seasoned" onclick="filterSlabs('Seasoned')" style="white-space:nowrap">✅ Seasoned</button>
         <button class="btn btn-sm btn-sec" id="flt-disphyd" onclick="filterSlabs('Dispatched via Hyd')" style="white-space:nowrap">🏭 Disp via Hyd</button>
-        <button class="btn btn-sm btn-sec" id="flt-dispatched" onclick="filterSlabs('Dispatched to SB')" style="white-space:nowrap">📦 Dispatched to SB</button>
       </div>
 
       <!-- Summary bar -->
@@ -301,7 +300,7 @@ select option{background:var(--bg3);color:var(--ink)}
       <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
         <button class="btn btn-primary btn-sm" onclick="openAddSlabDetailsModal()" id="add-slab-details-btn">+ Add Slab Details</button>
         <button class="btn btn-sec btn-sm" id="bulk-mode-btn" onclick="toggleBulkMode()">☑ Bulk Update</button>
-        <button class="btn btn-sm" id="dispatch-selected-btn" onclick="dispatchSelectedSlabs()" style="display:none;background:var(--seasoned);color:white">🚚 Dispatch Selected</button>
+        <button class="btn btn-sm" id="dispatch-selected-btn" onclick="dispatchSelectedSlabs()" style="display:none;background:var(--seasoned);color:white">🧾 Create Bill</button>
         <span style="font-size:12px;color:var(--ink3)" id="slab-count-lbl"></span>
       </div>
 
@@ -819,6 +818,49 @@ select option{background:var(--bg3);color:var(--ink)}
   </div>
 </div>
 
+<!-- CREATE BILL MODAL (Flow 1 — from Seasoned inventory) -->
+<div class="modal" id="create-bill-modal">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🧾 Create Bill</div>
+    <div class="modal-sub" id="cb-sub"></div>
+
+    <!-- Summary cards per species -->
+    <div id="cb-species-summary" style="margin-bottom:14px"></div>
+
+    <!-- Grand total -->
+    <div style="background:var(--bg3);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">Total Bill Value</div>
+        <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--wood)" id="cb-total-value">—</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:10px;color:var(--ink3);margin-bottom:3px">Total CFT</div>
+        <div style="font-family:var(--mono);font-size:16px;font-weight:600" id="cb-total-cft">—</div>
+        <div style="font-size:11px;color:var(--ink3)" id="cb-total-slabs"></div>
+      </div>
+    </div>
+
+    <!-- Download annexure -->
+    <button class="btn btn-sm" onclick="downloadDispatchAnnexureDraft()" style="width:100%;margin-bottom:10px;background:rgba(58,122,176,.15);border:1px solid rgba(58,122,176,.3);color:var(--gas);padding:10px">
+      📄 Download Slab Annexure — attach to bill
+    </button>
+
+    <!-- Bill details -->
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:8px">Bill Details</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <div class="field" style="margin-bottom:0"><label>Bill / Challan No.</label><input type="text" id="cb-billno" placeholder="XP/001/2026-27"></div>
+      <div class="field" style="margin-bottom:0"><label>Date</label><input type="date" id="cb-date"></div>
+    </div>
+    <div class="field"><label>Notes (optional)</label><textarea id="cb-notes" style="min-height:36px"></textarea></div>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sec" onclick="document.getElementById('create-bill-modal').classList.remove('show')" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCreateBill()" style="flex:2" id="cb-save-btn">🚚 Save Dispatch</button>
+    </div>
+  </div>
+</div>
+
 <!-- DISPATCH MODAL -->
 <div class="modal" id="dis-modal">
   <div class="modal-box">
@@ -885,6 +927,9 @@ select option{background:var(--bg3);color:var(--ink)}
         <button class="btn btn-primary btn-sm" onclick="document.getElementById('f-dis-sheet').click()" style="flex:1">📷 Upload Register / Excel / PDF</button>
         <button class="btn btn-sec btn-sm" onclick="addDisRow()">+ Manual</button>
         <input type="file" id="f-dis-sheet" accept="image/*,.pdf,.xlsx,.xls,.csv" multiple onchange="readDisSheet(event)" style="display:none">
+      </div>
+      <div id="dis-download-wrap" style="display:none;margin-bottom:8px">
+        <button class="btn btn-sm" onclick="downloadDispatchAnnexureDraft()" style="width:100%;background:rgba(58,122,176,.15);border:1px solid rgba(58,122,176,.3);color:var(--gas)">📄 Download Slab Annexure — attach to bill</button>
       </div>
       <div class="ai-spin-wrap" id="ai-dis"><div class="ai-spin"></div> Reading register…</div>
       <div id="dis-species-sections"></div>
@@ -1147,13 +1192,13 @@ function renderSlabs() {
 function filterSlabs(f) {
   slabFilter = f;
   window._currentSlabFilter = f;
-  ['raw','gas','solar','seasoned','disphyd','dispatched'].forEach(x => {
+  ['raw','gas','solar','seasoned','disphyd'].forEach(x => {
     const el = document.getElementById('flt-' + x);
     if (el) { el.style.background = ''; el.style.color = ''; el.className = 'btn btn-sm btn-sec'; }
   });
   const map = {
     'Unseasoned':'flt-raw', 'Gas Chamber':'flt-gas', 'Solar Chamber':'flt-solar',
-    'Seasoned':'flt-seasoned', 'Dispatched via Hyd':'flt-disphyd', 'Dispatched to SB':'flt-dispatched'
+    'Seasoned':'flt-seasoned', 'Dispatched via Hyd':'flt-disphyd'
   };
   const btn = document.getElementById(map[f]);
   if (btn) { btn.style.background = 'var(--wood)'; btn.style.color = 'white'; btn.className = 'btn btn-sm'; }
@@ -1266,43 +1311,112 @@ function dispatchSelectedSlabs() {
   sel.forEach(s => {
     const key = s.invoiceNo + '|' + s.species;
     if (!groups[key]) groups[key] = { invoiceNo: s.invoiceNo, species: s.species, slabs: [] };
-    groups[key].slabs.push({
-      lengthMM: s.lengthMM, widthMM: s.widthMM, thickMM: s.thickMM,
-      cft: parseFloat(s.cft || 0), slabId: s.slabId
-    });
+    groups[key].slabs.push({ lengthMM: s.lengthMM, widthMM: s.widthMM, thickMM: s.thickMM, cft: parseFloat(s.cft||0), slabId: s.slabId });
   });
 
-  // Determine markup tier from batches
+  // Determine markup from batches
   const batchMarkups = Object.values(groups).map(g => {
     const b = ST.batches.find(x => x.invoiceNo === g.invoiceNo);
     return b ? parseInt(b.markupTier || 300) : 300;
   });
   const uniqueMarkups = [...new Set(batchMarkups)];
-  const markup = uniqueMarkups[0] || 300; // use first batch's tier
+  const markup = uniqueMarkups[0] || 300;
 
-  // Pre-load into dispatch modal species groups
+  // Pre-load disSpeciesGroups for annexure generation
   disSpeciesGroups = {};
+  disFinanced = markup <= 200 ? true : true;
+  disSeasoned = markup === 300 ? true : markup === 100 ? true : false;
   Object.values(groups).forEach(g => {
     disSpeciesGroups[g.species] = g.slabs.map(s => ({ ...s, invoiceNo: g.invoiceNo }));
   });
 
-  // Open dispatch modal
-  showDispatchModal();
+  // Build Create Bill modal summary
+  let totalCFT = 0, totalValue = 0, totalSlabs = 0;
+  const summaryHtml = Object.values(groups).map(g => {
+    const batch = ST.batches.find(b => b.invoiceNo === g.invoiceNo);
+    const vendorRate = batch ? parseFloat(batch.rateCFT||0) || (batch.totalCFT > 0 ? Math.round(parseFloat(batch.woodValue||0)/batch.totalCFT) : 0) : 0;
+    const billRate = vendorRate + markup;
+    const spCFT = Math.round(g.slabs.reduce((s,r) => s+r.cft, 0)*1000)/1000;
+    const spValue = Math.round(spCFT * billRate);
+    totalCFT += spCFT; totalValue += spValue; totalSlabs += g.slabs.length;
+    return '<div style="background:var(--bg3);border-radius:var(--r);padding:10px 14px;margin-bottom:8px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+        '<span style="font-weight:600;font-size:13px">' + g.species + '</span>' +
+        '<span class="mono" style="font-size:13px;color:var(--wood);font-weight:700">₹' + spValue.toLocaleString('en-IN') + '</span>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:11px">' +
+        '<div style="color:var(--ink3)">Slabs<br><span style="color:var(--ink);font-weight:600">' + g.slabs.length + '</span></div>' +
+        '<div style="color:var(--ink3)">CFT<br><span class="mono" style="color:var(--ink);font-weight:600">' + spCFT.toFixed(3) + '</span></div>' +
+        '<div style="color:var(--ink3)">Rate/CFT<br><span class="mono" style="color:var(--amber);font-weight:600">' +
+          (vendorRate > 0 ? '₹'+vendorRate+'+₹'+markup : '₹'+markup) + '=<strong>₹'+billRate+'</strong>' +
+        '</span></div>' +
+      '</div>' +
+      (!batch ? '<div style="font-size:10px;color:var(--amber);margin-top:4px">⚠ No batch linked</div>' : '') +
+    '</div>';
+  }).join('') + (uniqueMarkups.length > 1 ? '<div style="font-size:11px;color:var(--amber);padding:6px 0">⚠ Multiple markup tiers — verify billing</div>' : '');
 
-  // Pre-set markup tier from batch
-  if (markup === 300) { disFinanced = true; disSeasoned = true; }
-  else if (markup === 200) { disFinanced = true; disSeasoned = false; }
-  else if (markup === 100) { disFinanced = false; disSeasoned = true; }
-  setDisMarkup('fin', disFinanced); // updates buttons + display
+  document.getElementById('cb-species-summary').innerHTML = summaryHtml;
+  document.getElementById('cb-total-value').textContent = '₹' + Math.round(totalValue).toLocaleString('en-IN');
+  document.getElementById('cb-total-cft').textContent = Math.round(totalCFT*1000)/1000 + ' CFT';
+  document.getElementById('cb-total-slabs').textContent = totalSlabs + ' slabs';
+  document.getElementById('cb-sub').textContent = uniqueMarkups.length > 1 ? '⚠ Mixed tiers' : '₹'+markup+'/CFT markup · ' + (disSeasoned ? '🌿 XP seasoned' : '🏭 Hyd seasoned');
+  document.getElementById('cb-billno').value = '';
+  document.getElementById('cb-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('cb-notes').value = '';
+  document.getElementById('create-bill-modal').classList.add('show');
 
-  // Render species sections with pre-loaded slabs
-  renderDisSpeciesSections();
+  // Store groups for save
+  window._cbGroups = groups;
+  window._cbMarkup = markup;
+}
 
-  // Show info
-  const totalCFT = sel.reduce((s,x) => s + parseFloat(x.cft||0), 0);
-  const msg = sel.length + ' slabs · ' + totalCFT.toFixed(3) + ' CFT · markup ₹' + markup + '/CFT pre-set' +
-    (uniqueMarkups.length > 1 ? ' ⚠ Multiple tiers detected — verify' : ' ✓');
-  toast(msg, uniqueMarkups.length > 1 ? 'err' : 'ok');
+async function saveCreateBill() {
+  const btn = document.getElementById('cb-save-btn');
+  const billNo = document.getElementById('cb-billno').value.trim();
+  const date = document.getElementById('cb-date').value;
+  if (!billNo) { toast('Enter bill / challan number', 'err'); return; }
+
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const markup = window._cbMarkup || 300;
+  const groups = window._cbGroups || {};
+  let saved = 0;
+
+  for (const g of Object.values(groups)) {
+    const batch = ST.batches.find(b => b.invoiceNo === g.invoiceNo);
+    const vendorRate = batch ? parseFloat(batch.rateCFT||0) || (batch.totalCFT > 0 ? Math.round(parseFloat(batch.woodValue||0)/batch.totalCFT) : 0) : 0;
+    const billRate = vendorRate + markup;
+    const slabsWithCost = g.slabs.map(s => ({ ...s, cbm: (s.lengthMM*s.widthMM*s.thickMM)/1e9, cost: s.cft*billRate, billRate }));
+    const totalCFT = Math.round(g.slabs.reduce((s,r) => s+r.cft, 0)*1000)/1000;
+    try {
+      const r = await apiPost({ action: 'saveSWDispatch', data: {
+        billNo, date, invoiceNo: g.invoiceNo,
+        species: g.species, vendor: batch?.vendor || '',
+        slabs: slabsWithCost, totalCFT,
+        totalValue: Math.round(totalCFT * billRate),
+        markupTier: markup,
+        financedByXP: disFinanced,
+        seasonedByXP: disSeasoned,
+        notes: document.getElementById('cb-notes').value.trim()
+      }});
+      if (r.success) {
+        saved++;
+        // Mark slabs as Dispatched to SB
+        const slabIds = g.slabs.map(s => s.slabId).filter(Boolean);
+        if (slabIds.length) {
+          await apiPost({ action: 'bulkUpdateSlabStatus', data: { slabIds, status: 'Dispatched to SB', date }});
+        }
+      } else toast('Error saving ' + g.species + ': ' + (r.error||'Failed'), 'err');
+    } catch(e) { toast('Network error for ' + g.species, 'err'); }
+  }
+
+  btn.disabled = false; btn.innerHTML = '🚚 Save Dispatch';
+  if (saved > 0) {
+    toast(saved + ' dispatch(es) saved ✓', 'ok');
+    document.getElementById('create-bill-modal').classList.remove('show');
+    selectedSlabs.clear();
+    updateBulkBar();
+    await loadAll();
+  }
 }
 
 function openHydModal() {
@@ -1841,8 +1955,20 @@ async function generateAnnexurePDF(data) {
     doc.setFontSize(9);
     doc.text('Total: ' + slabs.length + ' slabs', margin, y);
     doc.text(totalCFT.toFixed(3) + ' CFT', W - margin, y, { align: 'right' });
-    y += 10;
-  }
+    y += 6;
+    // Show billing info if available
+    if (data.billRate && data.billRate > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(80);
+      doc.text('Rate: ₹' + data.vendorRate + ' (wood) + ₹' + data.markup + ' (markup) = ₹' + data.billRate + '/CFT', margin, y);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0);
+      doc.text('Bill Value: ₹' + Math.round(totalCFT * data.billRate).toLocaleString('en-IN'), W - margin, y, { align: 'right' });
+      y += 5;
+    }
+    y += 5;
+  } // end if slabs.length
 
   // Footer
   doc.setFontSize(7);
@@ -2431,6 +2557,45 @@ function setDisMarkup(type, val) {
   renderDisSpeciesSections();
 }
 
+async function downloadDispatchAnnexureDraft() {
+  const species = Object.keys(disSpeciesGroups);
+  if (!species.length) { toast('No slabs selected', 'err'); return; }
+
+  const billNo = document.getElementById('d-billno')?.value.trim() || '';
+  const date = document.getElementById('d-date')?.value || new Date().toISOString().slice(0,10);
+  const allSlabs = Object.values(disSpeciesGroups).flat();
+  const totalCFT = Math.round(allSlabs.reduce((s,r) => s+r.cft, 0)*1000)/1000;
+  const markup = getDisMarkup();
+
+  // Generate one PDF per species or combined
+  for (const sp of species) {
+    const slabs = disSpeciesGroups[sp];
+    const batch = ST.batches.find(b => {
+      const selId = 'dis-batch-' + sp.replace(/\s/g,'_');
+      const selVal = document.getElementById(selId)?.value;
+      return b.invoiceNo === selVal;
+    });
+    const vendorRate = batch ? parseFloat(batch.rateCFT||0) || (batch.totalCFT > 0 ? Math.round(parseFloat(batch.woodValue||0)/batch.totalCFT) : 0) : 0;
+    const billRate = vendorRate + markup;
+    const spCFT = Math.round(slabs.reduce((s,r) => s+r.cft, 0)*1000)/1000;
+
+    await generateAnnexurePDF({
+      billNo: billNo || '(bill no. pending)',
+      date,
+      species: sp,
+      invoiceNo: batch?.invoiceNo || '',
+      batchName: batch?.batchName || batch?.invoiceNo || '',
+      slabCount: slabs.length,
+      totalCFT: spCFT,
+      slabs,
+      vendorRate,
+      billRate,
+      markup
+    });
+  }
+  toast('Annexure downloaded — attach to bill then save dispatch', 'ok');
+}
+
 function checkDisCFTMatch() {
   const billCFT = parseFloat(document.getElementById('d-bill-cft')?.value) || 0;
   const el = document.getElementById('d-cft-match');
@@ -2619,7 +2784,13 @@ If you cannot detect species headers, use "Unknown". Never mix species across gr
 function renderDisSpeciesSections() {
   const container = document.getElementById('dis-species-sections');
   const species = Object.keys(disSpeciesGroups);
-  if (!species.length) { container.innerHTML = ''; return; }
+  if (!species.length) {
+    container.innerHTML = '';
+    document.getElementById('dis-download-wrap').style.display = 'none';
+    return;
+  }
+  // Show download annexure button
+  document.getElementById('dis-download-wrap').style.display = 'block';
 
   container.innerHTML = species.map(sp => {
     const slabs = disSpeciesGroups[sp];
