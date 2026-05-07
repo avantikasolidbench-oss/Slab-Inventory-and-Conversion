@@ -801,13 +801,16 @@ select option{background:var(--bg3);color:var(--ink)}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
       <div class="field" style="margin-bottom:0"><label>Species</label><input type="text" id="edit-dis-species"></div>
-      <div class="field" style="margin-bottom:0"><label>Total CFT</label><input type="number" id="edit-dis-cft" step="0.001"></div>
+      <div class="field" style="margin-bottom:0"><label>Total CFT (slabs)</label><input type="number" id="edit-dis-cft" step="0.001"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
       <div class="field" style="margin-bottom:0"><label>Slab Count</label><input type="number" id="edit-dis-slabs"></div>
       <div class="field" style="margin-bottom:0"><label>Total Value ₹</label><input type="number" id="edit-dis-value"></div>
     </div>
-    <div class="field"><label>Batch / Invoice No.</label><input type="text" id="edit-dis-invno" placeholder="batch invoice number"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div class="field" style="margin-bottom:0"><label>Batch / Invoice No.</label><input type="text" id="edit-dis-invno" placeholder="batch invoice number"></div>
+      <div class="field" style="margin-bottom:0"><label>Bill CFT <span style="color:var(--ink3);font-size:10px">(as on cover page)</span></label><input type="number" id="edit-dis-billcft" step="0.001" placeholder="e.g. 161.962"></div>
+    </div>
     <div class="field"><label>Notes</label><textarea id="edit-dis-notes" style="min-height:40px"></textarea></div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-sec" onclick="document.getElementById('edit-dis-modal').classList.remove('show')" style="flex:1">Cancel</button>
@@ -1610,7 +1613,8 @@ function editDispatch(dispatchId) {
   document.getElementById('edit-dis-slabs').value = d.slabCount || '';
   document.getElementById('edit-dis-value').value = d.totalValue || '';
   document.getElementById('edit-dis-invno').value = d.invoiceNo || '';
-  document.getElementById('edit-dis-notes').value = (d.notes||'').replace(' [Hyd→SB]','').trim();
+  document.getElementById('edit-dis-billcft').value = d.billCFT || '';
+  document.getElementById('edit-dis-notes').value = (d.notes||'').replace(/\[Hyd→SB\]|\[markup:\d+\]|\[billCFT:[\d.]+\]|\[reconciled\]/g,'').trim();
   document.getElementById('edit-dis-modal').classList.add('show');
 }
 
@@ -1622,7 +1626,8 @@ async function saveEditDispatch() {
   const isHyd = dispatch?.dispatchType === 'hyd_to_sb' || (dispatch?.notes||'').includes('[Hyd→SB]');
   // Preserve existing special tags from notes
   const existingNotes = dispatch?.notes || '';
-  const billCFTTag = existingNotes.match(/\[billCFT:[\d.]+\]/) ? existingNotes.match(/\[billCFT:[\d.]+\]/)[0] : '';
+  const editBillCFT = parseFloat(document.getElementById('edit-dis-billcft').value) || 0;
+  const billCFTTag = editBillCFT > 0 ? '[billCFT:'+editBillCFT+']' : (existingNotes.match(/\[billCFT:[\d.]+\]/) ? existingNotes.match(/\[billCFT:[\d.]+\]/)[0] : '');
   const markupTag = existingNotes.match(/\[markup:\d+\]/) ? existingNotes.match(/\[markup:\d+\]/)[0] : '';
   const cleanNotes = document.getElementById('edit-dis-notes').value.trim();
   const fullNotes = [cleanNotes, isHyd ? '[Hyd→SB]' : '', billCFTTag, markupTag].filter(Boolean).join(' ');
@@ -1984,54 +1989,66 @@ function loadDash() {
 
   document.getElementById('dispatch-month-label').textContent = 'Jan 2026 – ' + thisMonLabel;
 
-  // Group all dispatches by month → species
-  const byMonth = {};
   ST.dispatches.forEach(d => {
     const mo = (d.date||'').slice(0,7);
     if (!mo || mo < '2026-01') return;
     const sp = d.species || 'Unknown';
     const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
     if (!byMonth[mo]) byMonth[mo] = {};
-    if (!byMonth[mo][sp]) byMonth[mo][sp] = { cft: 0, isHyd };
+    if (!byMonth[mo][sp]) byMonth[mo][sp] = { cft: 0, value: 0, isHyd };
     byMonth[mo][sp].cft += parseFloat(d.totalCFT || 0);
+    byMonth[mo][sp].value += parseFloat(d.totalValue || 0);
     if (isHyd) byMonth[mo][sp].isHyd = true;
   });
 
-  // Generate all months from Jan 2026 to current
-  const allMonths = [];
-  const cur = new Date();
-  let y = 2026, m = 1;
-  while (y < cur.getFullYear() || (y === cur.getFullYear() && m <= cur.getMonth()+1)) {
-    allMonths.push(y + '-' + String(m).padStart(2,'0'));
-    m++; if (m > 12) { m = 1; y++; }
-  }
-  allMonths.reverse(); // most recent first
-
   const grandTotal = ST.dispatches.reduce((s,d) => s + parseFloat(d.totalCFT||0), 0);
+  const grandValue = ST.dispatches.reduce((s,d) => s + parseFloat(d.totalValue||0), 0);
   const monthEl = document.getElementById('dispatch-this-month');
 
   monthEl.innerHTML = allMonths.map(mo => {
     const species = Object.entries(byMonth[mo] || {}).sort((a,b) => b[1].cft - a[1].cft);
     const moTotal = species.reduce((s,[,d]) => s + d.cft, 0);
+    const moValue = species.reduce((s,[,d]) => s + d.value, 0);
+    const hasData = species.length > 0;
     return '<div style="border-bottom:1px solid var(--rule)">' +
-      '<div style="padding:8px 16px 4px;display:flex;justify-content:space-between">' +
-        '<span style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600">' + monthLabel(mo) + '</span>' +
-        '<span class="mono" style="font-size:11px;color:' + (moTotal > 0 ? 'var(--wood)' : 'var(--ink3)') + '">' + (moTotal > 0 ? moTotal.toFixed(3) + ' CFT' : '—') + '</span>' +
+      // Month header
+      '<div style="padding:10px 16px 6px;display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:700">' + monthLabel(mo) + '</span>' +
+        (hasData
+          ? '<div style="text-align:right;line-height:1.3">' +
+              '<div class="mono" style="font-size:12px;font-weight:700;color:var(--wood)">' + moTotal.toFixed(2) + ' CFT</div>' +
+              '<div style="font-size:10px;color:var(--ink3)">₹' + Math.round(moValue).toLocaleString('en-IN') + '</div>' +
+            '</div>'
+          : '<span style="font-size:11px;color:var(--ink3)">—</span>') +
       '</div>' +
-      (species.length ? species.map(([sp, d]) =>
-        '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 16px 6px 20px">' +
-          '<div style="display:flex;align-items:center;gap:6px">' +
-            '<span style="font-size:13px;font-weight:600">' + sp + '</span>' +
-            (d.isHyd ? '<span class="badge b-hyd" style="font-size:9px">via Hyd</span>' : '<span class="badge b-wood" style="font-size:9px">direct</span>') +
-          '</div>' +
-          '<span class="mono" style="color:var(--wood);font-size:13px;font-weight:700">' + d.cft.toFixed(3) + ' CFT</span>' +
-        '</div>'
-      ).join('') : '<div style="padding:4px 16px 8px 20px;font-size:12px;color:var(--ink3)">No dispatches</div>') +
+      // Species rows
+      (hasData
+        ? '<div style="padding:0 16px 8px">' +
+          species.map(([sp, d]) =>
+            '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0 5px 8px;border-left:2px solid ' + (d.isHyd ? 'var(--gas)' : 'var(--wood)') + ';margin-bottom:4px">' +
+              '<div style="display:flex;align-items:center;gap:6px">' +
+                '<span style="font-size:12px;font-weight:600">' + sp + '</span>' +
+                (d.isHyd
+                  ? '<span style="font-size:9px;color:var(--gas);background:rgba(58,122,176,.15);padding:1px 5px;border-radius:8px">Hyd</span>'
+                  : '<span style="font-size:9px;color:var(--wood);background:rgba(192,150,58,.12);padding:1px 5px;border-radius:8px">Direct</span>') +
+              '</div>' +
+              '<div style="text-align:right;line-height:1.3">' +
+                '<span class="mono" style="font-size:12px;font-weight:600;color:var(--ink)">' + d.cft.toFixed(2) + ' CFT</span>' +
+                (d.value > 0 ? '<div style="font-size:10px;color:var(--ink3)">₹' + Math.round(d.value).toLocaleString('en-IN') + '</div>' : '') +
+              '</div>' +
+            '</div>'
+          ).join('') +
+          '</div>'
+        : '') +
     '</div>';
   }).join('') +
-  '<div style="padding:10px 16px;display:flex;justify-content:space-between;font-size:12px;background:var(--bg3)">' +
-    '<span style="color:var(--ink3);font-weight:600">Grand Total</span>' +
-    '<span class="mono" style="color:var(--wood);font-weight:700">' + grandTotal.toFixed(3) + ' CFT</span>' +
+  // Grand total footer
+  '<div style="padding:12px 16px;background:var(--bg3);display:flex;justify-content:space-between;align-items:center">' +
+    '<span style="font-size:11px;font-weight:600;color:var(--ink3)">Grand Total</span>' +
+    '<div style="text-align:right;line-height:1.4">' +
+      '<div class="mono" style="font-size:14px;font-weight:700;color:var(--wood)">' + grandTotal.toFixed(2) + ' CFT</div>' +
+      (grandValue > 0 ? '<div style="font-size:11px;color:var(--ink3)">₹' + Math.round(grandValue).toLocaleString('en-IN') + '</div>' : '') +
+    '</div>' +
   '</div>';
 
   document.getElementById('dispatch-history-btn').style.display = 'none';
