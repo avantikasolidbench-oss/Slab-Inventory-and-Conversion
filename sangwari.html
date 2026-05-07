@@ -857,6 +857,11 @@ select option{background:var(--bg3);color:var(--ink)}
         <div class="field" style="margin-bottom:0"><label>Bill / Challan No.</label><input type="text" id="d-billno" placeholder="XP/001/2026-27"></div>
         <div class="field" style="margin-bottom:0"><label>Date</label><input type="date" id="d-date"></div>
       </div>
+      <div class="field" style="margin-top:8px;margin-bottom:0">
+        <label>CFT on Bill <span style="color:var(--ink3);font-size:10px">(as printed on bill — for verification)</span></label>
+        <input type="number" id="d-bill-cft" step="0.001" placeholder="37.479" oninput="checkDisCFTMatch()">
+      </div>
+      <div id="d-cft-match" style="display:none;margin-top:6px;font-size:11px;padding:4px 8px;border-radius:3px"></div>
       <div id="d-cover-summary" style="display:none;margin-top:8px;padding:8px;background:var(--bg4);border-radius:4px;font-size:12px;color:var(--ink3)"></div>
     </div>
 
@@ -1453,6 +1458,29 @@ function renderDispatches(dispatches) {
     const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
     const tag = isHyd ? '<span class="badge b-hyd" style="font-size:10px">🏭 via Hyd</span>' : '<span class="badge b-wood" style="font-size:10px">🚚 Direct</span>';
     const hasBatch = ST.batches.some(b => b.invoiceNo === d.invoiceNo);
+
+    // Rate + CFT verification
+    const batch = ST.batches.find(b => b.invoiceNo === d.invoiceNo);
+    const markup = d.notes && d.notes.match(/\[markup:(\d+)\]/) ? parseInt(d.notes.match(/\[markup:(\d+)\]/)[1]) : 300;
+    const vendorRate = batch ? parseFloat(batch.rateCFT || 0) : 0;
+    const systemRate = vendorRate + markup;
+    const billRate = d.totalCFT > 0 ? Math.round(parseFloat(d.totalValue||0) / parseFloat(d.totalCFT)) : 0;
+    const rateMatch = billRate > 0 && Math.abs(billRate - systemRate) < 5;
+    // CFT check
+    const storedBillCFT = d.notes && d.notes.match(/\[billCFT:([\d.]+)\]/) ? parseFloat(d.notes.match(/\[billCFT:([\d.]+)\]/)[1]) : 0;
+    const slabCFT = Math.round(parseFloat(d.totalCFT||0)*1000)/1000;
+    const cftMatch = storedBillCFT > 0 ? Math.abs(slabCFT - storedBillCFT) < 0.01 : true;
+
+    const rateInfo =
+      '<div style="margin-top:3px;font-size:10px;color:var(--ink3)">' +
+        (d.financedByXP ? '💰 Financed' : '💰 SB finances') + ' · ' +
+        (d.seasonedByXP ? '🌿 XP seasons' : '🏭 Hyd seasons') + ' → ' +
+        '<span style="color:var(--amber);font-weight:600">₹' + d.markupTier + '/CFT</span>' +
+      '</div>' +
+      (billRate > 0 ? '<div style="font-size:10px;padding:2px 6px;border-radius:3px;background:' + (rateMatch?'rgba(74,154,106,.15)':'rgba(192,74,58,.15)') + ';color:' + (rateMatch?'var(--seasoned)':'var(--red)') + '">' +
+        (rateMatch?'✓ ':'⚠ ') + 'Rate: bill ₹'+billRate+' · sys ₹'+systemRate+'</div>' : '') +
+      (storedBillCFT > 0 ? '<div style="font-size:10px;padding:2px 6px;border-radius:3px;margin-top:2px;background:' + (cftMatch?'rgba(74,154,106,.15)':'rgba(192,74,58,.15)') + ';color:' + (cftMatch?'var(--seasoned)':'var(--red)') + '">' +
+        (cftMatch?'✓ ':'⚠ ') + 'CFT: slabs '+slabCFT.toFixed(3)+' · bill '+storedBillCFT.toFixed(3)+(cftMatch?'':' Δ'+(slabCFT-storedBillCFT).toFixed(3))+'</div>' : '');
     const missingBanner = !hasBatch
       ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;background:rgba(192,150,58,.15);border-top:1px solid rgba(192,150,58,.3)">' +
           '<span style="font-size:11px;color:var(--amber)">⚠ No purchase bill for ' + (d.species||'this species') + '</span>' +
@@ -1474,7 +1502,8 @@ function renderDispatches(dispatches) {
         '</div>' +
         '<div style="text-align:right;flex-shrink:0;margin-left:12px">' +
           '<div class="bi-cft" style="font-size:15px;font-weight:700">' + parseFloat(d.totalCFT||0).toFixed(3) + ' CFT</div>' +
-          '<div style="font-size:11px;color:var(--ink3);margin-top:2px">' + (d.slabCount||0) + ' slabs · ₹' + parseInt(d.totalValue||0).toLocaleString('en-IN') + '</div>' +
+          '<div style="font-size:11px;color:var(--ink3);margin-top:2px">' + (d.slabCount||0) + ' slabs</div>' +
+          rateInfo +
           '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">' +
             '<button onclick="event.stopPropagation();printDispatchAnnexure(\''+d.dispatchId+'\')" style="font-size:10px;padding:3px 8px;background:rgba(58,122,176,.2);border:1px solid rgba(58,122,176,.3);color:var(--gas);border-radius:3px;cursor:pointer">📄 Print</button>' +
             '<button onclick="event.stopPropagation();editDispatch(\''+d.dispatchId+'\')" style="font-size:10px;padding:3px 8px;background:var(--bg3);border:1px solid var(--rule);color:var(--ink3);border-radius:3px;cursor:pointer">✏️ Edit</button>' +
@@ -2209,15 +2238,6 @@ function updateDispatchRate() {
   calcDispatchTotals();
 }
 
-function showDispatchModal() {
-  document.getElementById('dis-modal').classList.add('show');
-  document.getElementById('d-date').value = new Date().toISOString().slice(0, 10);
-  document.getElementById('dis-rows').innerHTML = '';
-  disRowId = 0;
-  addDisRow();
-}
-function closeDisModal() { document.getElementById('dis-modal').classList.remove('show'); }
-
 let disRowCount = 0;
 function addDisRow() {
   const id = ++disRowCount;
@@ -2308,6 +2328,23 @@ function setDisMarkup(type, val) {
   renderDisSpeciesSections();
 }
 
+function checkDisCFTMatch() {
+  const billCFT = parseFloat(document.getElementById('d-bill-cft')?.value) || 0;
+  const el = document.getElementById('d-cft-match');
+  if (!el) return;
+  if (!billCFT || !Object.keys(disSpeciesGroups).length) { el.style.display='none'; return; }
+  const slabCFT = Math.round(Object.values(disSpeciesGroups).flat().reduce((s,r)=>s+r.cft,0)*1000)/1000;
+  if (!slabCFT) { el.style.display='none'; return; }
+  const diff = slabCFT - billCFT;
+  const match = Math.abs(diff) < 0.01;
+  el.style.display = 'block';
+  el.style.background = match ? 'rgba(74,154,106,.15)' : 'rgba(192,74,58,.15)';
+  el.style.color = match ? 'var(--seasoned)' : 'var(--red)';
+  el.textContent = match
+    ? '✓ CFT matches — slabs ' + slabCFT.toFixed(3) + ' = bill ' + billCFT.toFixed(3)
+    : '⚠ CFT mismatch — slabs ' + slabCFT.toFixed(3) + ' · bill ' + billCFT.toFixed(3) + ' · diff ' + diff.toFixed(3);
+}
+
 function showDispatchModal() {
   disSpeciesGroups = {};
   disRowCount = 0;
@@ -2317,6 +2354,8 @@ function showDispatchModal() {
   document.getElementById('d-date').value = new Date().toISOString().slice(0,10);
   document.getElementById('d-billno').value = '';
   document.getElementById('d-notes').value = '';
+  if (document.getElementById('d-bill-cft')) document.getElementById('d-bill-cft').value = '';
+  if (document.getElementById('d-cft-match')) document.getElementById('d-cft-match').style.display = 'none';
   document.getElementById('dis-species-sections').innerHTML = '';
   document.getElementById('dis-manual-wrap').style.display = 'none';
   document.getElementById('dis-rows').innerHTML = '';
@@ -2324,7 +2363,7 @@ function showDispatchModal() {
   document.getElementById('ai-dis').classList.remove('show');
   document.getElementById('ai-dis-cover').classList.remove('show');
   document.getElementById('dis-markup-display').textContent = '₹300/CFT';
-  setDisMarkup('fin', true); // reset buttons
+  setDisMarkup('fin', true);
 }
 function closeDisModal() { document.getElementById('dis-modal').classList.remove('show'); }
 
@@ -2356,6 +2395,7 @@ Return ONLY JSON: {"billNo":"XP/001","date":"2026-05-02","species":["Rosewood","
     document.getElementById('ai-dis-cover').classList.remove('show');
     if (d.billNo) document.getElementById('d-billno').value = d.billNo;
     if (d.date)   document.getElementById('d-date').value = d.date;
+    if (d.totalCFT && document.getElementById('d-bill-cft')) document.getElementById('d-bill-cft').value = d.totalCFT;
     // Show summary
     const sumEl = document.getElementById('d-cover-summary');
     const speciesList = (d.species||[]).join(', ') || 'Not detected';
@@ -2456,6 +2496,7 @@ If you cannot detect species headers, use "Unknown". Never mix species across gr
 
   document.getElementById('ai-dis').classList.remove('show');
   renderDisSpeciesSections();
+  checkDisCFTMatch();
   document.getElementById('f-dis-sheet').value = '';
 }
 
@@ -2572,6 +2613,9 @@ async function saveDispatch() {
   const btn = document.getElementById('dis-save-btn');
   const billNo = document.getElementById('d-billno').value.trim();
   const date = document.getElementById('d-date').value;
+  const billCFTVal = parseFloat(document.getElementById('d-bill-cft')?.value) || 0;
+  const notesBase = document.getElementById('d-notes').value.trim();
+  const notesWithBillCFT = notesBase + (billCFTVal > 0 ? ' [billCFT:'+billCFTVal+']' : '');
   if (!billNo) { toast('Enter bill / challan number', 'err'); return; }
 
   const species = Object.keys(disSpeciesGroups);
@@ -2597,7 +2641,9 @@ async function saveDispatch() {
           slabs: slabsWithCost, totalCFT,
           totalValue: Math.round(totalCFT * billRate),
           markupTier: getDisMarkup(),
-          notes: document.getElementById('d-notes').value.trim()
+          financedByXP: disFinanced,
+          seasonedByXP: disSeasoned,
+          notes: notesWithBillCFT
         }});
         if (r.success) {
           saved++;
@@ -2640,7 +2686,7 @@ async function saveDispatch() {
       billNo,date,invoiceNo,species:b?.species||'',vendor:b?.vendor||'',
       slabs:rows,totalCFT:rows.reduce((s,r)=>s+r.cft,0),
       totalValue:rows.reduce((s,r)=>s+r.cost,0),
-      notes:document.getElementById('d-notes').value.trim()
+      notes:notesWithBillCFT
     }});
     if(r.success){toast('Dispatch saved ✓','ok');closeDisModal();await loadAll();}
     else toast('Error: '+(r.error||'Failed'),'err');
