@@ -1462,7 +1462,9 @@ function renderDispatches(dispatches) {
     // Rate + CFT verification
     const batch = ST.batches.find(b => b.invoiceNo === d.invoiceNo);
     const markup = d.notes && d.notes.match(/\[markup:(\d+)\]/) ? parseInt(d.notes.match(/\[markup:(\d+)\]/)[1]) : 300;
-    const vendorRate = batch ? parseFloat(batch.rateCFT || 0) : 0;
+    const vendorRate = batch
+      ? parseFloat(batch.rateCFT || 0) || (batch.totalCFT > 0 ? Math.round(parseFloat(batch.woodValue || batch.taxableValue || 0) / batch.totalCFT) : 0)
+      : 0;
     const systemRate = vendorRate + markup;
     const billRate = d.totalCFT > 0 ? Math.round(parseFloat(d.totalValue||0) / parseFloat(d.totalCFT)) : 0;
     const rateMatch = billRate > 0 && Math.abs(billRate - systemRate) < 5;
@@ -1476,8 +1478,9 @@ function renderDispatches(dispatches) {
         (d.financedByXP ? '💰 Financed' : '💰 SB finances') + ' · ' +
         (d.seasonedByXP ? '🌿 XP seasons' : '🏭 Hyd seasons') + ' → ' +
         '<span style="color:var(--amber);font-weight:600">₹' + d.markupTier + '/CFT</span>' +
+        (!batch ? ' <span style="color:var(--red)">⚠ batch not linked</span>' : '') +
       '</div>' +
-      (billRate > 0 ? '<div style="font-size:10px;padding:2px 6px;border-radius:3px;background:' + (rateMatch?'rgba(74,154,106,.15)':'rgba(192,74,58,.15)') + ';color:' + (rateMatch?'var(--seasoned)':'var(--red)') + '">' +
+      (billRate > 0 && batch ? '<div style="font-size:10px;padding:2px 6px;border-radius:3px;background:' + (rateMatch?'rgba(74,154,106,.15)':'rgba(192,74,58,.15)') + ';color:' + (rateMatch?'var(--seasoned)':'var(--red)') + '">' +
         (rateMatch?'✓ ':'⚠ ') + 'Rate: bill ₹'+billRate+' · sys ₹'+systemRate+'</div>' : '') +
       (storedBillCFT > 0 ? '<div style="font-size:10px;padding:2px 6px;border-radius:3px;margin-top:2px;background:' + (cftMatch?'rgba(74,154,106,.15)':'rgba(192,74,58,.15)') + ';color:' + (cftMatch?'var(--seasoned)':'var(--red)') + '">' +
         (cftMatch?'✓ ':'⚠ ') + 'CFT: slabs '+slabCFT.toFixed(3)+' · bill '+storedBillCFT.toFixed(3)+(cftMatch?'':' Δ'+(slabCFT-storedBillCFT).toFixed(3))+'</div>' : '');
@@ -1561,7 +1564,14 @@ async function saveEditDispatch() {
   const btn = document.getElementById('edit-dis-save-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
   const dispatchId = document.getElementById('edit-dis-id').value;
-  const isHyd = ST.dispatches.find(x=>x.dispatchId===dispatchId)?.dispatchType === 'hyd_to_sb';
+  const dispatch = ST.dispatches.find(x => x.dispatchId === dispatchId);
+  const isHyd = dispatch?.dispatchType === 'hyd_to_sb' || (dispatch?.notes||'').includes('[Hyd→SB]');
+  // Preserve existing special tags from notes
+  const existingNotes = dispatch?.notes || '';
+  const billCFTTag = existingNotes.match(/\[billCFT:[\d.]+\]/) ? existingNotes.match(/\[billCFT:[\d.]+\]/)[0] : '';
+  const markupTag = existingNotes.match(/\[markup:\d+\]/) ? existingNotes.match(/\[markup:\d+\]/)[0] : '';
+  const cleanNotes = document.getElementById('edit-dis-notes').value.trim();
+  const fullNotes = [cleanNotes, isHyd ? '[Hyd→SB]' : '', billCFTTag, markupTag].filter(Boolean).join(' ');
   try {
     const r = await apiPost({ action: 'updateSWDispatch', data: {
       dispatchId,
@@ -1572,14 +1582,14 @@ async function saveEditDispatch() {
       slabCount:  parseInt(document.getElementById('edit-dis-slabs').value) || 0,
       totalValue: parseFloat(document.getElementById('edit-dis-value').value) || 0,
       invoiceNo:  document.getElementById('edit-dis-invno').value.trim(),
-      notes:      document.getElementById('edit-dis-notes').value.trim() + (isHyd ? ' [Hyd→SB]' : '')
+      notes:      fullNotes
     }});
     if (r.success) {
       toast('Dispatch updated ✓', 'ok');
       document.getElementById('edit-dis-modal').classList.remove('show');
       await loadAll();
-    } else toast('Error: ' + (r.error||'Failed'), 'err');
-  } catch(e) { toast('Network error', 'err'); }
+    } else toast('Save failed: ' + (r.error||'Unknown error') + ' — redeploy API as new version?', 'err');
+  } catch(e) { toast('Network error: ' + e.message, 'err'); }
   btn.disabled = false; btn.innerHTML = '💾 Save Changes';
 }
 
