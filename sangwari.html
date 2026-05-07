@@ -275,7 +275,7 @@ select option{background:var(--bg3);color:var(--ink)}
       </div>
 
       <div class="card">
-        <div class="card-head"><span class="card-title">Batches Needing Attention</span></div>
+        <div class="card-head"><span class="card-title">📋 Stock by Bill — Remaining CFT</span></div>
         <div id="attention-list"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
       </div>
     </div>
@@ -818,6 +818,40 @@ select option{background:var(--bg3);color:var(--ink)}
   </div>
 </div>
 
+<!-- SET BATCH STATUS MODAL -->
+<div class="modal" id="batch-status-modal">
+  <div class="modal-box" style="max-width:340px">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📦 Set Batch Status</div>
+    <div class="modal-sub" id="bsm-sub"></div>
+    <input type="hidden" id="bsm-invoice">
+    <input type="hidden" id="bsm-species">
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:12px">Set all slabs in this batch to the same status. Use for old material where slab-level entry isn't practical.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <button onclick="selectBatchStatus('Unseasoned')" id="bss-Unseasoned" class="btn btn-sec btn-sm" style="padding:10px;height:auto;flex-direction:column;gap:2px">
+        🪵<div style="font-size:11px;margin-top:4px">Unseasoned</div>
+      </button>
+      <button onclick="selectBatchStatus('Gas Chamber')" id="bss-Gas Chamber" class="btn btn-sec btn-sm" style="padding:10px;height:auto;flex-direction:column;gap:2px">
+        ⚗️<div style="font-size:11px;margin-top:4px">Gas Chamber</div>
+      </button>
+      <button onclick="selectBatchStatus('Solar Chamber')" id="bss-Solar Chamber" class="btn btn-sec btn-sm" style="padding:10px;height:auto;flex-direction:column;gap:2px">
+        ☀️<div style="font-size:11px;margin-top:4px">Solar Chamber</div>
+      </button>
+      <button onclick="selectBatchStatus('Seasoned')" id="bss-Seasoned" class="btn btn-sec btn-sm" style="padding:10px;height:auto;flex-direction:column;gap:2px">
+        ✅<div style="font-size:11px;margin-top:4px">Seasoned</div>
+      </button>
+      <button onclick="selectBatchStatus('Dispatched via Hyd')" id="bss-Dispatched via Hyd" class="btn btn-sec btn-sm" style="padding:10px;height:auto;flex-direction:column;gap:2px;grid-column:span 2">
+        🏭<div style="font-size:11px;margin-top:4px">Dispatched via Hyd</div>
+      </button>
+    </div>
+    <div id="bsm-selected" style="display:none;padding:8px 12px;background:var(--bg3);border-radius:4px;font-size:12px;margin-bottom:12px;text-align:center"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sec" onclick="document.getElementById('batch-status-modal').classList.remove('show')" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" onclick="applyBatchStatus()" style="flex:2" id="bsm-save-btn" disabled>Apply to All Slabs</button>
+    </div>
+  </div>
+</div>
+
 <!-- CREATE BILL MODAL (Flow 1 — from Seasoned inventory) -->
 <div class="modal" id="create-bill-modal">
   <div class="modal-box">
@@ -1113,10 +1147,11 @@ function renderBatches(batches) {
           <div class="bi-val">of ${cft} CFT</div>
           <div class="bi-val">₹${parseInt(b.woodValue||b.taxableValue||0).toLocaleString('en-IN')}</div>
         </div>
-        <div style="display:flex;gap:6px;margin-top:4px">
+        <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
           <button onclick="editBatch('${b.invoiceNo}')" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink2);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">✏️ Edit</button>
           <button onclick="openSlabEntryModal('${b.invoiceNo}','${b.species}')" style="background:rgba(58,122,176,.15);border:1px solid rgba(58,122,176,.3);color:var(--gas);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">📋 Slabs</button>
           <button onclick="printInventoryAnnexure('${b.invoiceNo}','${b.species}')" style="background:rgba(74,154,106,.15);border:1px solid rgba(74,154,106,.3);color:var(--seasoned);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">📄 Annexure</button>
+          <button onclick="setBatchStatus('${b.invoiceNo}','${b.species}')" style="background:rgba(192,150,58,.15);border:1px solid rgba(192,150,58,.3);color:var(--amber);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">📦 Set Status</button>
           <button onclick="deleteBatch('${b.invoiceNo}')" style="background:rgba(192,74,58,.15);border:1px solid rgba(192,74,58,.3);color:var(--red);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">🗑 Delete</button>
         </div>
       </div>
@@ -2191,46 +2226,101 @@ function loadDash() {
   document.getElementById('dispatch-history-btn').style.display = 'none';
 
   // Species breakdown
+  // Build species status map from slab data
   const speciesMap = {};
   ST.batches.forEach(b => {
-    if (!b.species) return;
-    if (!speciesMap[b.species]) speciesMap[b.species] = { cft: 0, value: 0, seasoned: 0 };
-    speciesMap[b.species].cft += parseFloat(b.remainingCFT || b.totalCFT || 0);
-    speciesMap[b.species].value += parseFloat(b.woodValue || b.taxableValue || 0);
+    if (!b.species || b.isCreditNote) return;
+    if (!speciesMap[b.species]) speciesMap[b.species] = { total: 0, unseasoned: 0, gas: 0, solar: 0, seasoned: 0, dispatched: 0 };
+    const bCFT = parseFloat(b.totalCFT || 0);
+    speciesMap[b.species].total += bCFT;
+    // If batch has a status and no slab-level data, apportion to that status
+    const bStatus = b.seasoningStatus || 'Unseasoned';
+    const hasSlabs = ST.slabs.some(s => s.invoiceNo === b.invoiceNo);
+    if (!hasSlabs && bCFT > 0) {
+      const dispatched = ST.dispatches.filter(d => d.invoiceNo === b.invoiceNo).reduce((s,d)=>s+parseFloat(d.totalCFT||0),0);
+      const remaining = Math.max(0, bCFT - dispatched);
+      if (bStatus === 'Seasoned') speciesMap[b.species].seasoned += remaining;
+      else if (bStatus === 'Gas Chamber') speciesMap[b.species].gas += remaining;
+      else if (bStatus === 'Solar Chamber') speciesMap[b.species].solar += remaining;
+      else speciesMap[b.species].unseasoned += remaining;
+    }
   });
-  ST.slabs.filter(s => s.status === 'Seasoned').forEach(s => {
-    if (s.species && speciesMap[s.species]) speciesMap[s.species].seasoned += parseFloat(s.cft || 0);
+  // Dispatched
+  ST.dispatches.forEach(d => {
+    const sp = d.species;
+    if (sp && speciesMap[sp]) speciesMap[sp].dispatched += parseFloat(d.totalCFT || 0);
+  });
+  // Slab-level status breakdown
+  ST.slabs.forEach(s => {
+    const sp = s.species;
+    if (!sp || !speciesMap[sp]) return;
+    const cft = parseFloat(s.cft || 0);
+    if (s.status === 'Seasoned') speciesMap[sp].seasoned += cft;
+    else if (s.status === 'Gas Chamber') speciesMap[sp].gas += cft;
+    else if (s.status === 'Solar Chamber') speciesMap[sp].solar += cft;
+    else if (s.status === 'Unseasoned') speciesMap[sp].unseasoned += cft;
   });
 
-  const maxCFT = Math.max(...Object.values(speciesMap).map(x => x.cft), 1);
-  document.getElementById('species-list').innerHTML = Object.entries(speciesMap).map(([sp, d]) => `
-    <div style="padding:14px 16px;border-bottom:1px solid var(--rule)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-weight:600;font-size:14px">${sp}</span>
-        <span class="mono" style="color:var(--wood)">${d.cft.toFixed(1)} CFT</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--ink3);margin-bottom:6px">
-        <span>₹${Math.round(d.value).toLocaleString('en-IN')} value</span>
-        <span style="color:var(--seasoned)">${d.seasoned.toFixed(1)} CFT seasoned</span>
-      </div>
-      <div class="prog-bar">
-        <div class="prog-fill" style="width:${(d.cft/maxCFT*100).toFixed(0)}%;background:var(--wood)"></div>
-      </div>
-    </div>`).join('') || '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No data yet</div>';
+  document.getElementById('species-list').innerHTML = Object.entries(speciesMap)
+    .sort((a,b) => b[1].total - a[1].total)
+    .map(([sp, d]) => {
+      const inStock = Math.max(0, d.total - d.dispatched);
+      const slabTracked = d.unseasoned + d.gas + d.solar + d.seasoned;
+      const untracked = Math.max(0, inStock - slabTracked);
+      const bars = [
+        { val: d.seasoned, color: 'var(--seasoned)', label: 'Seasoned' },
+        { val: d.gas, color: 'var(--gas)', label: 'Gas' },
+        { val: d.solar, color: 'var(--amber)', label: 'Solar' },
+        { val: d.unseasoned, color: 'var(--ink3)', label: 'Unseasoned' },
+        { val: untracked, color: 'rgba(255,255,255,.1)', label: 'Not entered' },
+      ].filter(x => x.val > 0.001);
 
-  // Attention needed
-  const needsAttention = ST.batches.filter(b => b.seasoningStatus === 'Unseasoned' && parseFloat(b.remainingCFT||b.totalCFT||0) > 0);
-  document.getElementById('attention-list').innerHTML = needsAttention.map(b => `
-    <div style="padding:14px 16px;border-bottom:1px solid var(--rule)">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
-          <div style="font-size:13px;font-weight:600;color:var(--wood)">${b.batchName || b.invoiceNo}</div>
-          <div class="mono" style="font-size:11px;color:var(--ink3);margin-top:1px">${b.invoiceNo}</div>
-          <div style="font-size:11px;color:var(--ink3);margin-top:2px">${b.species} · ${parseFloat(b.remainingCFT||b.totalCFT||0).toFixed(1)} CFT</div>
-        </div>
-        <span class="badge b-raw">Unseasoned</span>
-      </div>
-    </div>`).join('') || '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">✓ All stock in seasoning or ready</div>';
+      return '<div style="padding:12px 16px;border-bottom:1px solid var(--rule)">' +
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">' +
+          '<span style="font-weight:700;font-size:14px">' + sp + '</span>' +
+          '<span class="mono" style="font-size:13px;color:var(--wood)">' + inStock.toFixed(1) + ' CFT in stock</span>' +
+        '</div>' +
+        // Stacked bar
+        '<div style="height:8px;border-radius:4px;overflow:hidden;display:flex;background:var(--bg3);margin-bottom:8px">' +
+          bars.map(b => '<div style="height:100%;width:' + (b.val/d.total*100).toFixed(1) + '%;background:' + b.color + ';transition:width .3s"></div>').join('') +
+        '</div>' +
+        // Legend
+        '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
+          bars.map(b => '<span style="font-size:10px;color:var(--ink3);display:flex;align-items:center;gap:3px">' +
+            '<span style="width:8px;height:8px;border-radius:2px;background:' + b.color + ';display:inline-block"></span>' +
+            b.label + ' <span class="mono" style="color:var(--ink)">' + b.val.toFixed(1) + '</span>' +
+          '</span>').join('') +
+          (d.dispatched > 0 ? '<span style="font-size:10px;color:var(--ink3);margin-left:auto">Dispatched: <span class="mono">' + d.dispatched.toFixed(1) + '</span></span>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('') || '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No data yet</div>';
+
+  // Per-batch remaining CFT
+  const batchesWithStock = ST.batches
+    .filter(b => !b.isCreditNote && parseFloat(b.remainingCFT || b.totalCFT || 0) > 0)
+    .sort((a,b) => (b.date||'').localeCompare(a.date||''));
+
+  document.getElementById('attention-list').innerHTML = batchesWithStock.map(b => {
+    const total = parseFloat(b.totalCFT || 0);
+    const dispatched = ST.dispatches.filter(d => d.invoiceNo === b.invoiceNo).reduce((s,d) => s+parseFloat(d.totalCFT||0), 0);
+    const remaining = Math.max(0, total - dispatched);
+    const pct = total > 0 ? (remaining / total * 100).toFixed(0) : 0;
+    return '<div style="padding:12px 16px;border-bottom:1px solid var(--rule)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">' +
+        '<div>' +
+          '<div style="font-size:13px;font-weight:600">' + (b.batchName || b.invoiceNo) + '</div>' +
+          '<div style="font-size:11px;color:var(--ink3);margin-top:1px"><span class="sp-tag">' + b.species + '</span> · ' + b.date + '</div>' +
+        '</div>' +
+        '<div style="text-align:right">' +
+          '<div class="mono" style="font-size:13px;font-weight:700;color:' + (remaining > 0 ? 'var(--wood)' : 'var(--seasoned)') + '">' + remaining.toFixed(2) + ' CFT</div>' +
+          '<div style="font-size:10px;color:var(--ink3)">remaining of ' + total.toFixed(2) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="height:4px;border-radius:2px;background:var(--bg3);overflow:hidden">' +
+        '<div style="height:100%;width:' + pct + '%;background:' + (remaining > 0 ? 'var(--wood)' : 'var(--seasoned)') + ';border-radius:2px"></div>' +
+      '</div>' +
+    '</div>';
+  }).join('') || '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No active batches</div>';
 }
 
 let currentSort = 'date';
@@ -3044,6 +3134,70 @@ async function saveEditBatch() {
     } else toast('Error: ' + (r.error||'Failed'), 'err');
   } catch(e) { toast('Network error', 'err'); }
   btn.disabled = false; btn.innerHTML = '💾 Save Changes';
+}
+
+let _bsmStatus = '';
+
+function setBatchStatus(invoiceNo, species) {
+  _bsmStatus = '';
+  document.getElementById('bsm-invoice').value = invoiceNo;
+  document.getElementById('bsm-species').value = species;
+  const batch = ST.batches.find(b => b.invoiceNo === invoiceNo);
+  document.getElementById('bsm-sub').textContent = (batch?.batchName || invoiceNo) + ' · ' + species;
+  document.getElementById('bsm-selected').style.display = 'none';
+  document.getElementById('bsm-save-btn').disabled = true;
+  // Reset button styles
+  ['Unseasoned','Gas Chamber','Solar Chamber','Seasoned','Dispatched via Hyd'].forEach(s => {
+    const el = document.getElementById('bss-' + s);
+    if (el) { el.style.background = ''; el.style.color = ''; el.className = 'btn btn-sec btn-sm'; }
+  });
+  document.getElementById('batch-status-modal').classList.add('show');
+}
+
+function selectBatchStatus(status) {
+  _bsmStatus = status;
+  ['Unseasoned','Gas Chamber','Solar Chamber','Seasoned','Dispatched via Hyd'].forEach(s => {
+    const el = document.getElementById('bss-' + s);
+    if (el) {
+      el.style.background = s === status ? 'var(--wood)' : '';
+      el.style.color = s === status ? 'white' : '';
+    }
+  });
+  document.getElementById('bsm-selected').style.display = 'block';
+  document.getElementById('bsm-selected').textContent = 'All slabs → ' + status;
+  document.getElementById('bsm-save-btn').disabled = false;
+}
+
+async function applyBatchStatus() {
+  const invoiceNo = document.getElementById('bsm-invoice').value;
+  const status = _bsmStatus;
+  if (!status) return;
+  const btn = document.getElementById('bsm-save-btn');
+  btn.disabled = true; btn.textContent = 'Applying…';
+  try {
+    const today = new Date().toISOString().slice(0,10);
+
+    // Always update batch-level status in Purchases sheet
+    const r = await apiPost({ action: 'updateBatchStatus', data: { invoiceNo, status, date: today }});
+    if (!r.success) { toast('Error: ' + (r.error||'Failed'), 'err'); btn.disabled=false; btn.innerHTML='Apply to All Slabs'; return; }
+
+    // Also update slab-level if slabs exist
+    const slabIds = ST.slabs
+      .filter(s => s.invoiceNo === invoiceNo && !['Dispatched to SB','Dispatched via Hyd'].includes(s.status))
+      .map(s => s.slabId);
+    if (slabIds.length) {
+      await apiPost({ action: 'bulkUpdateSlabStatus', data: { slabIds, status, date: today }});
+      toast(slabIds.length + ' slabs + batch → ' + status + ' ✓', 'ok');
+    } else {
+      toast('Batch status → ' + status + ' ✓', 'ok');
+    }
+
+    document.getElementById('batch-status-modal').classList.remove('show');
+    await loadBatches();
+    await loadSlabs(); renderSlabs();
+    loadDash();
+  } catch(e) { toast('Network error', 'err'); }
+  btn.disabled = false; btn.innerHTML = 'Apply to All Slabs';
 }
 
 async function deleteBatch(invoiceNo) {
