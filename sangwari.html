@@ -858,10 +858,20 @@ select option{background:var(--bg3);color:var(--ink)}
         <div class="field" style="margin-bottom:0"><label>Date</label><input type="date" id="d-date"></div>
       </div>
       <div class="field" style="margin-top:8px;margin-bottom:0">
-        <label>CFT on Bill <span style="color:var(--ink3);font-size:10px">(as printed on bill — for verification)</span></label>
-        <input type="number" id="d-bill-cft" step="0.001" placeholder="37.479" oninput="checkDisCFTMatch()">
+        <label>CFT on Bill Cover <span style="color:var(--ink3);font-size:10px">(as printed — we verify against slab totals)</span></label>
+        <input type="number" id="d-bill-cft" step="0.001" placeholder="e.g. 37.479" oninput="checkDisCFTMatch()" style="font-family:var(--mono)">
       </div>
-      <div id="d-cft-match" style="display:none;margin-top:6px;font-size:11px;padding:4px 8px;border-radius:3px"></div>
+      <div id="d-cft-match" style="display:none;margin-top:6px;font-size:12px;padding:6px 10px;border-radius:4px;display:none">
+        <div style="display:flex;justify-content:space-between">
+          <span>Bill cover CFT</span><span class="mono" id="d-cft-bill">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:3px">
+          <span>Slab list total</span><span class="mono" id="d-cft-slabs">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px;font-weight:600" id="d-cft-diff-row">
+          <span>Difference</span><span class="mono" id="d-cft-diff">—</span>
+        </div>
+      </div>
       <div id="d-cover-summary" style="display:none;margin-top:8px;padding:8px;background:var(--bg4);border-radius:4px;font-size:12px;color:var(--ink3)"></div>
     </div>
 
@@ -1461,7 +1471,7 @@ function renderDispatches(dispatches) {
 
     // Rate + CFT verification
     const batch = ST.batches.find(b => b.invoiceNo === d.invoiceNo);
-    const markup = d.notes && d.notes.match(/\[markup:(\d+)\]/) ? parseInt(d.notes.match(/\[markup:(\d+)\]/)[1]) : 300;
+    const markup = d.markupTier || 300;
     const vendorRate = batch
       ? parseFloat(batch.rateCFT || 0) || (batch.totalCFT > 0 ? Math.round(parseFloat(batch.woodValue || batch.taxableValue || 0) / batch.totalCFT) : 0)
       : 0;
@@ -2397,17 +2407,30 @@ function checkDisCFTMatch() {
   const billCFT = parseFloat(document.getElementById('d-bill-cft')?.value) || 0;
   const el = document.getElementById('d-cft-match');
   if (!el) return;
-  if (!billCFT || !Object.keys(disSpeciesGroups).length) { el.style.display='none'; return; }
-  const slabCFT = Math.round(Object.values(disSpeciesGroups).flat().reduce((s,r)=>s+r.cft,0)*1000)/1000;
-  if (!slabCFT) { el.style.display='none'; return; }
-  const diff = slabCFT - billCFT;
+  if (!billCFT) { el.style.display = 'none'; return; }
+
+  const slabCFT = Math.round(Object.values(disSpeciesGroups).flat().reduce((s,r) => s+r.cft, 0)*1000)/1000;
+  const diff = Math.round((slabCFT - billCFT)*1000)/1000;
   const match = Math.abs(diff) < 0.01;
+
   el.style.display = 'block';
-  el.style.background = match ? 'rgba(74,154,106,.15)' : 'rgba(192,74,58,.15)';
-  el.style.color = match ? 'var(--seasoned)' : 'var(--red)';
-  el.textContent = match
-    ? '✓ CFT matches — slabs ' + slabCFT.toFixed(3) + ' = bill ' + billCFT.toFixed(3)
-    : '⚠ CFT mismatch — slabs ' + slabCFT.toFixed(3) + ' · bill ' + billCFT.toFixed(3) + ' · diff ' + diff.toFixed(3);
+  el.style.background = slabCFT > 0 ? (match ? 'rgba(74,154,106,.1)' : 'rgba(192,74,58,.1)') : 'var(--bg3)';
+  el.style.border = '1px solid ' + (slabCFT > 0 ? (match ? 'rgba(74,154,106,.3)' : 'rgba(192,74,58,.3)') : 'var(--rule)');
+  el.style.color = 'var(--ink)';
+
+  document.getElementById('d-cft-bill').textContent = billCFT.toFixed(3);
+  document.getElementById('d-cft-slabs').textContent = slabCFT > 0 ? slabCFT.toFixed(3) : '— (add register)';
+  document.getElementById('d-cft-slabs').style.color = slabCFT > 0 ? (match ? 'var(--seasoned)' : 'var(--red)') : 'var(--ink3)';
+
+  const diffRow = document.getElementById('d-cft-diff-row');
+  const diffEl = document.getElementById('d-cft-diff');
+  if (slabCFT > 0) {
+    diffRow.style.display = 'flex';
+    diffEl.textContent = match ? '0.000 ✓ Match' : (diff > 0 ? '+' : '') + diff.toFixed(3) + ' ⚠';
+    diffEl.style.color = match ? 'var(--seasoned)' : 'var(--red)';
+  } else {
+    diffRow.style.display = 'none';
+  }
 }
 
 function showDispatchModal() {
@@ -2613,6 +2636,8 @@ function renderDisSpeciesSections() {
     Object.values(disSpeciesGroups).flat().reduce((s,r)=>s+r.cft,0).toFixed(3) + ' CFT</span> · ' +
     Object.values(disSpeciesGroups).flat().length + ' slabs across ' + species.length + ' species' +
   '</div>';
+  // Update CFT match check live
+  checkDisCFTMatch();
 }
 
 function removeDisSpecies(sp) {
