@@ -1133,7 +1133,7 @@ function renderSlabs() {
       ${cbHtml}
       <div class="slab-main">
         <div class="slab-dims">${s.lengthMM}×${s.widthMM}×${s.thickMM} mm</div>
-        <div class="slab-meta">${s.invoiceNo} · <span class="sp-tag">${s.species}</span> · ${s.dateIn||s.date}</div>
+        <div class="slab-meta">${(ST.batches.find(b=>b.invoiceNo===s.invoiceNo)?.batchName || s.invoiceNo)} · <span class="sp-tag">${s.species}</span> · ${s.dateIn||s.date}</div>
         <div style="margin-top:4px">${badge}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -1482,7 +1482,7 @@ function renderDispatches(dispatches) {
     const billRate = d.totalCFT > 0 ? Math.round(parseFloat(d.totalValue||0) / parseFloat(d.totalCFT)) : 0;
     const rateMatch = billRate > 0 && Math.abs(billRate - systemRate) < 5;
     // CFT check
-    const storedBillCFT = d.notes && d.notes.match(/\[billCFT:([\d.]+)\]/) ? parseFloat(d.notes.match(/\[billCFT:([\d.]+)\]/)[1]) : 0;
+    const storedBillCFT = d.billCFT || 0;
     const slabCFT = Math.round(parseFloat(d.totalCFT||0)*1000)/1000;
     const cftMatch = storedBillCFT > 0 ? Math.abs(slabCFT - storedBillCFT) < 0.01 : true;
 
@@ -1557,7 +1557,7 @@ function renderDispatches(dispatches) {
               tag +
               (reconciled ? '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(74,154,106,.2);color:var(--seasoned)">✓</span>' : '') +
             '</div>' +
-            '<div class="bi-meta" style="font-size:11px">' + d.date + ' · ' + d.invoiceNo + ' · <span class="sp-tag">' + (d.species||'—') + '</span></div>' +
+            '<div class="bi-meta" style="font-size:11px">' + d.date + ' · <span style="color:var(--ink2)">' + (batch?.batchName || d.invoiceNo) + '</span> · <span class="sp-tag">' + (d.species||'—') + '</span></div>' +
           '</div>' +
           '<div style="text-align:right;flex-shrink:0;margin-left:12px">' +
             '<div style="font-size:18px;font-weight:700;font-family:var(--mono)">' + parseFloat(d.totalCFT||0).toFixed(3) + '</div>' +
@@ -1641,6 +1641,7 @@ async function saveEditDispatch() {
       slabCount:  parseInt(document.getElementById('edit-dis-slabs').value) || 0,
       totalValue: parseFloat(document.getElementById('edit-dis-value').value) || 0,
       invoiceNo:  document.getElementById('edit-dis-invno').value.trim(),
+      billCFT:    parseFloat(document.getElementById('edit-dis-billcft').value) || 0,
       notes:      fullNotes
     }});
     if (r.success) {
@@ -2750,6 +2751,7 @@ async function saveDispatch() {
           markupTier: getDisMarkup(),
           financedByXP: disFinanced,
           seasonedByXP: disSeasoned,
+          billCFT: parseFloat(document.getElementById('d-bill-cft')?.value) || 0,
           notes: notesWithBillCFT
         }});
         if (r.success) {
