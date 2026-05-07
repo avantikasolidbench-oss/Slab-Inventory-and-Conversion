@@ -1473,17 +1473,58 @@ function renderDispatches(dispatches) {
     const slabCFT = Math.round(parseFloat(d.totalCFT||0)*1000)/1000;
     const cftMatch = storedBillCFT > 0 ? Math.abs(slabCFT - storedBillCFT) < 0.01 : true;
 
-    const rateInfo =
-      '<div style="margin-top:3px;font-size:10px;color:var(--ink3)">' +
-        (d.financedByXP ? '💰 Financed' : '💰 SB finances') + ' · ' +
-        (d.seasonedByXP ? '🌿 XP seasons' : '🏭 Hyd seasons') + ' → ' +
-        '<span style="color:var(--amber);font-weight:600">₹' + d.markupTier + '/CFT</span>' +
-        (!batch ? ' <span style="color:var(--red)">⚠ batch not linked</span>' : '') +
-      '</div>' +
-      (billRate > 0 && batch ? '<div style="font-size:10px;padding:2px 6px;border-radius:3px;background:' + (rateMatch?'rgba(74,154,106,.15)':'rgba(192,74,58,.15)') + ';color:' + (rateMatch?'var(--seasoned)':'var(--red)') + '">' +
-        (rateMatch?'✓ ':'⚠ ') + 'Rate: bill ₹'+billRate+' · sys ₹'+systemRate+'</div>' : '') +
-      (storedBillCFT > 0 ? '<div style="font-size:10px;padding:2px 6px;border-radius:3px;margin-top:2px;background:' + (cftMatch?'rgba(74,154,106,.15)':'rgba(192,74,58,.15)') + ';color:' + (cftMatch?'var(--seasoned)':'var(--red)') + '">' +
-        (cftMatch?'✓ ':'⚠ ') + 'CFT: slabs '+slabCFT.toFixed(3)+' · bill '+storedBillCFT.toFixed(3)+(cftMatch?'':' Δ'+(slabCFT-storedBillCFT).toFixed(3))+'</div>' : '');
+    const reconciled = (d.notes||'').includes('[reconciled]');
+    const hasRateCheck = billRate > 0 && batch;
+    const hasCFTCheck = storedBillCFT > 0;
+    const allOk = (!hasRateCheck || rateMatch) && (!hasCFTCheck || cftMatch);
+
+    // Verification block
+    let verBlock = '';
+    if (reconciled) {
+      verBlock = '<div style="margin-top:6px;display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(74,154,106,.2);color:var(--seasoned)">✓ Reconciled</div>';
+    } else if (hasRateCheck || hasCFTCheck || !batch) {
+      const color = allOk ? 'rgba(74,154,106,.3)' : 'rgba(192,74,58,.3)';
+      const bg    = allOk ? 'rgba(74,154,106,.08)' : 'rgba(192,74,58,.08)';
+      const hdr   = allOk ? 'var(--seasoned)' : 'var(--red)';
+      verBlock =
+        '<div style="margin-top:8px;border:1px solid '+color+';border-radius:6px;overflow:hidden;font-size:11px">' +
+          '<div style="background:'+bg+';padding:4px 10px;display:flex;justify-content:space-between;align-items:center">' +
+            '<span style="font-weight:600;color:'+hdr+'">' + (allOk?'✓ Verified':'⚠ Needs Review') + '</span>' +
+            '<span style="color:var(--ink3)">' +
+              (d.financedByXP?'💰 Fin':'💰 SB') + ' · ' +
+              (d.seasonedByXP?'🌿 XP':'🏭 Hyd') + ' · ' +
+              '<span style="color:var(--amber);font-weight:600">₹'+d.markupTier+'</span>' +
+            '</span>' +
+          '</div>' +
+          '<div style="padding:6px 10px">' +
+            (!batch ? '<div style="color:var(--amber);margin-bottom:3px">⚠ Purchase batch not linked — edit to fix</div>' : '') +
+            (hasRateCheck ?
+              '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.06)">' +
+                '<span style="color:var(--ink3)">Rate / CFT</span>' +
+                '<span style="color:'+(rateMatch?'var(--seasoned)':'var(--red)')+'">'+
+                  'Bill <b>₹'+billRate+'</b> · Sys <b>₹'+systemRate+'</b>' +
+                  (rateMatch ? ' ✓' : ' Δ₹'+Math.abs(billRate-systemRate)) +
+                '</span>' +
+              '</div>' : '') +
+            (hasCFTCheck ?
+              '<div style="display:flex;justify-content:space-between;padding:2px 0">' +
+                '<span style="color:var(--ink3)">CFT</span>' +
+                '<span style="color:'+(cftMatch?'var(--seasoned)':'var(--red)')+'">'+
+                  'Slabs <b>'+slabCFT.toFixed(3)+'</b> · Bill <b>'+storedBillCFT.toFixed(3)+'</b>' +
+                  (cftMatch ? ' ✓' : ' Δ'+(slabCFT-storedBillCFT).toFixed(3)) +
+                '</span>' +
+              '</div>' : '') +
+          '</div>' +
+          (!allOk ?
+            '<div style="padding:4px 10px;border-top:1px solid '+color+'">' +
+              '<button onclick="event.stopPropagation();markReconciled(\''+d.dispatchId+'\')" style="font-size:10px;padding:3px 10px;background:rgba(74,154,106,.15);border:1px solid rgba(74,154,106,.3);color:var(--seasoned);border-radius:4px;cursor:pointer;width:100%">✓ Mark as Reconciled</button>' +
+            '</div>' : '') +
+        '</div>';
+    } else {
+      verBlock = '<div style="margin-top:4px;font-size:10px;color:var(--ink3)">' +
+        (d.financedByXP?'💰 Fin':'💰 SB') + ' · ' + (d.seasonedByXP?'🌿 XP':'🏭 Hyd') + ' · <span style="color:var(--amber)">₹'+d.markupTier+'/CFT</span></div>';
+    }
+
     const missingBanner = !hasBatch
       ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;background:rgba(192,150,58,.15);border-top:1px solid rgba(192,150,58,.3)">' +
           '<span style="font-size:11px;color:var(--amber)">⚠ No purchase bill for ' + (d.species||'this species') + '</span>' +
@@ -1493,26 +1534,29 @@ function renderDispatches(dispatches) {
           '</div>' +
         '</div>'
       : '';
-    return '<div class="batch-item" style="padding:0;overflow:hidden">' +
-      '<div onclick="toggleDispatchExpand(\'dis-'+idx+'\',\''+d.dispatchId+'\')" style="padding:14px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start">' +
-        '<div style="flex:1">' +
-          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
-            '<span class="bi-inv" style="font-size:13px">' + (d.billNo||'—') + '</span>' +
-            tag +
-            (!hasBatch ? '<span style="font-size:10px;color:var(--amber)">⚠ no bill</span>' : '') +
+
+    return '<div class="batch-item" style="padding:0;overflow:hidden' + (reconciled?';opacity:.75':'') + '">' +
+      '<div onclick="toggleDispatchExpand(\'dis-'+idx+'\',\''+d.dispatchId+'\')" style="padding:14px 16px 10px;cursor:pointer">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">' +
+              '<span class="bi-inv" style="font-size:13px">' + (d.billNo||'—') + '</span>' +
+              tag +
+              (reconciled ? '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(74,154,106,.2);color:var(--seasoned)">✓</span>' : '') +
+            '</div>' +
+            '<div class="bi-meta" style="font-size:11px">' + d.date + ' · ' + d.invoiceNo + ' · <span class="sp-tag">' + (d.species||'—') + '</span></div>' +
           '</div>' +
-          '<div class="bi-meta" style="font-size:11px">' + d.date + ' · ' + d.invoiceNo + ' · <span class="sp-tag">' + (d.species||'—') + '</span></div>' +
-        '</div>' +
-        '<div style="text-align:right;flex-shrink:0;margin-left:12px">' +
-          '<div class="bi-cft" style="font-size:15px;font-weight:700">' + parseFloat(d.totalCFT||0).toFixed(3) + ' CFT</div>' +
-          '<div style="font-size:11px;color:var(--ink3);margin-top:2px">' + (d.slabCount||0) + ' slabs</div>' +
-          rateInfo +
-          '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">' +
-            '<button onclick="event.stopPropagation();printDispatchAnnexure(\''+d.dispatchId+'\')" style="font-size:10px;padding:3px 8px;background:rgba(58,122,176,.2);border:1px solid rgba(58,122,176,.3);color:var(--gas);border-radius:3px;cursor:pointer">📄 Print</button>' +
-            '<button onclick="event.stopPropagation();editDispatch(\''+d.dispatchId+'\')" style="font-size:10px;padding:3px 8px;background:var(--bg3);border:1px solid var(--rule);color:var(--ink3);border-radius:3px;cursor:pointer">✏️ Edit</button>' +
-            '<span style="font-size:10px;color:var(--ink3);align-self:center" id="dis-'+idx+'-arrow">▾ slabs</span>' +
+          '<div style="text-align:right;flex-shrink:0;margin-left:12px">' +
+            '<div style="font-size:18px;font-weight:700;font-family:var(--mono)">' + parseFloat(d.totalCFT||0).toFixed(3) + '</div>' +
+            '<div style="font-size:10px;color:var(--ink3)">CFT · ' + (d.slabCount||0) + ' slabs</div>' +
+            '<div style="font-size:10px;color:var(--ink3);margin-top:1px" id="dis-'+idx+'-arrow">▾</div>' +
           '</div>' +
         '</div>' +
+        verBlock +
+      '</div>' +
+      '<div style="display:flex;gap:6px;padding:0 14px 10px">' +
+        '<button onclick="event.stopPropagation();printDispatchAnnexure(\''+d.dispatchId+'\')" style="font-size:11px;padding:5px 0;background:rgba(58,122,176,.15);border:1px solid rgba(58,122,176,.3);color:var(--gas);border-radius:4px;cursor:pointer;flex:1">📄 Print</button>' +
+        '<button onclick="event.stopPropagation();editDispatch(\''+d.dispatchId+'\')" style="font-size:11px;padding:5px 0;background:var(--bg3);border:1px solid var(--rule);color:var(--ink3);border-radius:4px;cursor:pointer;flex:1">✏️ Edit</button>' +
       '</div>' +
       missingBanner +
       '<div id="dis-'+idx+'" style="display:none;padding:12px 16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:13px">Loading…</div>' +
@@ -1793,6 +1837,17 @@ async function generateAnnexurePDF(data) {
   const filename = 'Annexure_' + (billNo || invoiceNo || 'Draft').replace(/\//g, '-') + '.pdf';
   doc.save(filename);
   toast('PDF downloaded ✓', 'ok');
+}
+
+async function markReconciled(dispatchId) {
+  const d = ST.dispatches.find(x => x.dispatchId === dispatchId);
+  if (!d) return;
+  const notes = (d.notes||'').replace('[reconciled]','').trim() + ' [reconciled]';
+  try {
+    const r = await apiPost({ action: 'updateSWDispatch', data: { ...d, notes }});
+    if (r.success) { toast('Marked as reconciled ✓', 'ok'); await loadDispatches(); }
+    else toast('Error: ' + (r.error||'Failed'), 'err');
+  } catch(e) { toast('Network error', 'err'); }
 }
 
 async function markAsOpeningStock(invoiceNo, species) {
