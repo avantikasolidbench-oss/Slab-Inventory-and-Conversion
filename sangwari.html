@@ -1650,7 +1650,7 @@ function renderDispatches(dispatches) {
     const markup = d.markupTier || 300;
     const vendorRate = batch ? parseFloat(batch.rateCFT||0) || (batch.totalCFT > 0 ? Math.round(parseFloat(batch.woodValue||0)/batch.totalCFT) : 0) : 0;
     const systemRate = vendorRate + markup;
-    const billRate = d.totalCFT > 0 ? Math.round(parseFloat(d.totalValue||0) / parseFloat(d.totalCFT)) : 0;
+    const billRate = d.billCFT > 0 ? Math.round(parseFloat(d.totalValue||0) / parseFloat(d.billCFT)) : 0;
     const rateMatch = billRate > 0 && Math.abs(billRate - systemRate) < 5;
     const storedBillCFT = d.billCFT || 0;
     const slabCFT = Math.round(parseFloat(d.totalCFT||0)*1000)/1000;
@@ -1658,6 +1658,7 @@ function renderDispatches(dispatches) {
     const reconciled = (d.notes||'').includes('[reconciled]');
     const hasRateCheck = billRate > 0 && batch;
     const hasCFTCheck = storedBillCFT > 0;
+    const missingBillCFT = !storedBillCFT;
     const allOk = (!hasRateCheck || rateMatch) && (!hasCFTCheck || cftMatch);
     const statusColor = reconciled ? 'rgba(74,154,106,.2)' : allOk ? 'rgba(74,154,106,.1)' : 'rgba(192,74,58,.1)';
     const borderColor = reconciled ? 'rgba(74,154,106,.4)' : allOk ? 'rgba(74,154,106,.25)' : 'rgba(192,74,58,.3)';
@@ -1708,7 +1709,7 @@ function renderDispatches(dispatches) {
       '</div>' +
       // Arrangement + verification
       '<div style="padding:8px 16px;border-top:1px solid rgba(255,255,255,.06)">' +
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:'+(verRows?'8px':'0')+';">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:'+(verRows||missingBillCFT?'8px':'0')+';">' +
           (d.financedByXP ? '<span style="font-size:11px;color:var(--ink3)">💰 Financed</span>' : '<span style="font-size:11px;color:var(--ink3)">💰 SB finances</span>') +
           '<span style="color:var(--ink3)">·</span>' +
           (d.seasonedByXP ? '<span style="font-size:11px;color:var(--ink3)">🌿 XP seasons</span>' : '<span style="font-size:11px;color:var(--ink3)">🏭 Hyd seasons</span>') +
@@ -1716,6 +1717,7 @@ function renderDispatches(dispatches) {
           '<span style="font-size:12px;color:var(--amber);font-weight:600">₹'+markup+'/CFT markup</span>' +
           (!batch ? ' <span style="font-size:11px;color:var(--red)">⚠ no batch</span>' : '') +
         '</div>' +
+        (missingBillCFT ? '<div style="font-size:11px;color:var(--red);padding:4px 0">⚠ Bill CFT (col O) not set — edit dispatch to add bill CFT for rate verification</div>' : '') +
         verRows +
         (!allOk && !reconciled ?
           '<button onclick="event.stopPropagation();markReconciled(\''+d.dispatchId+'\')" style="margin-top:8px;font-size:11px;padding:4px 0;background:rgba(74,154,106,.15);border:1px solid rgba(74,154,106,.3);color:var(--seasoned);border-radius:4px;cursor:pointer;width:100%">✓ Mark as Reconciled</button>' : '') +
