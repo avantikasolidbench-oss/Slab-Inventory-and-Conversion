@@ -1821,8 +1821,11 @@ function updateEditDisTotal() {
     const q=Math.max(1,parseInt(document.getElementById('edr'+id+'q')?.value)||1);
     if(l&&w&&t) total+=Math.round((l*w*t)/1e9*35.31466560103903*1000)/1000*q;
   });
+  const rounded = Math.round(total*1000)/1000;
   const el=document.getElementById('edit-dis-slab-total');
-  if(el) el.textContent = total>0 ? total.toFixed(3)+' CFT' : '—';
+  if(el) el.textContent = rounded>0 ? rounded.toFixed(3)+' CFT — will update column H' : '—';
+  // Live-update the CFT field
+  if (rounded > 0) document.getElementById('edit-dis-cft').value = rounded;
 }
 
 function getEditDisSlabs() {
@@ -1889,21 +1892,27 @@ async function saveEditDispatch() {
   const cleanNotes = document.getElementById('edit-dis-notes').value.trim();
   const fullNotes = [cleanNotes, isHyd ? '[Hyd→SB]' : '', billCFTTag, markupTag].filter(Boolean).join(' ');
   try {
-    const payload = {
+    const editedSlabs = getEditDisSlabs();
+    // Auto-calculate totalCFT from slabs if slabs exist
+    const calcCFT = editedSlabs.length > 0
+      ? Math.round(editedSlabs.reduce((s,r) => s + r.cft, 0) * 1000) / 1000
+      : parseFloat(document.getElementById('edit-dis-cft').value) || 0;
+    // Update the field so user can see it
+    if (editedSlabs.length > 0) document.getElementById('edit-dis-cft').value = calcCFT;
+
+    const r = await apiPost({ action: 'updateSWDispatch', data: {
       dispatchId,
       billNo:     document.getElementById('edit-dis-billno').value.trim(),
       date:       document.getElementById('edit-dis-date').value,
       species:    document.getElementById('edit-dis-species').value.trim(),
-      totalCFT:   parseFloat(document.getElementById('edit-dis-cft').value) || 0,
-      slabCount:  parseInt(document.getElementById('edit-dis-slabs').value) || 0,
+      totalCFT:   calcCFT,
+      slabCount:  editedSlabs.length || parseInt(document.getElementById('edit-dis-slabs').value) || 0,
       totalValue: parseFloat(document.getElementById('edit-dis-value').value) || 0,
       invoiceNo:  document.getElementById('edit-dis-invno').value.trim(),
       billCFT:    parseFloat(document.getElementById('edit-dis-billcft').value) || 0,
       notes:      fullNotes,
-      slabs:      getEditDisSlabs()
-    };
-    console.log('saveEditDispatch payload:', JSON.stringify(payload));
-    const r = await apiPost({ action: 'updateSWDispatch', data: payload });
+      slabs:      editedSlabs
+    }});
     console.log('saveEditDispatch response:', JSON.stringify(r));
     if (r.success) {
       toast('Dispatch updated ✓', 'ok');
