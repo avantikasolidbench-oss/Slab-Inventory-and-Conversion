@@ -816,6 +816,22 @@ select option{background:var(--bg3);color:var(--ink)}
       <div class="field" style="margin-bottom:0"><label>Bill CFT <span style="color:var(--ink3);font-size:10px">(as on cover page)</span></label><input type="number" id="edit-dis-billcft" step="0.001" placeholder="e.g. 161.962"></div>
     </div>
     <div class="field"><label>Notes</label><textarea id="edit-dis-notes" style="min-height:40px"></textarea></div>
+
+    <!-- Slab data editing -->
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <label style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600">Slab Data</label>
+        <button onclick="addEditDisRow()" class="btn btn-sec btn-sm">+ Add Row</button>
+      </div>
+      <div style="overflow-x:auto;max-height:200px;overflow-y:auto">
+        <table class="dtbl" style="font-size:12px">
+          <thead><tr><th>L mm</th><th>W mm</th><th>T mm</th><th style="color:var(--amber)">Qty</th><th>CFT</th><th></th></tr></thead>
+          <tbody id="edit-dis-slab-rows"></tbody>
+        </table>
+      </div>
+      <div style="font-size:11px;color:var(--ink3);margin-top:4px">Total: <span id="edit-dis-slab-total" style="color:var(--wood);font-family:var(--mono)">—</span></div>
+    </div>
+
     <div style="display:flex;gap:8px">
       <button class="btn btn-sec" onclick="document.getElementById('edit-dis-modal').classList.remove('show')" style="flex:1">Cancel</button>
       <button class="btn btn-primary" onclick="saveEditDispatch()" style="flex:2" id="edit-dis-save-btn">💾 Save Changes</button>
@@ -974,7 +990,7 @@ select option{background:var(--bg3);color:var(--ink)}
       <div id="dis-species-sections"></div>
       <div id="dis-manual-wrap" style="display:none">
         <div style="overflow-x:auto;margin-bottom:8px">
-          <table class="dtbl"><thead><tr><th>L mm</th><th>W mm</th><th>T mm</th><th>CFT</th><th>Cost ₹</th><th></th></tr></thead>
+          <table class="dtbl"><thead><tr><th>L mm</th><th>W mm</th><th>T mm</th><th style="color:var(--amber)">Qty</th><th>CFT</th><th>Cost ₹</th><th></th></tr></thead>
           <tbody id="dis-rows"></tbody></table>
         </div>
         <div class="field" style="margin-bottom:6px"><label>Batch</label>
@@ -1762,9 +1778,71 @@ async function toggleDispatchExpand(id, dispatchId) {
   } catch(e) { el.innerHTML = '<div style="color:var(--red);font-size:12px;padding:8px">Error loading slabs: ' + e.message + '</div>'; }
 }
 
+let editDisSlabs = [];
+let editDisRowCount = 0;
+
+function addEditDisRow(slab) {
+  const id = ++editDisRowCount;
+  const tr = document.createElement('tr');
+  tr.id = 'edr' + id;
+  tr.innerHTML =
+    '<td><input type="number" id="edr'+id+'l" value="'+(slab?.lengthMM||'')+'" placeholder="800" oninput="calcEditDisRow('+id+')" style="width:65px"></td>' +
+    '<td><input type="number" id="edr'+id+'w" value="'+(slab?.widthMM||'')+'" placeholder="200" oninput="calcEditDisRow('+id+')" style="width:60px"></td>' +
+    '<td><input type="number" id="edr'+id+'t" value="'+(slab?.thickMM||'')+'" placeholder="50" oninput="calcEditDisRow('+id+')" style="width:50px"></td>' +
+    '<td><input type="number" id="edr'+id+'q" value="'+(slab?.qty||1)+'" min="1" oninput="calcEditDisRow('+id+')" style="width:50px;color:var(--amber)"></td>' +
+    '<td class="mono" id="edr'+id+'cft" style="color:var(--wood);padding:6px;font-size:11px">'+(slab ? parseFloat(slab.cft||0).toFixed(3) : '—')+'</td>' +
+    '<td><button onclick="document.getElementById(\'edr'+id+'\').remove();updateEditDisTotal()" style="background:none;border:none;color:var(--ink3);font-size:14px;cursor:pointer;padding:2px 6px">✕</button></td>';
+  document.getElementById('edit-dis-slab-rows').appendChild(tr);
+  if (slab) calcEditDisRow(id);
+}
+
+function calcEditDisRow(id) {
+  const l=parseFloat(document.getElementById('edr'+id+'l')?.value)||0;
+  const w=parseFloat(document.getElementById('edr'+id+'w')?.value)||0;
+  const t=parseFloat(document.getElementById('edr'+id+'t')?.value)||0;
+  const q=Math.max(1,parseInt(document.getElementById('edr'+id+'q')?.value)||1);
+  const cft=Math.round((l*w*t)/1e9*35.31466560103903*1000)/1000;
+  const totalCft=Math.round(cft*q*1000)/1000;
+  const el=document.getElementById('edr'+id+'cft');
+  if(el) el.textContent = totalCft>0 ? (q>1?q+'×'+cft+'='+totalCft:totalCft.toFixed(3)) : '—';
+  updateEditDisTotal();
+}
+
+function updateEditDisTotal() {
+  let total=0;
+  document.querySelectorAll('#edit-dis-slab-rows tr').forEach(tr=>{
+    const id=tr.id.replace('edr','');
+    const l=parseFloat(document.getElementById('edr'+id+'l')?.value)||0;
+    const w=parseFloat(document.getElementById('edr'+id+'w')?.value)||0;
+    const t=parseFloat(document.getElementById('edr'+id+'t')?.value)||0;
+    const q=Math.max(1,parseInt(document.getElementById('edr'+id+'q')?.value)||1);
+    if(l&&w&&t) total+=Math.round((l*w*t)/1e9*35.31466560103903*1000)/1000*q;
+  });
+  const el=document.getElementById('edit-dis-slab-total');
+  if(el) el.textContent = total>0 ? total.toFixed(3)+' CFT' : '—';
+}
+
+function getEditDisSlabs() {
+  const slabs=[];
+  document.querySelectorAll('#edit-dis-slab-rows tr').forEach(tr=>{
+    const id=tr.id.replace('edr','');
+    const l=parseFloat(document.getElementById('edr'+id+'l')?.value)||0;
+    const w=parseFloat(document.getElementById('edr'+id+'w')?.value)||0;
+    const t=parseFloat(document.getElementById('edr'+id+'t')?.value)||0;
+    const q=Math.max(1,parseInt(document.getElementById('edr'+id+'q')?.value)||1);
+    if(l&&w&&t){
+      const cbm=(l*w*t)/1e9;
+      const cft=Math.round(cbm*35.31466560103903*1000)/1000*q;
+      slabs.push({lengthMM:l,widthMM:w,thickMM:t,cbm:parseFloat((cbm*q).toFixed(8)),cft,qty:q>1?q:undefined,notes:q>1?q+'× '+l+'×'+w+'×'+t+'mm':undefined});
+    }
+  });
+  return slabs;
+}
+
 function editDispatch(dispatchId) {
   const d = ST.dispatches.find(x => x.dispatchId === dispatchId);
   if (!d) return;
+  editDisRowCount = 0;
   document.getElementById('edit-dis-id').value = dispatchId;
   document.getElementById('edit-dis-sub').textContent = dispatchId;
   document.getElementById('edit-dis-billno').value = d.billNo || '';
@@ -1776,7 +1854,22 @@ function editDispatch(dispatchId) {
   document.getElementById('edit-dis-invno').value = d.invoiceNo || '';
   document.getElementById('edit-dis-billcft').value = d.billCFT || '';
   document.getElementById('edit-dis-notes').value = (d.notes||'').replace(/\[Hyd→SB\]|\[markup:\d+\]|\[billCFT:[\d.]+\]|\[reconciled\]/g,'').trim();
+
+  // Load slabs — fetch on demand
+  const tbody = document.getElementById('edit-dis-slab-rows');
+  tbody.innerHTML = '<tr><td colspan="6" style="padding:8px;color:var(--ink3);text-align:center">Loading slabs…</td></tr>';
   document.getElementById('edit-dis-modal').classList.add('show');
+
+  apiGet({ action: 'getSWDispatchDetail', dispatchId }).then(r => {
+    tbody.innerHTML = '';
+    editDisRowCount = 0;
+    const slabs = r.slabs || [];
+    if (slabs.length) slabs.forEach(s => addEditDisRow(s));
+    else tbody.innerHTML = '<tr><td colspan="6" style="padding:8px;color:var(--ink3);text-align:center;font-size:12px">No slab data — add rows manually</td></tr>';
+    updateEditDisTotal();
+  }).catch(() => {
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:8px;color:var(--ink3);text-align:center;font-size:12px">Could not load slabs</td></tr>';
+  });
 }
 
 async function saveEditDispatch() {
@@ -1803,7 +1896,8 @@ async function saveEditDispatch() {
       totalValue: parseFloat(document.getElementById('edit-dis-value').value) || 0,
       invoiceNo:  document.getElementById('edit-dis-invno').value.trim(),
       billCFT:    parseFloat(document.getElementById('edit-dis-billcft').value) || 0,
-      notes:      fullNotes
+      notes:      fullNotes,
+      slabs:      getEditDisSlabs()
     }});
     if (r.success) {
       toast('Dispatch updated ✓', 'ok');
@@ -2952,9 +3046,10 @@ function addDisRow() {
   const tr = document.createElement('tr');
   tr.id = 'dr' + id;
   tr.innerHTML =
-    '<td><input type="number" id="dr'+id+'l" placeholder="3000" oninput="calcDisRow('+id+')" style="width:70px"></td>' +
-    '<td><input type="number" id="dr'+id+'w" placeholder="280" oninput="calcDisRow('+id+')" style="width:65px"></td>' +
-    '<td><input type="number" id="dr'+id+'t" placeholder="55" oninput="calcDisRow('+id+')" style="width:55px"></td>' +
+    '<td><input type="number" id="dr'+id+'l" placeholder="800" oninput="calcDisRow('+id+')" style="width:65px"></td>' +
+    '<td><input type="number" id="dr'+id+'w" placeholder="200" oninput="calcDisRow('+id+')" style="width:60px"></td>' +
+    '<td><input type="number" id="dr'+id+'t" placeholder="50" oninput="calcDisRow('+id+')" style="width:50px"></td>' +
+    '<td><input type="number" id="dr'+id+'q" placeholder="1" value="1" min="1" oninput="calcDisRow('+id+')" style="width:50px;color:var(--amber)"></td>' +
     '<td class="mono" id="dr'+id+'cft" style="color:var(--wood);padding:8px">—</td>' +
     '<td class="mono" id="dr'+id+'cost" style="color:var(--ink3);padding:8px">—</td>' +
     '<td><button onclick="document.getElementById(\'dr'+id+'\').remove();calcDispatchTotals()" style="background:none;border:none;color:var(--ink3);font-size:16px;cursor:pointer;padding:4px 8px">✕</button></td>';
@@ -2965,13 +3060,15 @@ function calcDisRow(id) {
   const l=parseFloat(document.getElementById('dr'+id+'l')?.value)||0;
   const w=parseFloat(document.getElementById('dr'+id+'w')?.value)||0;
   const t=parseFloat(document.getElementById('dr'+id+'t')?.value)||0;
-  const cft=Math.round((l*w*t)/1e9*35.31466560103903*1000)/1000;
+  const q=Math.max(1,parseInt(document.getElementById('dr'+id+'q')?.value)||1);
+  const singleCft=Math.round((l*w*t)/1e9*35.31466560103903*1000)/1000;
+  const cft=Math.round(singleCft*q*1000)/1000;
   const inv=document.getElementById('d-batch')?.value||'';
   const b=ST.batches.find(x=>x.invoiceNo===inv);
   const billRate=(b?parseFloat(b.rateCFT||0):0)+CFG.markup;
   const cftEl=document.getElementById('dr'+id+'cft');
   const costEl=document.getElementById('dr'+id+'cost');
-  if(cftEl) cftEl.textContent=cft>0?cft.toFixed(3):'—';
+  if(cftEl) cftEl.textContent=cft>0?(q>1?q+'×'+singleCft+'='+cft:cft.toFixed(3)):'—';
   if(costEl) costEl.textContent=cft>0?'₹'+Math.round(cft*billRate).toLocaleString('en-IN'):'—';
   calcDispatchTotals();
 }
@@ -2983,17 +3080,18 @@ function calcDispatchTotals() {
     const l=parseFloat(document.getElementById('dr'+id+'l')?.value)||0;
     const w=parseFloat(document.getElementById('dr'+id+'w')?.value)||0;
     const t=parseFloat(document.getElementById('dr'+id+'t')?.value)||0;
+    const q=Math.max(1,parseInt(document.getElementById('dr'+id+'q')?.value)||1);
     if(!l||!w||!t) return;
-    const cft=Math.round((l*w*t)/1e9*35.31466560103903*1000)/1000;
+    const cft=Math.round((l*w*t)/1e9*35.31466560103903*1000)/1000*q;
     const inv=document.getElementById('d-batch')?.value||'';
     const b=ST.batches.find(x=>x.invoiceNo===inv);
     const billRate=(b?parseFloat(b.rateCFT||0):0)+CFG.markup;
-    totalCFT+=cft; totalVal+=cft*billRate; slabCount++;
+    totalCFT+=cft; totalVal+=cft*billRate; slabCount+=q;
   });
   const ts=document.getElementById('d-total-slabs');
   const tc=document.getElementById('d-total-cft');
   const tv=document.getElementById('d-total-val');
-  if(ts) ts.textContent=slabCount>0?slabCount+' slabs':'—';
+  if(ts) ts.textContent=slabCount>0?slabCount+' pcs':'—';
   if(tc) tc.textContent=totalCFT>0?totalCFT.toFixed(3)+' CFT':'—';
   if(tv) tv.textContent=totalVal>0?'₹'+Math.round(totalVal).toLocaleString('en-IN'):'—';
 }
@@ -3062,12 +3160,14 @@ async function saveDispatch() {
     const l=parseFloat(document.getElementById('dr'+id+'l')?.value)||0;
     const w=parseFloat(document.getElementById('dr'+id+'w')?.value)||0;
     const t=parseFloat(document.getElementById('dr'+id+'t')?.value)||0;
+    const q=Math.max(1,parseInt(document.getElementById('dr'+id+'q')?.value)||1);
     if(l&&w&&t){
       const cbm=(l*w*t)/1e9;
-      const cft=Math.round(cbm*35.31466560103903*1000)/1000;
+      const singleCft=Math.round(cbm*35.31466560103903*1000)/1000;
+      const cft=Math.round(singleCft*q*1000)/1000;
       const b=ST.batches.find(x=>x.invoiceNo===invoiceNo);
       const billRate=(b?parseFloat(b.rateCFT||0):0)+CFG.markup;
-      rows.push({lengthMM:l,widthMM:w,thickMM:t,cbm,cft,cost:cft*billRate,billRate});
+      rows.push({lengthMM:l,widthMM:w,thickMM:t,cbm:cbm*q,cft,cost:cft*billRate,billRate,qty:q,notes:q>1?q+'× '+l+'×'+w+'×'+t+'mm':''});
     }
   });
   if (!rows.length) { toast('Add slabs or upload register', 'err'); return; }
