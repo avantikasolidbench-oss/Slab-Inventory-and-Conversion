@@ -20,6 +20,8 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{height:100%;-webkit-text-size-adjust:100%}
 body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;min-height:100%;overscroll-behavior:none}
+.dis-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.dis-grid{grid-template-columns:1fr}}
 
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar{width:4px}
@@ -341,7 +343,8 @@ select option{background:var(--bg3);color:var(--ink)}
 
       <div class="card">
         <div class="card-head"><span class="card-title">Dispatch History</span></div>
-        <div id="dispatch-list"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
+        <div id="dispatch-list-wrap" class="dis-grid"></div>
+        <div id="dispatch-list" style="display:none"></div>
       </div>
     </div>
 
@@ -1611,116 +1614,98 @@ async function loadDispatches() {
 }
 
 function renderDispatches(dispatches) {
-  const el = document.getElementById('dispatch-list');
+  const wrap = document.getElementById('dispatch-list-wrap');
   if (!dispatches.length) {
-    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No dispatches yet</div>';
+    wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px;grid-column:1/-1">No dispatches yet</div>';
     return;
   }
-  el.innerHTML = dispatches.map((d, idx) => {
+  wrap.innerHTML = dispatches.map((d, idx) => {
     const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
-    const tag = isHyd ? '<span class="badge b-hyd" style="font-size:10px">🏭 via Hyd</span>' : '<span class="badge b-wood" style="font-size:10px">🚚 Direct</span>';
+    const tag = isHyd
+      ? '<span class="badge b-hyd" style="font-size:10px">🏭 via Hyd</span>'
+      : '<span class="badge b-wood" style="font-size:10px">🚚 Direct</span>';
     const hasBatch = ST.batches.some(b => b.invoiceNo === d.invoiceNo);
-
-    // Rate + CFT verification
     const batch = ST.batches.find(b => b.invoiceNo === d.invoiceNo);
     const markup = d.markupTier || 300;
-    const vendorRate = batch
-      ? parseFloat(batch.rateCFT || 0) || (batch.totalCFT > 0 ? Math.round(parseFloat(batch.woodValue || batch.taxableValue || 0) / batch.totalCFT) : 0)
-      : 0;
+    const vendorRate = batch ? parseFloat(batch.rateCFT||0) || (batch.totalCFT > 0 ? Math.round(parseFloat(batch.woodValue||0)/batch.totalCFT) : 0) : 0;
     const systemRate = vendorRate + markup;
     const billRate = d.totalCFT > 0 ? Math.round(parseFloat(d.totalValue||0) / parseFloat(d.totalCFT)) : 0;
     const rateMatch = billRate > 0 && Math.abs(billRate - systemRate) < 5;
-    // CFT check
     const storedBillCFT = d.billCFT || 0;
     const slabCFT = Math.round(parseFloat(d.totalCFT||0)*1000)/1000;
     const cftMatch = storedBillCFT > 0 ? Math.abs(slabCFT - storedBillCFT) < 0.01 : true;
-
     const reconciled = (d.notes||'').includes('[reconciled]');
     const hasRateCheck = billRate > 0 && batch;
     const hasCFTCheck = storedBillCFT > 0;
     const allOk = (!hasRateCheck || rateMatch) && (!hasCFTCheck || cftMatch);
+    const statusColor = reconciled ? 'rgba(74,154,106,.2)' : allOk ? 'rgba(74,154,106,.1)' : 'rgba(192,74,58,.1)';
+    const borderColor = reconciled ? 'rgba(74,154,106,.4)' : allOk ? 'rgba(74,154,106,.25)' : 'rgba(192,74,58,.3)';
 
-    // Verification block
-    let verBlock = '';
-    if (reconciled) {
-      verBlock = '<div style="margin-top:6px;display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(74,154,106,.2);color:var(--seasoned)">✓ Reconciled</div>';
-    } else if (hasRateCheck || hasCFTCheck || !batch) {
-      const color = allOk ? 'rgba(74,154,106,.3)' : 'rgba(192,74,58,.3)';
-      const bg    = allOk ? 'rgba(74,154,106,.08)' : 'rgba(192,74,58,.08)';
-      const hdr   = allOk ? 'var(--seasoned)' : 'var(--red)';
-      verBlock =
-        '<div style="margin-top:8px;border:1px solid '+color+';border-radius:6px;overflow:hidden;font-size:11px">' +
-          '<div style="background:'+bg+';padding:4px 10px;display:flex;justify-content:space-between;align-items:center">' +
-            '<span style="font-weight:600;color:'+hdr+'">' + (allOk?'✓ Verified':'⚠ Needs Review') + '</span>' +
-            '<span style="color:var(--ink3)">' +
-              (d.financedByXP?'💰 Fin':'💰 SB') + ' · ' +
-              (d.seasonedByXP?'🌿 XP':'🏭 Hyd') + ' · ' +
-              '<span style="color:var(--amber);font-weight:600">₹'+d.markupTier+'</span>' +
-            '</span>' +
-          '</div>' +
-          '<div style="padding:6px 10px">' +
-            (!batch ? '<div style="color:var(--amber);margin-bottom:3px">⚠ Purchase batch not linked — edit to fix</div>' : '') +
-            (hasRateCheck ?
-              '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.06)">' +
-                '<span style="color:var(--ink3)">Rate / CFT</span>' +
-                '<span style="color:'+(rateMatch?'var(--seasoned)':'var(--red)')+'">'+
-                  'Bill <b>₹'+billRate+'</b> · Sys <b>₹'+systemRate+'</b>' +
-                  (rateMatch ? ' ✓' : ' Δ₹'+Math.abs(billRate-systemRate)) +
-                '</span>' +
-              '</div>' : '') +
-            (hasCFTCheck ?
-              '<div style="display:flex;justify-content:space-between;padding:2px 0">' +
-                '<span style="color:var(--ink3)">CFT</span>' +
-                '<span style="color:'+(cftMatch?'var(--seasoned)':'var(--red)')+'">'+
-                  'Slabs <b>'+slabCFT.toFixed(3)+'</b> · Bill <b>'+storedBillCFT.toFixed(3)+'</b>' +
-                  (cftMatch ? ' ✓' : ' Δ'+(slabCFT-storedBillCFT).toFixed(3)) +
-                '</span>' +
-              '</div>' : '') +
-          '</div>' +
-          (!allOk ?
-            '<div style="padding:4px 10px;border-top:1px solid '+color+'">' +
-              '<button onclick="event.stopPropagation();markReconciled(\''+d.dispatchId+'\')" style="font-size:10px;padding:3px 10px;background:rgba(74,154,106,.15);border:1px solid rgba(74,154,106,.3);color:var(--seasoned);border-radius:4px;cursor:pointer;width:100%">✓ Mark as Reconciled</button>' +
-            '</div>' : '') +
-        '</div>';
-    } else {
-      verBlock = '<div style="margin-top:4px;font-size:10px;color:var(--ink3)">' +
-        (d.financedByXP?'💰 Fin':'💰 SB') + ' · ' + (d.seasonedByXP?'🌿 XP':'🏭 Hyd') + ' · <span style="color:var(--amber)">₹'+d.markupTier+'/CFT</span></div>';
-    }
+    // Verification rows
+    let verRows = '';
+    if (hasRateCheck) verRows +=
+      '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+        '<span style="color:var(--ink3);font-size:12px">Rate/CFT</span>' +
+        '<span style="font-size:12px;color:'+(rateMatch?'var(--seasoned)':'var(--red)')+'">Bill <b>₹'+billRate+'</b> · Sys <b>₹'+systemRate+'</b>'+(rateMatch?' ✓':' Δ₹'+Math.abs(billRate-systemRate))+'</span>' +
+      '</div>';
+    if (hasCFTCheck) verRows +=
+      '<div style="display:flex;justify-content:space-between;padding:4px 0">' +
+        '<span style="color:var(--ink3);font-size:12px">CFT</span>' +
+        '<span style="font-size:12px;color:'+(cftMatch?'var(--seasoned)':'var(--red)')+'">Slabs <b>'+slabCFT.toFixed(3)+'</b> · Bill <b>'+storedBillCFT.toFixed(3)+'</b>'+(cftMatch?' ✓':' Δ'+(slabCFT-storedBillCFT).toFixed(3))+'</span>' +
+      '</div>';
 
     const missingBanner = !hasBatch
       ? '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;background:rgba(192,150,58,.15);border-top:1px solid rgba(192,150,58,.3)">' +
-          '<span style="font-size:11px;color:var(--amber)">⚠ No purchase bill for ' + (d.species||'this species') + '</span>' +
-          '<div style="display:flex;gap:6px;flex-shrink:0">' +
-            '<button onclick="event.stopPropagation();showPurModal(\''+d.species+'\')" style="font-size:11px;padding:4px 8px;background:rgba(192,150,58,.2);border:1px solid rgba(192,150,58,.4);color:var(--amber);border-radius:4px;cursor:pointer">📋 Upload Bill</button>' +
-            '<button onclick="event.stopPropagation();markAsOpeningStock(\''+d.invoiceNo+'\',\''+d.species+'\')" style="font-size:11px;padding:4px 8px;background:rgba(74,154,106,.15);border:1px solid rgba(74,154,106,.3);color:var(--seasoned);border-radius:4px;cursor:pointer">✓ Opening Stock</button>' +
+          '<span style="font-size:11px;color:var(--amber)">⚠ No purchase bill linked</span>' +
+          '<div style="display:flex;gap:6px">' +
+            '<button onclick="event.stopPropagation();showPurModal(\''+d.species+'\')" style="font-size:11px;padding:3px 8px;background:rgba(192,150,58,.2);border:1px solid rgba(192,150,58,.4);color:var(--amber);border-radius:4px;cursor:pointer">📋 Upload Bill</button>' +
+            '<button onclick="event.stopPropagation();markAsOpeningStock(\''+d.invoiceNo+'\',\''+d.species+'\')" style="font-size:11px;padding:3px 8px;background:rgba(74,154,106,.15);border:1px solid rgba(74,154,106,.3);color:var(--seasoned);border-radius:4px;cursor:pointer">✓ Opening Stock</button>' +
           '</div>' +
         '</div>'
       : '';
 
-    return '<div class="batch-item" style="padding:0;overflow:hidden' + (reconciled?';opacity:.75':'') + '">' +
-      '<div onclick="toggleDispatchExpand(\'dis-'+idx+'\',\''+d.dispatchId+'\')" style="padding:14px 16px 10px;cursor:pointer">' +
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
-          '<div style="flex:1;min-width:0">' +
-            '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">' +
-              '<span class="bi-inv" style="font-size:13px">' + (d.billNo||'—') + '</span>' +
-              tag +
-              (reconciled ? '<span style="font-size:9px;padding:1px 6px;border-radius:8px;background:rgba(74,154,106,.2);color:var(--seasoned)">✓</span>' : '') +
-            '</div>' +
-            '<div class="bi-meta" style="font-size:11px">' + d.date + ' · <span style="color:var(--ink2)">' + (batch?.batchName || d.invoiceNo) + '</span> · <span class="sp-tag">' + (d.species||'—') + '</span></div>' +
+    return '<div class="batch-item" style="padding:0;overflow:hidden;border:1px solid '+borderColor+'">' +
+      // Header row — full width
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:14px 16px 10px;background:'+statusColor+'">' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">' +
+            '<span style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--ink)">' + (d.billNo||'—') + '</span>' +
+            tag +
+            (reconciled ? '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:rgba(74,154,106,.25);color:var(--seasoned)">✓ Reconciled</span>' : '') +
           '</div>' +
-          '<div style="text-align:right;flex-shrink:0;margin-left:12px">' +
-            '<div style="font-size:18px;font-weight:700;font-family:var(--mono)">' + parseFloat(d.totalCFT||0).toFixed(3) + '</div>' +
-            '<div style="font-size:10px;color:var(--ink3)">CFT · ' + (d.slabCount||0) + ' slabs</div>' +
-            '<div style="font-size:10px;color:var(--ink3);margin-top:1px" id="dis-'+idx+'-arrow">▾</div>' +
+          '<div style="font-size:12px;color:var(--ink3)">' +
+            d.date + ' · ' +
+            '<span style="color:var(--ink2)">' + (batch?.batchName || d.invoiceNo) + '</span> · ' +
+            '<span class="sp-tag">' + (d.species||'—') + '</span>' +
           '</div>' +
         '</div>' +
-        verBlock +
+        '<div style="text-align:right;flex-shrink:0;margin-left:16px">' +
+          '<div style="font-family:var(--mono);font-size:22px;font-weight:800;color:var(--wood)">' + parseFloat(d.totalCFT||0).toFixed(3) + '</div>' +
+          '<div style="font-size:11px;color:var(--ink3)">CFT · ' + (d.slabCount||0) + ' slabs</div>' +
+          '<div style="font-size:12px;color:var(--ink2);margin-top:2px">₹' + parseInt(d.totalValue||0).toLocaleString('en-IN') + '</div>' +
+        '</div>' +
       '</div>' +
-      '<div style="display:flex;gap:6px;padding:0 14px 10px">' +
-        '<button onclick="event.stopPropagation();printDispatchAnnexure(\''+d.dispatchId+'\')" style="font-size:11px;padding:5px 0;background:rgba(58,122,176,.15);border:1px solid rgba(58,122,176,.3);color:var(--gas);border-radius:4px;cursor:pointer;flex:1">📄 Print</button>' +
-        '<button onclick="event.stopPropagation();editDispatch(\''+d.dispatchId+'\')" style="font-size:11px;padding:5px 0;background:var(--bg3);border:1px solid var(--rule);color:var(--ink3);border-radius:4px;cursor:pointer;flex:1">✏️ Edit</button>' +
+      // Arrangement + verification
+      '<div style="padding:8px 16px;border-top:1px solid rgba(255,255,255,.06)">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:'+(verRows?'8px':'0')+';">' +
+          (d.financedByXP ? '<span style="font-size:11px;color:var(--ink3)">💰 Financed</span>' : '<span style="font-size:11px;color:var(--ink3)">💰 SB finances</span>') +
+          '<span style="color:var(--ink3)">·</span>' +
+          (d.seasonedByXP ? '<span style="font-size:11px;color:var(--ink3)">🌿 XP seasons</span>' : '<span style="font-size:11px;color:var(--ink3)">🏭 Hyd seasons</span>') +
+          '<span style="color:var(--ink3)">·</span>' +
+          '<span style="font-size:12px;color:var(--amber);font-weight:600">₹'+markup+'/CFT markup</span>' +
+          (!batch ? ' <span style="font-size:11px;color:var(--red)">⚠ no batch</span>' : '') +
+        '</div>' +
+        verRows +
+        (!allOk && !reconciled ?
+          '<button onclick="event.stopPropagation();markReconciled(\''+d.dispatchId+'\')" style="margin-top:8px;font-size:11px;padding:4px 0;background:rgba(74,154,106,.15);border:1px solid rgba(74,154,106,.3);color:var(--seasoned);border-radius:4px;cursor:pointer;width:100%">✓ Mark as Reconciled</button>' : '') +
       '</div>' +
       missingBanner +
+      // Action row
+      '<div style="display:flex;gap:0;border-top:1px solid rgba(255,255,255,.06)">' +
+        '<button onclick="printDispatchAnnexure(\''+d.dispatchId+'\')" style="flex:1;padding:9px;font-size:12px;background:none;border:none;border-right:1px solid rgba(255,255,255,.06);color:var(--gas);cursor:pointer">📄 Print</button>' +
+        '<button onclick="editDispatch(\''+d.dispatchId+'\')" style="flex:1;padding:9px;font-size:12px;background:none;border:none;border-right:1px solid rgba(255,255,255,.06);color:var(--ink3);cursor:pointer">✏️ Edit</button>' +
+        '<button onclick="toggleDispatchExpand(\'dis-'+idx+'\',\''+d.dispatchId+'\')" style="flex:1;padding:9px;font-size:12px;background:none;border:none;color:var(--ink3);cursor:pointer" id="dis-'+idx+'-arrow">▾ Slabs</button>' +
+      '</div>' +
       '<div id="dis-'+idx+'" style="display:none;padding:12px 16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:13px">Loading…</div>' +
     '</div>';
   }).join('');
