@@ -20,8 +20,6 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{height:100%;-webkit-text-size-adjust:100%}
 body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;min-height:100%;overscroll-behavior:none}
-.dis-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media(max-width:700px){.dis-grid{grid-template-columns:1fr}}
 
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar{width:4px}
@@ -343,7 +341,7 @@ select option{background:var(--bg3);color:var(--ink)}
 
       <div class="card">
         <div class="card-head"><span class="card-title">Dispatch History</span></div>
-        <div id="dispatch-list-wrap" class="dis-grid"></div>
+        <div id="dispatch-list-wrap"></div>
         <div id="dispatch-list" style="display:none"></div>
       </div>
     </div>
