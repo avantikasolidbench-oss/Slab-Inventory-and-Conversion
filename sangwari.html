@@ -419,10 +419,14 @@ select option{background:var(--bg3);color:var(--ink)}
     <!-- Manual entry row -->
     <div id="se-manual" style="display:none;background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:12px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-        <div><label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:4px">L mm</label><input type="number" id="se-ml" placeholder="3000" style="width:75px;background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;font-family:var(--mono)"></div>
-        <div><label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:4px">W mm</label><input type="number" id="se-mw" placeholder="280" style="width:70px;background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;font-family:var(--mono)"></div>
-        <div><label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:4px">T mm</label><input type="number" id="se-mt" placeholder="50" style="width:65px;background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;font-family:var(--mono)"></div>
-        <button class="btn btn-primary btn-sm" onclick="addSEManualRow()">Add</button>
+        <div><label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:4px">L mm</label><input type="number" id="se-ml" placeholder="3000" oninput="previewSERow()" style="width:75px;background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;font-family:var(--mono)"></div>
+        <div><label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:4px">W mm</label><input type="number" id="se-mw" placeholder="280" oninput="previewSERow()" style="width:70px;background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;font-family:var(--mono)"></div>
+        <div><label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:4px">T mm</label><input type="number" id="se-mt" placeholder="50" oninput="previewSERow()" style="width:65px;background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;font-family:var(--mono)"></div>
+        <div><label style="font-size:10px;color:var(--ink3);display:block;margin-bottom:4px">Qty</label><input type="number" id="se-mq" placeholder="1" value="1" min="1" oninput="previewSERow()" style="width:55px;background:var(--bg4);border:1px solid var(--rule);color:var(--amber);padding:8px;border-radius:4px;font-family:var(--mono)"></div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div id="se-row-preview" style="font-size:11px;color:var(--wood);font-family:var(--mono);min-height:16px"></div>
+          <button class="btn btn-primary btn-sm" onclick="addSEManualRow()">Add</button>
+        </div>
       </div>
     </div>
 
@@ -1713,26 +1717,51 @@ function renderDispatches(dispatches) {
 
 async function toggleDispatchExpand(id, dispatchId) {
   const el = document.getElementById(id);
+  if (!el) { console.error('expand div not found:', id); return; }
   const arrow = document.getElementById(id + '-arrow');
   const open = el.style.display !== 'none';
   if (open) {
     el.style.display = 'none';
-    if (arrow) arrow.textContent = '▾ slabs';
+    if (arrow) arrow.innerHTML = '▾ Slabs';
     return;
   }
   el.style.display = 'block';
-  if (arrow) arrow.textContent = '▴ hide';
-  // Load slab detail on demand
+  if (arrow) arrow.innerHTML = '▴ Hide';
+  if (el.dataset.loaded) return; // already loaded
+  el.innerHTML = '<div style="padding:8px;color:var(--ink3);font-size:12px">Loading slabs…</div>';
   try {
     const r = await apiGet({ action: 'getSWDispatchDetail', dispatchId });
     const slabs = r.slabs || [];
-    if (!slabs.length) { el.innerHTML = '<div style="color:var(--ink3);font-size:13px">No slab-level detail stored</div>'; return; }
-    el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
-      '<thead><tr style="background:var(--bg3)"><th style="padding:5px 8px;text-align:left;color:var(--ink3)">#</th><th style="padding:5px 8px;text-align:left;color:var(--ink3)">L mm</th><th style="padding:5px 8px;text-align:left;color:var(--ink3)">W mm</th><th style="padding:5px 8px;text-align:left;color:var(--ink3)">T mm</th><th style="padding:5px 8px;text-align:right;color:var(--ink3)">CFT</th></tr></thead><tbody>' +
-      slabs.map((s,i) => '<tr style="border-bottom:1px solid rgba(255,255,255,.04)"><td style="padding:5px 8px;color:var(--ink3);font-size:11px">'+(i+1)+'</td><td style="padding:5px 8px;font-family:var(--mono)">'+(s.lengthMM||'—')+'</td><td style="padding:5px 8px;font-family:var(--mono)">'+(s.widthMM||'—')+'</td><td style="padding:5px 8px;font-family:var(--mono)">'+(s.thickMM||'—')+'</td><td style="padding:5px 8px;font-family:var(--mono);color:var(--wood);text-align:right">'+parseFloat(s.cft||0).toFixed(3)+'</td></tr>').join('') +
-      '<tr style="background:var(--bg3)"><td colspan="4" style="padding:6px 8px;font-size:11px;color:var(--ink3)">Total · '+slabs.length+' slabs</td><td style="padding:6px 8px;font-family:var(--mono);color:var(--wood);font-weight:700;text-align:right">'+slabs.reduce((s,x)=>s+parseFloat(x.cft||0),0).toFixed(3)+'</td></tr>' +
+    el.dataset.loaded = '1';
+    if (!slabs.length) {
+      el.innerHTML = '<div style="color:var(--ink3);font-size:12px;padding:8px">No slab-level detail stored for this dispatch</div>';
+      return;
+    }
+    const totalCFT = slabs.reduce((s,x) => s + parseFloat(x.cft||0), 0);
+    el.innerHTML =
+      '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+      '<thead><tr style="background:var(--bg3)">' +
+        '<th style="padding:6px 8px;text-align:left;color:var(--ink3);font-weight:500">#</th>' +
+        '<th style="padding:6px 8px;color:var(--ink3);font-weight:500">L mm</th>' +
+        '<th style="padding:6px 8px;color:var(--ink3);font-weight:500">W mm</th>' +
+        '<th style="padding:6px 8px;color:var(--ink3);font-weight:500">T mm</th>' +
+        '<th style="padding:6px 8px;text-align:right;color:var(--ink3);font-weight:500">CFT</th>' +
+      '</tr></thead><tbody>' +
+      slabs.map((s,i) =>
+        '<tr style="border-bottom:1px solid rgba(255,255,255,.04)">' +
+          '<td style="padding:5px 8px;color:var(--ink3)">' + (i+1) + '</td>' +
+          '<td style="padding:5px 8px;font-family:var(--mono)">' + (s.lengthMM||'—') + '</td>' +
+          '<td style="padding:5px 8px;font-family:var(--mono)">' + (s.widthMM||'—') + '</td>' +
+          '<td style="padding:5px 8px;font-family:var(--mono)">' + (s.thickMM||'—') + '</td>' +
+          '<td style="padding:5px 8px;font-family:var(--mono);color:var(--wood);text-align:right">' + parseFloat(s.cft||0).toFixed(3) + '</td>' +
+        '</tr>'
+      ).join('') +
+      '<tr style="background:var(--bg3)">' +
+        '<td colspan="4" style="padding:6px 8px;font-size:11px;color:var(--ink3);font-weight:600">Total · ' + slabs.length + ' slabs</td>' +
+        '<td style="padding:6px 8px;font-family:var(--mono);color:var(--wood);font-weight:700;text-align:right">' + totalCFT.toFixed(3) + '</td>' +
+      '</tr>' +
       '</tbody></table>';
-  } catch(e) { el.innerHTML = '<div style="color:var(--red);font-size:13px">Error loading slabs</div>'; }
+  } catch(e) { el.innerHTML = '<div style="color:var(--red);font-size:12px;padding:8px">Error loading slabs: ' + e.message + '</div>'; }
 }
 
 function editDispatch(dispatchId) {
@@ -3551,14 +3580,37 @@ async function openSlabEntryModal(invoiceNo, species) {
 function closeSlabEntryModal() { document.getElementById('slab-entry-modal').classList.remove('show'); }
 function toggleSEManual() { const m=document.getElementById('se-manual'); m.style.display=m.style.display==='none'?'block':'none'; }
 
+function previewSERow() {
+  const l=parseFloat(document.getElementById('se-ml').value)||0;
+  const w=parseFloat(document.getElementById('se-mw').value)||0;
+  const t=parseFloat(document.getElementById('se-mt').value)||0;
+  const q=parseInt(document.getElementById('se-mq').value)||1;
+  const el=document.getElementById('se-row-preview');
+  if(l&&w&&t) {
+    const cft=Math.round((l*w*t)/1e9*35.31466560103903*1000)/1000;
+    el.textContent = q > 1 ? q+'× '+cft+' = '+(Math.round(cft*q*1000)/1000)+' CFT' : cft+' CFT';
+  } else { el.textContent = ''; }
+}
+
 function addSEManualRow() {
   const l=parseFloat(document.getElementById('se-ml').value)||0;
   const w=parseFloat(document.getElementById('se-mw').value)||0;
   const t=parseFloat(document.getElementById('se-mt').value)||0;
+  const q=Math.max(1, parseInt(document.getElementById('se-mq').value)||1);
   if(!l||!w||!t){toast('Enter L, W and T','err');return;}
   const cft=Math.round((l*w*t)/1e9*35.31466560103903*1000)/1000;
-  SE.staged.push({lengthMM:l,widthMM:w,thickMM:t,cft});
-  document.getElementById('se-ml').value=''; document.getElementById('se-mw').value='';
+  if (q === 1) {
+    SE.staged.push({lengthMM:l, widthMM:w, thickMM:t, cft});
+  } else {
+    // Store as single entry with qty in notes, total CFT
+    const totalCFT = Math.round(cft*q*1000)/1000;
+    SE.staged.push({lengthMM:l, widthMM:w, thickMM:t, cft:totalCFT, qty:q, notes:q+'× '+l+'×'+w+'×'+t+'mm'});
+  }
+  document.getElementById('se-ml').value='';
+  document.getElementById('se-mw').value='';
+  document.getElementById('se-mt').value='';
+  document.getElementById('se-mq').value='1';
+  document.getElementById('se-row-preview').textContent='';
   renderSEStaged();
 }
 
@@ -3567,10 +3619,10 @@ function renderSEStaged() {
   if(!SE.staged.length){wrap.style.display='none';return;}
   wrap.style.display='block';
   const total=SE.staged.reduce((s,r)=>s+r.cft,0);
-  document.getElementById('se-staged-count').textContent=SE.staged.length+' staged · '+total.toFixed(3)+' CFT';
+  document.getElementById('se-staged-count').textContent=SE.staged.length+' entr'+(SE.staged.length>1?'ies':'y')+' · '+total.toFixed(3)+' CFT';
   document.getElementById('se-staged-tbody').innerHTML=SE.staged.map((r,i)=>
     '<tr style="border-bottom:1px solid var(--rule)">' +
-    '<td style="padding:5px 8px;font-family:var(--mono);font-size:12px">'+r.lengthMM+'</td>' +
+    '<td style="padding:5px 8px;font-family:var(--mono);font-size:12px">' + (r.qty > 1 ? '<span style="color:var(--amber);font-size:10px">×'+r.qty+' </span>' : '') + r.lengthMM + '</td>' +
     '<td style="padding:5px 8px;font-family:var(--mono);font-size:12px">'+r.widthMM+'</td>' +
     '<td style="padding:5px 8px;font-family:var(--mono);font-size:12px">'+r.thickMM+'</td>' +
     '<td style="padding:5px 8px;font-family:var(--mono);font-size:12px;color:var(--wood)">'+r.cft.toFixed(3)+'</td>' +
