@@ -1107,8 +1107,11 @@ async function apiGet(p) {
 }
 async function apiPost(d) {
   if (!CFG.url) throw new Error('No URL');
+  console.log('apiPost →', d.action, 'URL:', CFG.url);
   const r = await fetch(CFG.url, { method: 'POST', body: JSON.stringify(d) });
-  return r.json();
+  const text = await r.text();
+  console.log('apiPost ←', d.action, 'raw:', text.slice(0, 300));
+  try { return JSON.parse(text); } catch(e) { throw new Error('Non-JSON response: ' + text.slice(0,100)); }
 }
 
 // ── NAV ──
@@ -1886,7 +1889,7 @@ async function saveEditDispatch() {
   const cleanNotes = document.getElementById('edit-dis-notes').value.trim();
   const fullNotes = [cleanNotes, isHyd ? '[Hyd→SB]' : '', billCFTTag, markupTag].filter(Boolean).join(' ');
   try {
-    const r = await apiPost({ action: 'updateSWDispatch', data: {
+    const payload = {
       dispatchId,
       billNo:     document.getElementById('edit-dis-billno').value.trim(),
       date:       document.getElementById('edit-dis-date').value,
@@ -1898,7 +1901,10 @@ async function saveEditDispatch() {
       billCFT:    parseFloat(document.getElementById('edit-dis-billcft').value) || 0,
       notes:      fullNotes,
       slabs:      getEditDisSlabs()
-    }});
+    };
+    console.log('saveEditDispatch payload:', JSON.stringify(payload));
+    const r = await apiPost({ action: 'updateSWDispatch', data: payload });
+    console.log('saveEditDispatch response:', JSON.stringify(r));
     if (r.success) {
       toast('Dispatch updated ✓', 'ok');
       document.getElementById('edit-dis-modal').classList.remove('show');
