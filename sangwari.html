@@ -978,35 +978,40 @@ select option{background:var(--bg3);color:var(--ink)}
       <div id="d-cover-summary" style="display:none;margin-top:8px;padding:8px;background:var(--bg4);border-radius:4px;font-size:12px;color:var(--ink3)"></div>
     </div>
 
-    <!-- Step 2: Slab register pages -->
+    <!-- Step 2: Slab Register — per species sections -->
     <div style="background:var(--bg3);border-radius:var(--r);padding:12px;margin-bottom:12px">
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:8px">Step 2 — Slab Register (multiple pages ok)</div>
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <button class="btn btn-primary btn-sm" onclick="document.getElementById('f-dis-sheet').click()" style="flex:1">📷 Upload Register / Excel / PDF</button>
-        <button class="btn btn-sec btn-sm" onclick="addDisRow()">+ Manual</button>
-        <input type="file" id="f-dis-sheet" accept="image/*,.pdf,.xlsx,.xls,.csv" multiple onchange="readDisSheet(event)" style="display:none">
-      </div>
-      <div id="dis-download-wrap" style="display:none;margin-bottom:8px">
-        <button class="btn btn-sm" onclick="downloadDispatchAnnexureDraft()" style="width:100%;background:rgba(58,122,176,.15);border:1px solid rgba(58,122,176,.3);color:var(--gas)">📄 Download Slab Annexure — attach to bill</button>
-      </div>
-      <div class="ai-spin-wrap" id="ai-dis"><div class="ai-spin"></div> Reading register…</div>
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:600;margin-bottom:8px">Step 2 — Slab Register</div>
+      <!-- Species sections created from cover page read -->
       <div id="dis-species-sections"></div>
-      <div id="dis-manual-wrap" style="display:none">
-        <div style="overflow-x:auto;margin-bottom:8px">
-          <table class="dtbl"><thead><tr><th>L mm</th><th>W mm</th><th>T mm</th><th style="color:var(--amber)">Qty</th><th>CFT</th><th>Cost ₹</th><th></th></tr></thead>
-          <tbody id="dis-rows"></tbody></table>
+      <!-- Fallback single upload if no species detected -->
+      <div id="dis-single-upload" style="display:none">
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('f-dis-sheet').click()" style="flex:1">📷 Upload Register / Excel / PDF</button>
+          <button class="btn btn-sec btn-sm" onclick="addDisRow()">+ Manual</button>
+          <input type="file" id="f-dis-sheet" accept="image/*,.pdf,.xlsx,.xls,.csv" multiple onchange="readDisSheet(event)" style="display:none">
         </div>
-        <div class="field" style="margin-bottom:6px"><label>Batch</label>
-          <select id="d-batch" onchange="updateDispatchRate()" style="background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;width:100%;font-size:13px">
-            <option value="">— select batch —</option>
-          </select>
+        <div class="ai-spin-wrap" id="ai-dis"><div class="ai-spin"></div> Reading register…</div>
+        <div id="dis-manual-wrap" style="display:none">
+          <div style="overflow-x:auto;margin-bottom:8px">
+            <table class="dtbl"><thead><tr><th>L mm</th><th>W mm</th><th>T mm</th><th style="color:var(--amber)">Qty</th><th>CFT</th><th>Cost ₹</th><th></th></tr></thead>
+            <tbody id="dis-rows"></tbody></table>
+          </div>
+          <div class="field" style="margin-bottom:6px"><label>Batch</label>
+            <select id="d-batch" onchange="updateDispatchRate()" style="background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;width:100%;font-size:13px">
+              <option value="">— select batch —</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:12px;font-size:12px;color:var(--ink3);flex-wrap:wrap">
+            <span>CFT: <span class="mono" id="d-total-cft">—</span></span>
+            <span>Value: <span class="mono" style="color:var(--wood)" id="d-total-val">—</span></span>
+            <span id="d-total-slabs" style="display:none"></span>
+            <span id="d-vendor-rate" style="display:none"></span>
+            <span id="d-bill-rate" style="display:none"></span>
+          </div>
         </div>
-        <div style="display:flex;gap:12px;font-size:12px;color:var(--ink3);flex-wrap:wrap">
-          <span>Rate: <span class="mono" id="d-vendor-rate">—</span> +₹300 = <span class="mono" style="color:var(--wood)" id="d-bill-rate">—</span></span>
-          <span>CFT: <span class="mono" id="d-total-cft">—</span></span>
-          <span>Value: <span class="mono" style="color:var(--wood)" id="d-total-val">—</span></span>
-          <span id="d-total-slabs" style="display:none"></span>
-        </div>
+      </div>
+      <div id="dis-download-wrap" style="display:none;margin-top:8px">
+        <button class="btn btn-sm" onclick="downloadDispatchAnnexureDraft()" style="width:100%;background:rgba(58,122,176,.15);border:1px solid rgba(58,122,176,.3);color:var(--gas)">📄 Download Slab Annexure — attach to bill</button>
       </div>
     </div>
 
@@ -1171,8 +1176,9 @@ function renderBatches(batches) {
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
         <div class="bi-nums" style="text-align:right">
           <div class="bi-cft">${remCFT} CFT</div>
-          <div class="bi-val">of ${cft} CFT</div>
-          <div class="bi-val">₹${parseInt(b.woodValue||b.taxableValue||0).toLocaleString('en-IN')}</div>
+          <div class="bi-val" style="color:var(--ink3)">of ${cft} total</div>
+          <div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--wood);margin-top:2px">₹${parseInt(b.woodValue||b.taxableValue||0).toLocaleString('en-IN')}</div>
+          <div style="font-size:10px;color:var(--ink3)">wood value</div>
         </div>
         <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
           <button onclick="editBatch('${b.invoiceNo}')" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink2);padding:5px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans)">✏️ Edit</button>
@@ -2927,6 +2933,9 @@ Return ONLY JSON: {"billNo":"XP/001","date":"2026-05-02","species":["Rosewood","
     if (d.billNo) document.getElementById('d-billno').value = d.billNo;
     if (d.date)   document.getElementById('d-date').value = d.date;
     if (d.totalCFT && document.getElementById('d-bill-cft')) document.getElementById('d-bill-cft').value = d.totalCFT;
+    // Store species from cover for Step 2
+    window._coverSpecies = d.species || [];
+    renderDisRegisterUpload();
     // Show summary
     const sumEl = document.getElementById('d-cover-summary');
     const speciesList = (d.species||[]).join(', ') || 'Not detected';
@@ -2942,6 +2951,39 @@ Return ONLY JSON: {"billNo":"XP/001","date":"2026-05-02","species":["Rosewood","
     toast('Cover read failed — fill manually', 'err');
   }
   document.getElementById('f-dis-cover').value = '';
+}
+
+let _selectedRegisterSpecies = '';
+
+function renderDisRegisterUpload() {
+  const species = window._coverSpecies || [];
+  const container = document.getElementById('dis-species-sections');
+  const singleUpload = document.getElementById('dis-single-upload');
+
+  if (!species.length) {
+    // No species from cover — show single upload
+    if (singleUpload) singleUpload.style.display = 'block';
+    return;
+  }
+
+  if (singleUpload) singleUpload.style.display = 'none';
+
+  // Create a section per species if not already exists
+  species.forEach(sp => {
+    if (!disSpeciesGroups[sp]) disSpeciesGroups[sp] = [];
+  });
+  renderDisSpeciesSections();
+}
+
+function selectRegisterSpecies(sp) {
+  _selectedRegisterSpecies = sp;
+  (window._coverSpecies || []).forEach(s => {
+    const btn = document.getElementById('rsp-' + s.replace(/\s/g,'_'));
+    if (btn) {
+      btn.style.background = s === sp ? 'var(--wood)' : '';
+      btn.style.color = s === sp ? 'white' : '';
+    }
+  });
 }
 
 async function readDisSheet(event) {
@@ -3034,63 +3076,149 @@ If you cannot detect species headers, use "Unknown". Never mix species across gr
 function renderDisSpeciesSections() {
   const container = document.getElementById('dis-species-sections');
   const species = Object.keys(disSpeciesGroups);
-  if (!species.length) {
-    container.innerHTML = '';
-    document.getElementById('dis-download-wrap').style.display = 'none';
-    return;
-  }
-  // Show download annexure button
-  document.getElementById('dis-download-wrap').style.display = 'block';
 
-  container.innerHTML = species.map(sp => {
-    const slabs = disSpeciesGroups[sp];
+  // Also show empty sections for species from cover page not yet filled
+  const coverSpecies = window._coverSpecies || [];
+  const allSpecies = [...new Set([...coverSpecies, ...species])];
+
+  if (!allSpecies.length) { container.innerHTML = ''; checkDisCFTMatch(); return; }
+
+  document.getElementById('dis-download-wrap').style.display = allSpecies.some(sp => (disSpeciesGroups[sp]||[]).length) ? 'block' : 'none';
+
+  container.innerHTML = allSpecies.map(sp => {
+    const slabs = disSpeciesGroups[sp] || [];
     const totalCFT = slabs.reduce((s,r) => s+r.cft, 0);
-    // Find matching batch
     const markup = getDisMarkup();
     const matchBatch = ST.batches.find(b => b.species === sp && !b.isCreditNote);
-    const vendorRate = matchBatch ? parseFloat(matchBatch.rateCFT||0) : 0;
+    const vendorRate = matchBatch ? parseFloat(matchBatch.rateCFT||0) || (matchBatch.totalCFT > 0 ? Math.round(parseFloat(matchBatch.woodValue||0)/matchBatch.totalCFT) : 0) : 0;
     const billRate = vendorRate + markup;
     const batchOpts = ST.batches.filter(b => !b.isCreditNote)
-      .map(b => '<option value="'+b.invoiceNo+'"'+(b.invoiceNo===matchBatch?.invoiceNo?' selected':'')+'>'+(b.batchName||b.invoiceNo)+' · '+b.species+' · ₹'+parseFloat(b.rateCFT||0).toFixed(0)+'/CFT</option>')
+      .map(b => '<option value="'+b.invoiceNo+'"'+(b.invoiceNo===matchBatch?.invoiceNo?' selected':'')+'>'+(b.batchName||b.invoiceNo)+' · '+b.species+'</option>')
       .join('');
+    const spId = sp.replace(/\s/g,'_');
+    const fileInputId = 'f-dis-sp-'+spId;
 
-    const billRateCheck = vendorRate > 0
-      ? '<div style="font-size:11px;margin-top:6px;padding:5px 8px;background:var(--bg4);border-radius:3px">' +
-          '₹'+vendorRate.toFixed(0)+' + ₹'+markup+' = <strong style="color:var(--wood)">₹'+billRate.toFixed(0)+'/CFT</strong> bill rate · ' +
-          totalCFT.toFixed(3)+' CFT = <strong style="color:var(--wood)">₹'+Math.round(totalCFT*billRate).toLocaleString('en-IN')+'</strong> expected bill value' +
-        '</div>'
-      : '<div style="font-size:11px;color:var(--ink3);margin-top:4px">⚠ Select batch to verify bill amount</div>';
+    const billRateInfo = vendorRate > 0
+      ? '<div style="font-size:11px;margin-top:4px;color:var(--ink3)">₹'+vendorRate+' + ₹'+markup+' = <strong style="color:var(--wood)">₹'+billRate+'/CFT</strong>' +
+        (slabs.length ? ' · '+totalCFT.toFixed(3)+' CFT = <strong style="color:var(--wood)">₹'+Math.round(totalCFT*billRate).toLocaleString('en-IN')+'</strong>' : '') + '</div>'
+      : '';
 
-    return '<div style="background:var(--bg3);border-radius:var(--r);padding:14px;margin-bottom:12px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
-        '<div>' +
-          '<span class="sp-tag" style="font-size:13px;font-weight:700">' + sp + '</span>' +
-          '<span style="font-size:12px;color:var(--ink3);margin-left:8px">' + slabs.length + ' slabs · ' + totalCFT.toFixed(3) + ' CFT</span>' +
-        '</div>' +
-        '<button onclick="removeDisSpecies(\''+sp+'\')" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:16px">✕</button>' +
+    return '<div style="background:var(--bg4);border-radius:6px;padding:12px;margin-bottom:10px;border:1px solid var(--rule)">' +
+      // Header
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+        '<span style="font-weight:700;font-size:14px;color:var(--wood)">' + sp + '</span>' +
+        (slabs.length ? '<span style="font-size:12px;color:var(--ink3)">' + slabs.length + ' slabs · ' + totalCFT.toFixed(3) + ' CFT</span>' : '<span style="font-size:11px;color:var(--ink3)">No slabs yet</span>') +
       '</div>' +
-      '<div class="field" style="margin-bottom:0">' +
-        '<label style="font-size:10px">Batch for ' + sp + '</label>' +
-        '<select id="dis-batch-'+sp.replace(/\s/g,'_')+'" onchange="renderDisSpeciesSections()" style="background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;width:100%;font-size:13px">' +
-          '<option value="">— select batch —</option>' +
-          batchOpts +
+      // Batch selector
+      '<div class="field" style="margin-bottom:8px">' +
+        '<label style="font-size:10px">Batch</label>' +
+        '<select id="dis-batch-'+spId+'" onchange="renderDisSpeciesSections()" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;width:100%;font-size:13px">' +
+          '<option value="">— select batch —</option>' + batchOpts +
         '</select>' +
-        billRateCheck +
-        (!matchBatch ? '<div style="font-size:11px;color:var(--amber);margin-top:4px">⚠ No batch found for ' + sp + ' — select manually or save without batch</div>' : '') +
+        billRateInfo +
       '</div>' +
+      // Upload + manual buttons
+      '<div style="display:flex;gap:6px;margin-bottom:'+(slabs.length?'8px':'0')+'">' +
+        '<button onclick="document.getElementById(\''+fileInputId+'\').click()" class="btn btn-primary btn-sm" style="flex:1;font-size:11px">📷 Upload Register</button>' +
+        '<button onclick="addDisManualRow(\''+sp+'\')" class="btn btn-sec btn-sm" style="font-size:11px">+ Manual</button>' +
+        '<input type="file" id="'+fileInputId+'" accept="image/*,.pdf,.xlsx,.xls,.csv" multiple onchange="readDisSheetForSpecies(event,\''+sp+'\')" style="display:none">' +
+        (slabs.length ? '<button onclick="removeDisSpecies(\''+sp+'\')" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:16px;padding:0 4px">✕</button>' : '') +
+      '</div>' +
+      // Slab rows for this species
+      (slabs.length ?
+        '<div style="overflow-x:auto">' +
+        '<table style="width:100%;border-collapse:collapse;font-size:12px">' +
+        '<thead><tr style="background:var(--bg3)"><th style="padding:4px 6px;text-align:left;color:var(--ink3)">L</th><th style="padding:4px 6px;color:var(--ink3)">W</th><th style="padding:4px 6px;color:var(--ink3)">T</th><th style="padding:4px 6px;color:var(--ink3)">Qty</th><th style="padding:4px 6px;text-align:right;color:var(--ink3)">CFT</th><th></th></tr></thead><tbody>' +
+        slabs.map((s,i) =>
+          '<tr style="border-bottom:1px solid rgba(255,255,255,.04)">' +
+          '<td style="padding:4px 6px;font-family:var(--mono)">' + s.lengthMM + '</td>' +
+          '<td style="padding:4px 6px;font-family:var(--mono)">' + s.widthMM + '</td>' +
+          '<td style="padding:4px 6px;font-family:var(--mono)">' + s.thickMM + '</td>' +
+          '<td style="padding:4px 6px;font-family:var(--mono);color:var(--amber)">' + (s.qty||1) + '</td>' +
+          '<td style="padding:4px 6px;font-family:var(--mono);color:var(--wood);text-align:right">' + s.cft.toFixed(3) + '</td>' +
+          '<td><button onclick="disSpeciesGroups[\''+sp+'\'].splice('+i+',1);renderDisSpeciesSections()" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:12px;padding:2px 4px">✕</button></td>' +
+          '</tr>'
+        ).join('') +
+        '</tbody></table></div>'
+        : '') +
     '</div>';
-  }).join('') +
-  '<div style="background:var(--bg3);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--ink3)">' +
-    'Total: <span class="mono" style="color:var(--wood);font-weight:600">' +
-    Object.values(disSpeciesGroups).flat().reduce((s,r)=>s+r.cft,0).toFixed(3) + ' CFT</span> · ' +
-    Object.values(disSpeciesGroups).flat().length + ' slabs across ' + species.length + ' species' +
-  '</div>';
-  // Update CFT match check live
+  }).join('');
+
   checkDisCFTMatch();
 }
 
-function removeDisSpecies(sp) {
-  delete disSpeciesGroups[sp];
+function addDisManualRow(sp) {
+  const l = prompt('Length mm:'); if (!l) return;
+  const w = prompt('Width mm:'); if (!w) return;
+  const t = prompt('Thickness mm:'); if (!t) return;
+  const q = parseInt(prompt('Qty (default 1):') || '1') || 1;
+  const cft = Math.round(parseInt(l)*parseInt(w)*parseInt(t)/1e9*35.31466560103903*1000)/1000*q;
+  if (!disSpeciesGroups[sp]) disSpeciesGroups[sp] = [];
+  disSpeciesGroups[sp].push({ lengthMM:parseInt(l), widthMM:parseInt(w), thickMM:parseInt(t), cft, qty:q>1?q:undefined });
+  renderDisSpeciesSections();
+}
+
+async function readDisSheetForSpecies(event, sp) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+  if (!CFG.key) { toast('API key not set', 'err'); return; }
+  document.getElementById('ai-dis')?.classList.add('show');
+  if (!disSpeciesGroups[sp]) disSpeciesGroups[sp] = [];
+
+  for (const file of files) {
+    const isExcel = /\.(xlsx|xls|csv)$/i.test(file.name);
+    if (isExcel) {
+      try {
+        if (!window.XLSX) await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data);
+        for (const sheetName of wb.SheetNames) {
+          const ws = wb.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+          const header = (rows[0]||[]).map(h => String(h||'').toLowerCase());
+          const lIdx = header.findIndex(h => /length|^l$/.test(h));
+          const wIdx = header.findIndex(h => /width|^w$/.test(h));
+          const tIdx = header.findIndex(h => /height|thick|^h$|^t$/.test(h));
+          if (lIdx < 0 || wIdx < 0 || tIdx < 0) continue;
+          rows.slice(1).filter(r => r[lIdx] && r[wIdx] && r[tIdx]).forEach(r => {
+            const l=parseFloat(r[lIdx])||0, w=parseFloat(r[wIdx])||0, t=parseFloat(r[tIdx])||0;
+            if(l&&w&&t) disSpeciesGroups[sp].push({ lengthMM:l, widthMM:w, thickMM:t, cft: Math.round(l*w*t/1e9*35.31466560103903*1000)/1000 });
+          });
+        }
+        toast(sp + ' — Excel read ✓', 'ok');
+      } catch(e) { toast('Excel read failed', 'err'); }
+    } else {
+      // Image/PDF — ask AI just for dimensions, no species detection needed
+      try {
+        const b64 = await toB64(file);
+        const mt = file.type === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
+        const prompt = `This is a slab register page for ${sp} wood. Read every row.
+For each row extract: L (length mm), W (width mm), T/H (thickness mm).
+Return ONLY JSON array: [{"lengthMM":2750,"widthMM":200,"thickMM":50},...]
+No species detection needed — all slabs on this page are ${sp}.`;
+        const resp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+          body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 4000, messages: [{ role: 'user', content: [
+            { type: mt === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: mt, data: b64.split(',')[1] } },
+            { type: 'text', text: prompt }
+          ]}]})
+        });
+        const data = await resp.json();
+        const txt = data.content?.[0]?.text || '[]';
+        const arr = JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim());
+        if (Array.isArray(arr)) {
+          arr.forEach(s => {
+            const cft = Math.round((s.lengthMM*s.widthMM*s.thickMM)/1e9*35.31466560103903*1000)/1000;
+            disSpeciesGroups[sp].push({ lengthMM:s.lengthMM, widthMM:s.widthMM, thickMM:s.thickMM, cft });
+          });
+          toast(sp + ' — ' + arr.length + ' slabs read ✓', 'ok');
+        }
+      } catch(e) { toast('Failed reading ' + sp + ' register', 'err'); }
+    }
+  }
+  document.getElementById('ai-dis')?.classList.remove('show');
+  event.target.value = '';
   renderDisSpeciesSections();
 }
 
