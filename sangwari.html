@@ -961,8 +961,8 @@ select option{background:var(--bg3);color:var(--ink)}
         <div class="field" style="margin-bottom:0"><label>Date</label><input type="date" id="d-date"></div>
       </div>
       <div class="field" style="margin-top:8px;margin-bottom:0">
-        <label>CFT on Bill Cover <span style="color:var(--ink3);font-size:10px">(as printed — we verify against slab totals)</span></label>
-        <input type="number" id="d-bill-cft" step="0.001" placeholder="e.g. 37.479" oninput="checkDisCFTMatch()" style="font-family:var(--mono)">
+        <label>CFT on Bill Cover <span style="color:var(--ink3);font-size:10px">(auto-filled from AI read — override if needed)</span></label>
+        <input type="number" id="d-bill-cft" step="0.001" placeholder="auto-filled from bill" oninput="checkDisCFTMatch()" style="font-family:var(--mono)">
       </div>
       <div id="d-cft-match" style="display:none;margin-top:6px;font-size:12px;padding:6px 10px;border-radius:4px;display:none">
         <div style="display:flex;justify-content:space-between">
@@ -1683,7 +1683,55 @@ function renderDispatches(dispatches) {
         '</div>' +
       '</div>';
   } else if (banner) banner.style.display = 'none';
-  wrap.innerHTML = dispatches.map((d, idx) => {
+  // Group dispatches by month
+  const byMo = {};
+  dispatches.forEach(d => {
+    const mo = (d.date||'').slice(0,7) || 'Unknown';
+    if (!byMo[mo]) byMo[mo] = [];
+    byMo[mo].push(d);
+  });
+  const months = Object.keys(byMo).sort().reverse();
+  const currentMo = new Date().toISOString().slice(0,7);
+
+  wrap.innerHTML = months.map(mo => {
+    const moDispatches = byMo[mo];
+    const moLabel = mo === 'Unknown' ? 'Unknown Date' : monthLabel(mo);
+    const isOpen = mo === currentMo || mo === months[0]; // open current/latest month
+    const moId = 'mo-' + mo.replace('-','');
+    const moCFT = moDispatches.reduce((s,d) => s + parseFloat(d.totalCFT||0), 0);
+    const moVal = moDispatches.reduce((s,d) => s + parseFloat(d.totalValue||0), 0);
+
+    return '<div style="margin-bottom:4px">' +
+      // Month header — collapsible
+      '<div onclick="toggleMonthGroup(\'' + moId + '\')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--bg3);border-radius:6px;cursor:pointer;margin-bottom:4px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span id="' + moId + '-arrow" style="font-size:12px;color:var(--ink3);transition:transform .2s">' + (isOpen ? '▾' : '▸') + '</span>' +
+          '<span style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--ink2)">' + moLabel + '</span>' +
+          '<span style="font-size:11px;color:var(--ink3)">' + moDispatches.length + ' dispatch' + (moDispatches.length>1?'es':'') + '</span>' +
+        '</div>' +
+        '<div style="text-align:right">' +
+          '<div class="mono" style="font-size:13px;font-weight:700;color:var(--wood)">' + moCFT.toFixed(2) + ' CFT</div>' +
+          (moVal > 0 ? '<div style="font-size:10px;color:var(--ink3)">₹' + Math.round(moVal).toLocaleString('en-IN') + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+      // Dispatch tiles for this month
+      '<div id="' + moId + '" style="display:' + (isOpen?'block':'none') + '">' +
+        moDispatches.map((d, idx) => renderDispatchTile(d, mo + '-' + idx)).join('') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleMonthGroup(moId) {
+  const el = document.getElementById(moId);
+  const arrow = document.getElementById(moId + '-arrow');
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.textContent = open ? '▸' : '▾';
+}
+
+function renderDispatchTile(d, idx) {
     const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
     const tag = isHyd
       ? '<span class="badge b-hyd" style="font-size:10px">🏭 via Hyd</span>'
@@ -1774,7 +1822,6 @@ function renderDispatches(dispatches) {
       '</div>' +
       '<div id="dis-'+idx+'" style="display:none;padding:12px 16px;border-top:1px solid var(--rule);color:var(--ink3);font-size:13px">Loading…</div>' +
     '</div>';
-  }).join('');
 }
 
 async function toggleDispatchExpand(id, dispatchId) {
@@ -2323,11 +2370,11 @@ function loadDash() {
     if (!mo || mo < '2026-01') return;
     const sp = d.species || 'Unknown';
     const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
+    const key = sp + '|' + (isHyd ? 'hyd' : 'direct'); // separate key per type
     if (!byMonth[mo]) byMonth[mo] = {};
-    if (!byMonth[mo][sp]) byMonth[mo][sp] = { cft: 0, value: 0, isHyd };
-    byMonth[mo][sp].cft += parseFloat(d.totalCFT || 0);
-    byMonth[mo][sp].value += parseFloat(d.totalValue || 0);
-    if (isHyd) byMonth[mo][sp].isHyd = true;
+    if (!byMonth[mo][key]) byMonth[mo][key] = { sp, cft: 0, value: 0, isHyd };
+    byMonth[mo][key].cft += parseFloat(d.totalCFT || 0);
+    byMonth[mo][key].value += parseFloat(d.totalValue || 0);
   });
 
   const allMonths = [];
@@ -2344,12 +2391,11 @@ function loadDash() {
   const monthEl = document.getElementById('dispatch-this-month');
 
   monthEl.innerHTML = allMonths.map(mo => {
-    const species = Object.entries(byMonth[mo] || {}).sort((a,b) => b[1].cft - a[1].cft);
-    const moTotal = species.reduce((s,[,d]) => s + d.cft, 0);
-    const moValue = species.reduce((s,[,d]) => s + d.value, 0);
-    const hasData = species.length > 0;
+    const entries = Object.entries(byMonth[mo] || {}).sort((a,b) => b[1].cft - a[1].cft);
+    const moTotal = entries.reduce((s,[,d]) => s + d.cft, 0);
+    const moValue = entries.reduce((s,[,d]) => s + d.value, 0);
+    const hasData = entries.length > 0;
     return '<div style="border-bottom:1px solid var(--rule)">' +
-      // Month header
       '<div style="padding:10px 16px 6px;display:flex;justify-content:space-between;align-items:center">' +
         '<span style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--ink3);font-weight:700">' + monthLabel(mo) + '</span>' +
         (hasData
@@ -2359,13 +2405,12 @@ function loadDash() {
             '</div>'
           : '<span style="font-size:11px;color:var(--ink3)">—</span>') +
       '</div>' +
-      // Species rows
       (hasData
         ? '<div style="padding:0 16px 8px">' +
-          species.map(([sp, d]) =>
+          entries.map(([key, d]) =>
             '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0 5px 8px;border-left:2px solid ' + (d.isHyd ? 'var(--gas)' : 'var(--wood)') + ';margin-bottom:4px">' +
               '<div style="display:flex;align-items:center;gap:6px">' +
-                '<span style="font-size:12px;font-weight:600">' + sp + '</span>' +
+                '<span style="font-size:12px;font-weight:600">' + d.sp + '</span>' +
                 (d.isHyd
                   ? '<span style="font-size:9px;color:var(--gas);background:rgba(58,122,176,.15);padding:1px 5px;border-radius:8px">Hyd</span>'
                   : '<span style="font-size:9px;color:var(--wood);background:rgba(192,150,58,.12);padding:1px 5px;border-radius:8px">Direct</span>') +
@@ -2911,17 +2956,32 @@ async function readDisCover(event) {
   try {
     const b64 = await toB64(file);
     const mt = file.type === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
-    const prompt = `This is a dispatch bill or challan cover page from a wood yard. Extract:
-- billNo: bill or challan number
-- date: date in YYYY-MM-DD
-- species: array of wood species mentioned (e.g. ["Rosewood","CP Teak","White Ash"])
-- totalCFT: total CFT on the bill (if shown)
-- vendor: supplier/party name
-Return ONLY JSON: {"billNo":"XP/001","date":"2026-05-02","species":["Rosewood","CP Teak"],"totalCFT":85.4,"vendor":"SS Enterprises"}`;
+    const prompt = `This is a dispatch bill or challan cover page from a wood yard (Xpertpack to Solid Bench).
+Extract ALL line items. Each line item has a species, CFT quantity, rate per CFT, and amount.
+
+Return ONLY JSON:
+{
+  "billNo": "1T262702026",
+  "date": "2026-05-07",
+  "vendor": "SS Enterprises",
+  "lineItems": [
+    {"species": "Rosewood", "cft": 49.967, "rateCFT": 2700, "value": 134911},
+    {"species": "Rosewood-800x200x50", "cft": 56.6, "rateCFT": 2700, "value": 152820}
+  ]
+}
+
+Rules:
+- species: wood type name from the description
+- cft: quantity in CFT for that line
+- rateCFT: rate per CFT (e.g. 2700.00)
+- value: amount for that line (cft × rateCFT)
+- If only one line item, still return as array with one item
+- Use species name as written on bill`;
+
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': CFG.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 500, messages: [{ role: 'user', content: [
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{ role: 'user', content: [
         { type: mt === 'application/pdf' ? 'document' : 'image', source: { type: 'base64', media_type: mt, data: b64.split(',')[1] } },
         { type: 'text', text: prompt }
       ]}]})
@@ -2930,22 +2990,34 @@ Return ONLY JSON: {"billNo":"XP/001","date":"2026-05-02","species":["Rosewood","
     const txt = data.content?.[0]?.text || '{}';
     const d = JSON.parse(txt.replace(/\x60\x60\x60json|\x60\x60\x60/g,'').trim());
     document.getElementById('ai-dis-cover').classList.remove('show');
+
     if (d.billNo) document.getElementById('d-billno').value = d.billNo;
     if (d.date)   document.getElementById('d-date').value = d.date;
-    if (d.totalCFT && document.getElementById('d-bill-cft')) document.getElementById('d-bill-cft').value = d.totalCFT;
-    // Store species from cover for Step 2
-    window._coverSpecies = d.species || [];
+
+    const lineItems = d.lineItems || [];
+    // Store line items for use in species sections
+    window._coverLineItems = lineItems;
+    window._coverSpecies = lineItems.map(l => l.species).filter(Boolean);
+
+    // If single line item, set bill CFT field
+    if (lineItems.length === 1) {
+      document.getElementById('d-bill-cft').value = lineItems[0].cft || '';
+    }
+
     renderDisRegisterUpload();
+
     // Show summary
     const sumEl = document.getElementById('d-cover-summary');
-    const speciesList = (d.species||[]).join(', ') || 'Not detected';
-    sumEl.innerHTML =
-      '✓ Read: <strong>' + (d.billNo||'—') + '</strong> · ' + (d.date||'—') +
-      (d.totalCFT ? ' · <span style="color:var(--wood)"><strong>' + d.totalCFT + ' CFT</strong></span>' : '') +
-      ' · Species: <span style="color:var(--wood)">' + speciesList + '</span>' +
-      (d.vendor ? ' · ' + d.vendor : '');
+    sumEl.innerHTML = '✓ <strong>' + (d.billNo||'—') + '</strong> · ' + (d.date||'—') + '<br>' +
+      lineItems.map(l =>
+        '<span style="color:var(--wood)">' + l.species + '</span>: ' +
+        '<span class="mono">' + (l.cft||'?') + ' CFT</span> × ' +
+        '<span class="mono">₹' + (l.rateCFT||'?') + '</span> = ' +
+        '<span class="mono" style="color:var(--wood);font-weight:600">₹' + Math.round(l.value||0).toLocaleString('en-IN') + '</span>'
+      ).join('<br>') +
+      (d.vendor ? '<br><span style="color:var(--ink3)">' + d.vendor + '</span>' : '');
     sumEl.style.display = 'block';
-    toast('Cover read ✓ — now upload register photos', 'ok');
+    toast('Cover read ✓ — ' + lineItems.length + ' line item(s) found', 'ok');
   } catch(e) {
     document.getElementById('ai-dis-cover').classList.remove('show');
     toast('Cover read failed — fill manually', 'err');
@@ -3092,6 +3164,13 @@ function renderDisSpeciesSections() {
     const matchBatch = ST.batches.find(b => b.species === sp && !b.isCreditNote);
     const vendorRate = matchBatch ? parseFloat(matchBatch.rateCFT||0) || (matchBatch.totalCFT > 0 ? Math.round(parseFloat(matchBatch.woodValue||0)/matchBatch.totalCFT) : 0) : 0;
     const billRate = vendorRate + markup;
+
+    // Get line item data from cover page read
+    const lineItems = window._coverLineItems || [];
+    const lineItem = lineItems.find(l => l.species === sp) || lineItems.find(l => (l.species||'').toLowerCase().includes(sp.toLowerCase().split(' ')[0]));
+    const liBillCFT = lineItem?.cft || 0;
+    const liValue = lineItem?.value || 0;
+    const liRate = lineItem?.rateCFT || 0;
     const batchOpts = ST.batches.filter(b => !b.isCreditNote)
       .map(b => '<option value="'+b.invoiceNo+'"'+(b.invoiceNo===matchBatch?.invoiceNo?' selected':'')+'>'+(b.batchName||b.invoiceNo)+' · '+b.species+'</option>')
       .join('');
@@ -3107,7 +3186,10 @@ function renderDisSpeciesSections() {
       // Header
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
         '<span style="font-weight:700;font-size:14px;color:var(--wood)">' + sp + '</span>' +
-        (slabs.length ? '<span style="font-size:12px;color:var(--ink3)">' + slabs.length + ' slabs · ' + totalCFT.toFixed(3) + ' CFT</span>' : '<span style="font-size:11px;color:var(--ink3)">No slabs yet</span>') +
+        '<div style="text-align:right">' +
+          (slabs.length ? '<span style="font-size:12px;color:var(--ink3)">' + slabs.length + ' slabs · ' + totalCFT.toFixed(3) + ' CFT</span>' : '<span style="font-size:11px;color:var(--ink3)">No slabs yet</span>') +
+          (liBillCFT ? '<div style="font-size:11px;color:var(--ink3)">Bill: <span class="mono" style="color:var(--wood)">' + liBillCFT + ' CFT</span> · <span class="mono" style="color:var(--wood)">₹' + Math.round(liValue).toLocaleString('en-IN') + '</span> @ ₹' + liRate + '/CFT</div>' : '') +
+        '</div>' +
       '</div>' +
       // Batch selector
       '<div class="field" style="margin-bottom:8px">' +
@@ -3302,19 +3384,26 @@ async function saveDispatch() {
       const slabs = disSpeciesGroups[sp];
       if (!slabs.length) continue;
       const b = ST.batches.find(x => x.invoiceNo === invoiceNo);
-      const billRate = (b ? parseFloat(b.rateCFT||0) : 0) + CFG.markup;
+      const vendorRate = b ? parseFloat(b.rateCFT||0) || (b.totalCFT > 0 ? Math.round(parseFloat(b.woodValue||0)/b.totalCFT) : 0) : 0;
+      const billRate = vendorRate + CFG.markup;
       const slabsWithCost = slabs.map(s => ({ ...s, cbm: (s.lengthMM*s.widthMM*s.thickMM)/1e9, cost: s.cft*billRate, billRate }));
       const totalCFT = Math.round(slabs.reduce((s,r)=>s+r.cft,0)*1000)/1000;
+
+      // Use line item data from cover read
+      const lineItems = window._coverLineItems || [];
+      const li = lineItems.find(l => l.species === sp) || lineItems.find(l => (l.species||'').toLowerCase().includes(sp.toLowerCase().split(' ')[0]));
+      const billCFT = li?.cft || parseFloat(document.getElementById('d-bill-cft')?.value) || 0;
+      const totalValue = li?.value ? Math.round(li.value) : Math.round(totalCFT * billRate);
       try {
         const r = await apiPost({ action: 'saveSWDispatch', data: {
           billNo, date, invoiceNo: invoiceNo || sp + '-' + date,
           species: sp, vendor: b?.vendor || '',
           slabs: slabsWithCost, totalCFT,
-          totalValue: Math.round(totalCFT * billRate),
+          totalValue,
           markupTier: getDisMarkup(),
           financedByXP: disFinanced,
           seasonedByXP: disSeasoned,
-          billCFT: parseFloat(document.getElementById('d-bill-cft')?.value) || 0,
+          billCFT,
           notes: notesWithBillCFT
         }});
         if (r.success) {
