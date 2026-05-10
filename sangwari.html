@@ -271,6 +271,11 @@ select option{background:var(--bg3);color:var(--ink)}
       </div>
 
       <div class="card">
+        <div class="card-head"><span class="card-title">📦 FY 2025-26 Inventory</span></div>
+        <div id="closing-inv-list"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
+      </div>
+
+      <div class="card">
         <div id="species-list"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
       </div>
 
@@ -2357,11 +2362,11 @@ function loadDash() {
   const now = new Date();
   const thisMonLabel = now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
 
-  function monthLabel(ym) {
-    const [y, m] = ym.split('-');
-    return new Date(parseInt(y), parseInt(m)-1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-  }
-
+function monthLabel(ym) {
+  if (!ym || ym.length < 7) return ym;
+  const [y, m] = ym.split('-');
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1] + ' ' + y;
+}
   document.getElementById('dispatch-month-label').textContent = 'Jan 2026 – ' + thisMonLabel;
 
   const byMonth = {};
@@ -2370,11 +2375,12 @@ function loadDash() {
     if (!mo || mo < '2026-01') return;
     const sp = d.species || 'Unknown';
     const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
-    const key = sp + '|' + (isHyd ? 'hyd' : 'direct'); // separate key per type
+    const key = sp + '|' + (isHyd ? 'hyd' : 'direct');
     if (!byMonth[mo]) byMonth[mo] = {};
-    if (!byMonth[mo][key]) byMonth[mo][key] = { sp, cft: 0, value: 0, isHyd };
+    if (!byMonth[mo][key]) byMonth[mo][key] = { sp, cft: 0, value: 0, slabs: 0, isHyd };
     byMonth[mo][key].cft += parseFloat(d.totalCFT || 0);
     byMonth[mo][key].value += parseFloat(d.totalValue || 0);
+    byMonth[mo][key].slabs += parseInt(d.slabCount || 0);
   });
 
   const allMonths = [];
@@ -2414,6 +2420,7 @@ function loadDash() {
                 (d.isHyd
                   ? '<span style="font-size:9px;color:var(--gas);background:rgba(58,122,176,.15);padding:1px 5px;border-radius:8px">Hyd</span>'
                   : '<span style="font-size:9px;color:var(--wood);background:rgba(192,150,58,.12);padding:1px 5px;border-radius:8px">Direct</span>') +
+                (d.slabs > 0 ? '<span style="font-size:10px;color:var(--ink3)">' + d.slabs + ' slabs</span>' : '') +
               '</div>' +
               '<div style="text-align:right;line-height:1.3">' +
                 '<span class="mono" style="font-size:12px;font-weight:600;color:var(--ink)">' + d.cft.toFixed(2) + ' CFT</span>' +
@@ -2434,7 +2441,49 @@ function loadDash() {
     '</div>' +
   '</div>';
 
-  document.getElementById('dispatch-history-btn').style.display = 'none';
+  // FY Inventory — Opening 31 Mar 2025 and Closing 31 Mar 2026
+  const fyCalc = (cutoffDate) => {
+    const bySpecies = {};
+    ST.batches.filter(b => !b.isCreditNote && b.date <= cutoffDate).forEach(b => {
+      const sp = b.species || 'Unknown';
+      if (!bySpecies[sp]) bySpecies[sp] = { purchased: 0, dispatched: 0 };
+      bySpecies[sp].purchased += parseFloat(b.totalCFT || 0);
+    });
+    ST.dispatches.filter(d => d.date <= cutoffDate).forEach(d => {
+      const sp = d.species || 'Unknown';
+      if (!bySpecies[sp]) bySpecies[sp] = { purchased: 0, dispatched: 0 };
+      bySpecies[sp].dispatched += parseFloat(d.billCFT || d.totalCFT || 0);
+    });
+    const total = Object.values(bySpecies).reduce((s,v) => s + Math.max(0, v.purchased - v.dispatched), 0);
+    return { bySpecies, total };
+  };
+
+  const opening = fyCalc('2025-03-31');
+  const closing = fyCalc('2026-03-31');
+  const allSpecies = [...new Set([...Object.keys(opening.bySpecies), ...Object.keys(closing.bySpecies)])].sort();
+
+  const closingEl = document.getElementById('closing-inv-list');
+  if (closingEl) {
+    closingEl.innerHTML =
+      // Header row
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:8px 16px;background:var(--bg3);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);font-weight:600">' +
+        '<div>Species</div><div style="text-align:right">Opening<br><span style="font-size:9px;font-weight:400">31 Mar 2025</span></div><div style="text-align:right">Closing<br><span style="font-size:9px;font-weight:400">31 Mar 2026</span></div>' +
+      '</div>' +
+      allSpecies.map(sp => {
+        const o = Math.max(0, (opening.bySpecies[sp]?.purchased||0) - (opening.bySpecies[sp]?.dispatched||0));
+        const c = Math.max(0, (closing.bySpecies[sp]?.purchased||0) - (closing.bySpecies[sp]?.dispatched||0));
+        return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 16px;border-bottom:1px solid var(--rule);align-items:center">' +
+          '<div style="font-size:13px;font-weight:600">' + sp + '</div>' +
+          '<div style="text-align:right;font-family:var(--mono);font-size:13px;color:' + (o>0?'var(--wood)':'var(--ink3)') + '">' + (o>0?o.toFixed(2):'—') + '</div>' +
+          '<div style="text-align:right;font-family:var(--mono);font-size:13px;font-weight:700;color:' + (c>0?'var(--wood)':'var(--ink3)') + '">' + (c>0?c.toFixed(2):'—') + '</div>' +
+        '</div>';
+      }).join('') +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 16px;background:var(--bg3);font-weight:600">' +
+        '<span style="font-size:12px">Total</span>' +
+        '<span style="text-align:right;font-family:var(--mono);color:var(--wood)">' + (opening.total>0?opening.total.toFixed(2):'—') + '</span>' +
+        '<span style="text-align:right;font-family:var(--mono);color:var(--wood);font-size:15px">' + closing.total.toFixed(2) + ' CFT</span>' +
+      '</div>';
+  }
 
   // Species breakdown
   // Build species status map from slab data
