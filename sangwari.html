@@ -1121,7 +1121,9 @@ async function apiGet(p) {
   if (!CFG.url) throw new Error('No URL');
   const qs = Object.entries(p).map(([k,v]) => k + '=' + encodeURIComponent(v)).join('&');
   const r = await fetch(CFG.url + '?' + qs);
-  return r.json();
+  const text = await r.text();
+  console.log('apiGet ←', p.action, 'raw:', text.slice(0, 200));
+  try { return JSON.parse(text); } catch(e) { throw new Error('Non-JSON: ' + text.slice(0,100)); }
 }
 async function apiPost(d) {
   if (!CFG.url) throw new Error('No URL');
@@ -1648,9 +1650,15 @@ async function loadDispatches() {
   if (!CFG.url) { renderDispatches([]); return; }
   try {
     const r = await apiGet({ action: 'getSWDispatches' });
+    console.log('loadDispatches:', r.dispatches?.length, 'dispatches');
     ST.dispatches = r.dispatches || [];
     renderDispatches(ST.dispatches);
-  } catch(e) { renderDispatches([]); }
+  } catch(e) {
+    console.error('loadDispatches error:', e);
+    // Use cached data if available
+    if (ST.dispatches?.length) renderDispatches(ST.dispatches);
+    else renderDispatches([]);
+  }
 }
 
 function renderDispatches(dispatches) {
@@ -1683,23 +1691,20 @@ function renderDispatches(dispatches) {
     '</div>';
   } else if (banner) banner.style.display = 'none';
 
-  // Month tabs
+  // Build filter UI and render
   window._allDispatches = dispatches;
-  const months = [...new Set(dispatches.map(d => (d.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
-  const species = [...new Set(dispatches.map(d => d.species).filter(Boolean))].sort();
-  window._disMonths = months;
-
-  const tabs = '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">' +
-    '<button onclick="setDisTab()" id="dis-tab-all" class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:var(--wood);color:white;border:none">All</button>' +
-    months.map(m => '<button onclick="setDisTab(\''+m+'\')" id="dis-tab-'+m+'" class="btn btn-sec btn-sm" style="font-size:11px;padding:4px 10px">' + monthLabel(m) + '</button>').join('') +
-  '</div>' +
-  '<select id="dis-filter-sp" onchange="applyDisFilter()" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink);padding:5px 8px;border-radius:4px;font-size:12px;margin-bottom:10px">' +
-    '<option value="">All species</option>' + species.map(s => '<option value="'+s+'">'+s+'</option>').join('') +
-  '</select>';
-
-  wrap.innerHTML = tabs + '<div id="dis-tiles"></div>';
   window._disActiveMo = '';
-  applyDisFilter();
+  window._disMonths = [...new Set(dispatches.map(d => (d.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
+  const species = [...new Set(dispatches.map(d => d.species).filter(Boolean))].sort();
+
+  const tabs =
+    '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">' +
+      '<button onclick="setDisTab()" id="dis-tab-all" class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:var(--wood);color:white;border:none">All</button>' +
+      window._disMonths.map(m => '<button onclick="setDisTab(\''+m+'\')" id="dis-tab-'+m+'" class="btn btn-sec btn-sm" style="font-size:11px;padding:4px 10px">'+monthLabel(m)+'</button>').join('') +
+    '</div>' +
+    (species.length > 1 ? '<select id="dis-filter-sp" onchange="applyDisFilter()" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink);padding:5px 8px;border-radius:4px;font-size:12px;margin-bottom:10px"><option value="">All species</option>' + species.map(s=>'<option value="'+s+'">'+s+'</option>').join('') + '</select>' : '<div id="dis-filter-sp" style="display:none"></div>');
+
+  wrap.innerHTML = tabs + '<div id="dis-tiles">' + dispatches.map((d,i) => renderDispatchTile(d,i)).join('') + '</div>';
 }
 
 function setDisTab(mo) {
@@ -1727,7 +1732,10 @@ function applyDisFilter() {
   if (!tilesEl) return;
   try {
     tilesEl.innerHTML = filtered.length
-      ? filtered.map((d,idx) => renderDispatchTile(d, idx)).join('')
+      ? filtered.map((d,idx) => {
+          try { return renderDispatchTile(d, idx); }
+          catch(e) { return '<div style="padding:10px 16px;color:var(--red);font-size:11px;border-bottom:1px solid var(--rule)">⚠ Error rendering ' + (d.dispatchId||'?') + ': ' + e.message + '</div>'; }
+        }).join('')
       : '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No dispatches for this filter</div>';
   } catch(e) {
     tilesEl.innerHTML = '<div style="padding:16px;color:var(--red);font-size:12px">Error: ' + e.message + '</div>';
