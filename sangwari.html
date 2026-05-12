@@ -1704,7 +1704,12 @@ function renderDispatches(dispatches) {
     '</div>' +
     (species.length > 1 ? '<select id="dis-filter-sp" onchange="applyDisFilter()" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink);padding:5px 8px;border-radius:4px;font-size:12px;margin-bottom:10px"><option value="">All species</option>' + species.map(s=>'<option value="'+s+'">'+s+'</option>').join('') + '</select>' : '<div id="dis-filter-sp" style="display:none"></div>');
 
-  wrap.innerHTML = tabs + '<div id="dis-tiles">' + dispatches.map((d,i) => renderDispatchTile(d,i)).join('') + '</div>';
+  wrap.innerHTML = tabs + '<div id="dis-tiles">' + 
+    dispatches.map((d,i) => {
+      try { return renderDispatchTile(d,i); }
+      catch(e) { console.error('tile error', d.dispatchId, e); return '<div style="padding:10px 16px;color:var(--red);font-size:11px;border-bottom:1px solid var(--rule)">⚠ '+d.dispatchId+': '+e.message+'</div>'; }
+    }).join('') + 
+  '</div>';
 }
 
 function setDisTab(mo) {
@@ -2282,6 +2287,10 @@ async function markAsOpeningStock(invoiceNo, species) {
 
 // ── DASHBOARD ──
 function loadDash() {
+  try { _loadDash(); } catch(e) { console.error('loadDash crash:', e); }
+}
+
+function _loadDash() {
   // Total stock from batches (source of truth — always populated)
   const totalCFT = ST.batches.reduce((s, b) => s + parseFloat(b.remainingCFT || b.totalCFT || 0), 0);
   const totalValue = ST.batches.reduce((s, b) => s + parseFloat(b.woodValue || b.taxableValue || 0), 0);
