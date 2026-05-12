@@ -283,6 +283,11 @@ select option{background:var(--bg3);color:var(--ink)}
         <div class="card-head"><span class="card-title">📋 Stock by Bill — Remaining CFT</span></div>
         <div id="attention-list"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
       </div>
+
+      <div class="card">
+        <div class="card-head"><span class="card-title">💼 Xpertpack Exposure</span></div>
+        <div id="xp-exposure"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
+      </div>
     </div>
 
     <!-- INVENTORY (Slab level with seasoning) -->
@@ -2632,6 +2637,80 @@ function monthLabel(ym) {
       '</div>' +
     '</div>';
   }).join('') || '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No active batches</div>';
+
+  // XP Exposure
+  const xpEl = document.getElementById('xp-exposure');
+  if (xpEl) {
+    const xpBatches = ST.batches.filter(b => !b.isCreditNote);
+    const totalSpent = xpBatches.reduce((s,b) => s + parseFloat(b.woodValue || b.taxableValue || 0), 0);
+    const xpDispatches = ST.dispatches;
+    const totalBilled = xpDispatches.reduce((s,d) => s + parseFloat(d.totalValue || 0), 0);
+    const billedCFT = xpDispatches.reduce((s,d) => s + parseFloat(d.billCFT || d.totalCFT || 0), 0);
+    const woodCostDispatched = xpDispatches.reduce((s,d) => {
+      const b = ST.batches.find(x => x.invoiceNo === d.invoiceNo);
+      const rate = b ? (parseFloat(b.rateCFT||0) || (parseFloat(b.totalCFT||0)>0 ? parseFloat(b.woodValue||0)/parseFloat(b.totalCFT) : 0)) : 0;
+      return s + parseFloat(d.billCFT||d.totalCFT||0) * rate;
+    }, 0);
+    const pendingCFT = xpBatches.reduce((s,b) => {
+      const dispatched = xpDispatches.filter(d => d.invoiceNo === b.invoiceNo).reduce((x,d) => x + parseFloat(d.billCFT||d.totalCFT||0), 0);
+      return s + Math.max(0, parseFloat(b.totalCFT||0) - dispatched);
+    }, 0);
+    const pendingValue = xpBatches.reduce((s,b) => {
+      const dispatched = xpDispatches.filter(d => d.invoiceNo === b.invoiceNo).reduce((x,d) => x + parseFloat(d.billCFT||d.totalCFT||0), 0);
+      const remaining = Math.max(0, parseFloat(b.totalCFT||0) - dispatched);
+      const rate = parseFloat(b.rateCFT||0) || (parseFloat(b.totalCFT||0)>0 ? parseFloat(b.woodValue||0)/parseFloat(b.totalCFT) : 0);
+      return s + remaining * (rate + 300);
+    }, 0);
+    const margin = totalBilled - woodCostDispatched;
+    const fmt = v => '₹' + Math.round(v).toLocaleString('en-IN');
+
+    // KPI calculations
+    const totalPurchasedCFT = xpBatches.reduce((s,b) => s + parseFloat(b.totalCFT||0), 0);
+    const pctDispatched = totalPurchasedCFT > 0 ? billedCFT / totalPurchasedCFT * 100 : 0;
+    const marginPct = totalBilled > 0 ? margin / totalBilled * 100 : 0;
+    // Seasoned CFT from slab sheet
+    const seasonedCFT = ST.slabs.filter(s => s.status === 'Seasoned').reduce((s,x) => s + parseFloat(x.cft||0), 0);
+    // Also add batch-level seasoned (no slabs entered)
+    const batchSeasonedCFT = xpBatches.filter(b => b.seasoningStatus === 'Seasoned' && !ST.slabs.some(s => s.invoiceNo === b.invoiceNo)).reduce((s,b) => {
+      const dispatched = xpDispatches.filter(d => d.invoiceNo === b.invoiceNo).reduce((x,d) => x + parseFloat(d.billCFT||d.totalCFT||0), 0);
+      return s + Math.max(0, parseFloat(b.totalCFT||0) - dispatched);
+    }, 0);
+    const totalSeasonedCFT = seasonedCFT + batchSeasonedCFT;
+    const currentStock = pendingCFT; // what's left undispatched
+    const pctSeasoned = currentStock > 0 ? totalSeasonedCFT / currentStock * 100 : 0;
+    const pctSeasonedHolding = currentStock > 0 ? totalSeasonedCFT / currentStock * 100 : 0; // seasoned but not yet dispatched
+
+    const kpi = (label, val, color, sub) =>
+      '<div style="background:var(--bg3);border-radius:6px;padding:8px 10px;flex:1;min-width:80px">' +
+        '<div class="mono" style="font-size:18px;font-weight:700;color:' + color + '">' + val + '</div>' +
+        '<div style="font-size:10px;color:var(--ink3);margin-top:2px;line-height:1.3">' + label + '</div>' +
+        (sub ? '<div style="font-size:9px;color:var(--ink3)">' + sub + '</div>' : '') +
+      '</div>';
+
+    const row = (label, val, sub, col) =>
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--rule)">' +
+        '<div><div style="font-size:13px;font-weight:500">' + label + '</div>' +
+        (sub ? '<div style="font-size:11px;color:var(--ink3);margin-top:1px">' + sub + '</div>' : '') + '</div>' +
+        '<div class="mono" style="font-size:15px;font-weight:700;color:' + (col||'var(--ink)') + '">' + fmt(val) + '</div>' +
+      '</div>';
+
+    xpEl.innerHTML =
+      // KPI chips
+      '<div style="display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--rule);flex-wrap:wrap">' +
+        kpi('Dispatched', pctDispatched.toFixed(0)+'%', pctDispatched>60?'var(--seasoned)':'var(--amber)', billedCFT.toFixed(1)+' of '+totalPurchasedCFT.toFixed(1)+' CFT') +
+        kpi('Margin', marginPct.toFixed(1)+'%', marginPct>10?'var(--seasoned)':'var(--amber)', 'on billed value') +
+        kpi('Seasoned', pctSeasoned.toFixed(0)+'%', pctSeasoned>50?'var(--seasoned)':'var(--amber)', 'of current stock') +
+        kpi('Waiting for SB', pctSeasonedHolding.toFixed(0)+'%', pctSeasonedHolding>40?'var(--red)':'var(--amber)', 'seasoned, not billed') +
+      '</div>' +
+      row('Wood Cost (all batches)', totalSpent, xpBatches.length + ' batches', 'var(--ink)') +
+      row('Billed to Solid Bench', totalBilled, billedCFT.toFixed(2) + ' CFT · ' + xpDispatches.length + ' dispatches', 'var(--seasoned)') +
+      row('Pending to Bill', pendingValue, pendingCFT.toFixed(2) + ' CFT in stock', 'var(--amber)') +
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--bg3)">' +
+        '<div><div style="font-size:13px;font-weight:600">Margin Earned</div>' +
+        '<div style="font-size:11px;color:var(--ink3)">Billed − wood cost of dispatched</div></div>' +
+        '<div class="mono" style="font-size:16px;font-weight:700;color:' + (margin>=0?'var(--seasoned)':'var(--red)') + '">' + fmt(margin) + '</div>' +
+      '</div>';
+  }
 }
 
 let currentSort = 'date';
