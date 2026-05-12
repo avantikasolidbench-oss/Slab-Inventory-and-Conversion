@@ -271,7 +271,7 @@ select option{background:var(--bg3);color:var(--ink)}
       </div>
 
       <div class="card">
-        <div class="card-head"><span class="card-title">📦 FY 2025-26 Inventory</span></div>
+        <div class="card-head"><span class="card-title">📦 FY Inventory</span></div>
         <div id="closing-inv-list"><div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">Loading…</div></div>
       </div>
 
@@ -1651,6 +1651,7 @@ async function loadDispatches() {
 function renderDispatches(dispatches) {
   const wrap = document.getElementById('dispatch-list-wrap');
   const banner = document.getElementById('dispatch-recon-banner');
+
   if (!dispatches.length) {
     wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">No dispatches yet</div>';
     if (banner) banner.style.display = 'none';
@@ -1674,67 +1675,62 @@ function renderDispatches(dispatches) {
       '<div style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">' +
         '<div>' +
           '<div style="font-size:12px;font-weight:600;color:'+(ok?'var(--seasoned)':'var(--red)')+';margin-bottom:4px">' +
-            (ok ? '✓ Overall CFT within 2% tolerance' : '⚠ CFT variance >2% — consider bill correction') +
+            (ok ? '\u2713 Overall CFT within 2% tolerance' : '\u26A0 CFT variance >2% — consider bill correction') +
           '</div>' +
           '<div style="display:flex;gap:16px;font-size:12px;flex-wrap:wrap">' +
             '<span style="color:var(--ink3)">Bill total: <b class="mono">' + totalBillCFT.toFixed(3) + ' CFT</b></span>' +
             '<span style="color:var(--ink3)">Slab total: <b class="mono">' + totalSlabCFT.toFixed(3) + ' CFT</b></span>' +
-            '<span style="color:'+(ok?'var(--seasoned)':'var(--red)')+'">Δ <b class="mono">' + (delta>0?'+':'') + delta.toFixed(3) + ' (' + (delta>0?'+':'') + deltaPct.toFixed(1) + '%)</b></span>' +
+            '<span style="color:'+(ok?'var(--seasoned)':'var(--red)')+'">\u0394 <b class="mono">' + (delta>0?'+':'') + delta.toFixed(3) + ' (' + (delta>0?'+':'') + deltaPct.toFixed(1) + '%)</b></span>' +
           '</div>' +
         '</div>' +
         '<div style="text-align:right">' +
           '<div style="font-size:10px;color:var(--ink3)">Total Billed</div>' +
-          '<div class="mono" style="font-size:16px;font-weight:700;color:var(--wood)">₹' + Math.round(totalBillValue).toLocaleString('en-IN') + '</div>' +
+          '<div class="mono" style="font-size:16px;font-weight:700;color:var(--wood)">\u20B9' + Math.round(totalBillValue).toLocaleString('en-IN') + '</div>' +
         '</div>' +
       '</div>';
   } else if (banner) banner.style.display = 'none';
-  // Group dispatches by month
-  const byMo = {};
-  dispatches.forEach(d => {
-    const mo = (d.date||'').slice(0,7) || 'Unknown';
-    if (!byMo[mo]) byMo[mo] = [];
-    byMo[mo].push(d);
-  });
-  const months = Object.keys(byMo).sort().reverse();
-  const currentMo = new Date().toISOString().slice(0,7);
 
-  wrap.innerHTML = months.map(mo => {
-    const moDispatches = byMo[mo];
-    const moLabel = mo === 'Unknown' ? 'Unknown Date' : monthLabel(mo);
-    const isOpen = mo === currentMo || mo === months[0]; // open current/latest month
-    const moId = 'mo-' + mo.replace('-','');
-    const moCFT = moDispatches.reduce((s,d) => s + parseFloat(d.totalCFT||0), 0);
-    const moVal = moDispatches.reduce((s,d) => s + parseFloat(d.totalValue||0), 0);
-
-    return '<div style="margin-bottom:4px">' +
-      // Month header — collapsible
-      '<div onclick="toggleMonthGroup(\'' + moId + '\')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--bg3);border-radius:6px;cursor:pointer;margin-bottom:4px">' +
-        '<div style="display:flex;align-items:center;gap:8px">' +
-          '<span id="' + moId + '-arrow" style="font-size:12px;color:var(--ink3);transition:transform .2s">' + (isOpen ? '▾' : '▸') + '</span>' +
-          '<span style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--ink2)">' + moLabel + '</span>' +
-          '<span style="font-size:11px;color:var(--ink3)">' + moDispatches.length + ' dispatch' + (moDispatches.length>1?'es':'') + '</span>' +
-        '</div>' +
-        '<div style="text-align:right">' +
-          '<div class="mono" style="font-size:13px;font-weight:700;color:var(--wood)">' + moCFT.toFixed(2) + ' CFT</div>' +
-          (moVal > 0 ? '<div style="font-size:10px;color:var(--ink3)">₹' + Math.round(moVal).toLocaleString('en-IN') + '</div>' : '') +
-        '</div>' +
-      '</div>' +
-      // Dispatch tiles for this month
-      '<div id="' + moId + '" style="display:' + (isOpen?'block':'none') + '">' +
-        moDispatches.map((d, idx) => renderDispatchTile(d, mo + '-' + idx)).join('') +
-      '</div>' +
+  // Filter bar
+  const months = [...new Set(dispatches.map(d => (d.date||'').slice(0,7)).filter(Boolean))].sort().reverse();
+  const species = [...new Set(dispatches.map(d => d.species).filter(Boolean))].sort();
+  const filterBar =
+    '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">' +
+      '<select id="dis-filter-mo" onchange="applyDisFilter()" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink);padding:6px 10px;border-radius:4px;font-size:12px">' +
+        '<option value="">All months</option>' +
+        months.map(m => '<option value="'+m+'">'+monthLabel(m)+'</option>').join('') +
+      '</select>' +
+      '<select id="dis-filter-sp" onchange="applyDisFilter()" style="background:var(--bg3);border:1px solid var(--rule);color:var(--ink);padding:6px 10px;border-radius:4px;font-size:12px">' +
+        '<option value="">All species</option>' +
+        species.map(s => '<option value="'+s+'">'+s+'</option>').join('') +
+      '</select>' +
+      '<span style="font-size:11px;color:var(--ink3)" id="dis-filter-count">' + dispatches.length + ' dispatches</span>' +
     '</div>';
-  }).join('');
+  wrap.innerHTML = filterBar + '<div id="dis-tiles"></div>';
+  window._allDispatches = dispatches;
+  applyDisFilter();
 }
 
-function toggleMonthGroup(moId) {
-  const el = document.getElementById(moId);
-  const arrow = document.getElementById(moId + '-arrow');
-  if (!el) return;
-  const open = el.style.display !== 'none';
-  el.style.display = open ? 'none' : 'block';
-  if (arrow) arrow.textContent = open ? '▸' : '▾';
+function applyDisFilter() {
+  const mo = document.getElementById('dis-filter-mo')?.value || '';
+  const sp = document.getElementById('dis-filter-sp')?.value || '';
+  const all = window._allDispatches || [];
+  const filtered = all.filter(d =>
+    (!mo || (d.date||'').startsWith(mo)) &&
+    (!sp || d.species === sp)
+  );
+  const countEl = document.getElementById('dis-filter-count');
+  if (countEl) countEl.textContent = filtered.length + ' dispatch' + (filtered.length!==1?'es':'');
+  const tilesEl = document.getElementById('dis-tiles');
+  if (!tilesEl) return;
+  try {
+    tilesEl.innerHTML = filtered.map((d,idx) => renderDispatchTile(d, idx)).join('');
+  } catch(e) {
+    console.error('renderDispatchTile error:', e);
+    tilesEl.innerHTML = '<div style="padding:16px;color:var(--red);font-size:12px">Error rendering tiles: ' + e.message + '</div>';
+  }
 }
+
+
 
 function renderDispatchTile(d, idx) {
     const isHyd = d.dispatchType === 'hyd_to_sb' || (d.notes||'').includes('[Hyd→SB]');
@@ -2362,6 +2358,15 @@ function loadDash() {
   const now = new Date();
   const thisMonLabel = now.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
 
+function toggleInvSpecies(id) {
+  const el = document.getElementById(id);
+  const arr = document.getElementById(id + '-arr');
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (arr) arr.textContent = open ? '▸' : '▾';
+}
+
 function monthLabel(ym) {
   if (!ym || ym.length < 7) return ym;
   const [y, m] = ym.split('-');
@@ -2465,23 +2470,51 @@ function monthLabel(ym) {
   const closingEl = document.getElementById('closing-inv-list');
   if (closingEl) {
     closingEl.innerHTML =
-      // Header row
+      // Section header row
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:8px 16px;background:var(--bg3);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);font-weight:600">' +
-        '<div>Species</div><div style="text-align:right">Opening<br><span style="font-size:9px;font-weight:400">31 Mar 2025</span></div><div style="text-align:right">Closing<br><span style="font-size:9px;font-weight:400">31 Mar 2026</span></div>' +
+        '<div>Species</div>' +
+        '<div style="text-align:right">Opening<br><span style="font-weight:400">31 Mar 2025</span></div>' +
+        '<div style="text-align:right">Closing<br><span style="font-weight:400">31 Mar 2026</span></div>' +
       '</div>' +
       allSpecies.map(sp => {
-        const o = Math.max(0, (opening.bySpecies[sp]?.purchased||0) - (opening.bySpecies[sp]?.dispatched||0));
-        const c = Math.max(0, (closing.bySpecies[sp]?.purchased||0) - (closing.bySpecies[sp]?.dispatched||0));
-        return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 16px;border-bottom:1px solid var(--rule);align-items:center">' +
-          '<div style="font-size:13px;font-weight:600">' + sp + '</div>' +
-          '<div style="text-align:right;font-family:var(--mono);font-size:13px;color:' + (o>0?'var(--wood)':'var(--ink3)') + '">' + (o>0?o.toFixed(2):'—') + '</div>' +
-          '<div style="text-align:right;font-family:var(--mono);font-size:13px;font-weight:700;color:' + (c>0?'var(--wood)':'var(--ink3)') + '">' + (c>0?c.toFixed(2):'—') + '</div>' +
+        const ov = opening.bySpecies[sp] || { purchased: 0, dispatched: 0 };
+        const cv = closing.bySpecies[sp] || { purchased: 0, dispatched: 0 };
+        const o = Math.max(0, ov.purchased - ov.dispatched);
+        const c = Math.max(0, cv.purchased - cv.dispatched);
+        const spId = 'inv-sp-' + sp.replace(/\s/g,'_');
+        // Estimate value: use average rate from batches for that species
+        const spBatches = ST.batches.filter(b => b.species === sp && !b.isCreditNote);
+        const avgRate = spBatches.length ? spBatches.reduce((s,b) => s + parseFloat(b.rateCFT||0), 0) / spBatches.length : 0;
+        return '<div style="border-bottom:1px solid var(--rule)">' +
+          '<div onclick="toggleInvSpecies(\'' + spId + '\')" style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 16px;align-items:center;cursor:pointer">' +
+            '<div style="display:flex;align-items:center;gap:6px">' +
+              '<span id="' + spId + '-arr" style="font-size:10px;color:var(--ink3)">▸</span>' +
+              '<span style="font-size:13px;font-weight:600">' + sp + '</span>' +
+            '</div>' +
+            '<div style="text-align:right;font-family:var(--mono);font-size:13px;color:' + (o>0?'var(--wood)':'var(--ink3)') + '">' + (o>0?o.toFixed(2):'—') + '</div>' +
+            '<div style="text-align:right;font-family:var(--mono);font-size:13px;font-weight:700;color:' + (c>0?'var(--wood)':'var(--ink3)') + '">' + (c>0?c.toFixed(2):'—') + '</div>' +
+          '</div>' +
+          // Expandable detail
+          '<div id="' + spId + '" style="display:none;padding:0 16px 10px;font-size:11px;color:var(--ink3)">' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">' +
+              '<div></div><div style="text-align:right;font-size:10px;padding-bottom:4px;color:var(--ink3)">CFT</div><div style="text-align:right;font-size:10px;padding-bottom:4px;color:var(--ink3)">Value (est.)</div>' +
+              '<div style="color:var(--ink3)">Purchased</div>' +
+              '<div style="text-align:right;font-family:var(--mono)">' + cv.purchased.toFixed(2) + '</div>' +
+              '<div style="text-align:right;font-family:var(--mono)">₹' + Math.round(cv.purchased * avgRate).toLocaleString('en-IN') + '</div>' +
+              '<div style="color:var(--ink3)">Dispatched</div>' +
+              '<div style="text-align:right;font-family:var(--mono)">' + cv.dispatched.toFixed(2) + '</div>' +
+              '<div style="text-align:right;font-family:var(--mono)">₹' + Math.round(cv.dispatched * avgRate).toLocaleString('en-IN') + '</div>' +
+              '<div style="font-weight:600;color:var(--ink)">Closing stock</div>' +
+              '<div style="text-align:right;font-family:var(--mono);font-weight:600;color:var(--wood)">' + (c>0?c.toFixed(2):'—') + '</div>' +
+              '<div style="text-align:right;font-family:var(--mono);font-weight:600;color:var(--wood)">' + (c>0?'₹'+Math.round(c*avgRate).toLocaleString('en-IN'):'—') + '</div>' +
+            '</div>' +
+          '</div>' +
         '</div>';
       }).join('') +
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 16px;background:var(--bg3);font-weight:600">' +
-        '<span style="font-size:12px">Total</span>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 16px;background:var(--bg3);font-weight:600;font-size:12px">' +
+        '<span>Total</span>' +
         '<span style="text-align:right;font-family:var(--mono);color:var(--wood)">' + (opening.total>0?opening.total.toFixed(2):'—') + '</span>' +
-        '<span style="text-align:right;font-family:var(--mono);color:var(--wood);font-size:15px">' + closing.total.toFixed(2) + ' CFT</span>' +
+        '<span style="text-align:right;font-family:var(--mono);color:var(--wood);font-size:14px">' + closing.total.toFixed(2) + ' CFT</span>' +
       '</div>';
   }
 
