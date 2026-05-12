@@ -1661,6 +1661,12 @@ async function loadDispatches() {
   }
 }
 
+function monthLabel(ym) {
+  if (!ym || ym.length < 7) return ym;
+  const [y, m] = ym.split('-');
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1] + ' ' + y;
+}
+
 function renderDispatches(dispatches) {
   const wrap = document.getElementById('dispatch-list-wrap');
   const banner = document.getElementById('dispatch-recon-banner');
@@ -2397,11 +2403,6 @@ function toggleInvSpecies(id) {
   if (arr) arr.textContent = open ? '▸' : '▾';
 }
 
-function monthLabel(ym) {
-  if (!ym || ym.length < 7) return ym;
-  const [y, m] = ym.split('-');
-  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1] + ' ' + y;
-}
   document.getElementById('dispatch-month-label').textContent = 'Jan 2026 – ' + thisMonLabel;
 
   const byMonth = {};
