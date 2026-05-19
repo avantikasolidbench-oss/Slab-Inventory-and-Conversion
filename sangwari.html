@@ -825,7 +825,11 @@ select option{background:var(--bg3);color:var(--ink)}
       <div class="field" style="margin-bottom:0"><label>Total Value ₹</label><input type="number" id="edit-dis-value"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-      <div class="field" style="margin-bottom:0"><label>Batch / Invoice No.</label><input type="text" id="edit-dis-invno" placeholder="batch invoice number"></div>
+      <div class="field" style="margin-bottom:0"><label>Batch / Invoice No.</label>
+        <select id="edit-dis-invno" style="background:var(--bg4);border:1px solid var(--rule);color:var(--ink);padding:8px;border-radius:4px;width:100%;font-size:13px">
+          <option value="">— select batch —</option>
+        </select>
+      </div>
       <div class="field" style="margin-bottom:0"><label>Bill CFT <span style="color:var(--ink3);font-size:10px">(as on cover page)</span></label><input type="number" id="edit-dis-billcft" step="0.001" placeholder="e.g. 161.962"></div>
     </div>
     <div class="field"><label>Notes</label><textarea id="edit-dis-notes" style="min-height:40px"></textarea></div>
@@ -1973,6 +1977,13 @@ function editDispatch(dispatchId) {
   document.getElementById('edit-dis-cft').value = d.totalCFT || '';
   document.getElementById('edit-dis-slabs').value = d.slabCount || '';
   document.getElementById('edit-dis-value').value = d.totalValue || '';
+  // Populate batch dropdown
+  const invSel = document.getElementById('edit-dis-invno');
+  invSel.innerHTML = '<option value="">— select batch —</option>' +
+    ST.batches.filter(b => !b.isCreditNote)
+      .sort((a,b) => (b.date||'').localeCompare(a.date||''))
+      .map(b => '<option value="'+b.invoiceNo+'"'+(b.invoiceNo===d.invoiceNo?' selected':'')+'>'+(b.batchName||b.invoiceNo)+' · '+b.species+' · '+b.date+'</option>')
+      .join('');
   document.getElementById('edit-dis-invno').value = d.invoiceNo || '';
   document.getElementById('edit-dis-billcft').value = d.billCFT || '';
   document.getElementById('edit-dis-notes').value = (d.notes||'').replace(/\[Hyd→SB\]|\[markup:\d+\]|\[billCFT:[\d.]+\]|\[reconciled\]/g,'').trim();
